@@ -1,0 +1,86 @@
+services:
+  # PostgreSQL 数据库（使用官方镜像）
+  db:
+    image: postgres:17
+    container_name: sms-filing-db
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sms_filing} -d ${POSTGRES_DB:-sms_filing}"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+    volumes:
+      - postgres-data:/var/lib/postgresql/data/pgdata
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sms_filing@123}
+      POSTGRES_USER: ${POSTGRES_USER:-sms_filing}
+      POSTGRES_DB: ${POSTGRES_DB:-sms_filing}
+    networks:
+      - sms-filing-network
+    ports:
+      - "5432:5432"
+
+  # 后端服务（从私有仓库拉取）
+  backend:
+    image: docker.runyz.com/${DOCKER_IMAGE_BACKEND:-sms-filing-backend}:${TAG:-latest}
+    container_name: sms-filing-backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      FRONTEND_HOST: ${FRONTEND_HOST:-http://localhost:3000}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:3000,http://localhost}
+      SECRET_KEY: ${SECRET_KEY:-changethis-insecure-secret-key}
+      FIRST_SUPERUSER: ${FIRST_SUPERUSER:-admin@example.com}
+      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD:-changethis}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      EMAILS_FROM_EMAIL: ${EMAILS_FROM_EMAIL:-noreply@example.com}
+      POSTGRES_SERVER: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-sms_filing}
+      POSTGRES_USER: ${POSTGRES_USER:-sms_filing}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sms_filing@123}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    networks:
+      - sms-filing-network
+    # 移除端口映射，后端服务只在容器内部网络可访问，通过前端 Nginx 代理访问
+    # ports:
+    #   - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/utils/health-check/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: >
+      sh -c "
+        bash scripts/prestart.sh &&
+        fastapi run --host 0.0.0.0 --port 8000 --workers 4 app/main.py
+      "
+
+  # 前端服务（从私有仓库拉取）
+  frontend:
+    image: docker.runyz.com/${DOCKER_IMAGE_FRONTEND:-sms-filing-frontend}:${TAG:-latest}
+    container_name: sms-filing-frontend
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - sms-filing-network
+    ports:
+      - "30100:3000"
+
+volumes:
+  postgres-data:
+    driver: local
+
+networks:
+  sms-filing-network:
+    driver: bridge

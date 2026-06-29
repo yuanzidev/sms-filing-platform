@@ -1,0 +1,58 @@
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.eggs/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.cache
+
+# Node
+node_modules/
+.npm
+.pnpm-store/
+
+# Build outputs
+frontend/dist/
+frontend/build/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Local config with secrets
+.env.local
+.env.deploy.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Copier
+.copier/
+
+# Local tooling
+/snmpTools/

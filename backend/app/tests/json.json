@@ -1,0 +1,7 @@
+{
+  "ipv6": false,
+  "registry-mirrors": [
+    "https://docker.runyz.com"
+  ],
+  "insecure-registries": ["docker.runyz.com"]
+}
