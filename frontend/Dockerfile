@@ -1,5 +1,5 @@
 # 第一阶段：构建前端应用
-FROM node:20-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /app
 
