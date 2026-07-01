@@ -28,7 +28,7 @@ services:
       context: ./backend
       dockerfile: ${BACKEND_DOCKERFILE:-Dockerfile}
       args:
-        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
     container_name: sms-filing-backend
     restart: always
     depends_on:

@@ -25,13 +25,13 @@ ENV UV_CONCURRENT_DOWNLOADS=2
 ENV UV_NO_CACHE=0
 ENV UV_REQUEST_TIMEOUT=60
 
-# 配置使用国内镜像源，提供多个备选方案
-ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple
+# 配置使用国内镜像源，默认清华源，阿里云作备用
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 ENV UV_INDEX_URL=${PIP_INDEX_URL}
 ENV PIP_INDEX_URL=${PIP_INDEX_URL}
 
 # 备选镜像源配置
-ENV UV_EXTRA_INDEX_URL="https://pypi.doubanio.com/simple/"
+ENV UV_EXTRA_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/"
 
 # 创建虚拟环境并安装依赖
 RUN --mount=type=cache,target=/root/.cache/uv \
