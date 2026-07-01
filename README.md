@@ -79,6 +79,66 @@ open http://localhost:30100
 ./scripts/build.sh
 ```
 
+## 部署到生产服务器
+
+项目提供 **本地 SSH 一键部署** 闭环(基于阿里云 ACR 中转镜像),覆盖初次部署与后续代码更新发布两个场景。
+
+### 一次性准备
+
+1. **本地依赖**:
+   - Docker / Docker Compose
+   - 能 `ssh sms` 连到服务器的 SSH 配置(`~/.ssh/config` 中定义 `Host sms`)
+
+2. **服务器侧**:
+   - Docker / Docker Compose 已安装
+   - 已登录阿里云 ACR(只需一次):
+     ```bash
+     ssh sms
+     docker login crpi-nnm7kvwebfzqh8so.cn-hangzhou.personal.cr.aliyuncs.com/feixinyun
+     ```
+
+3. **本地配置**:
+   - `.env.deploy`:生产环境变量(DOMAIN、SECRET_KEY、POSTGRES_PASSWORD 等),从 `.env.deploy.local`(本地验证用)派生
+   - `docker-compose-deploy.yml`:部署用的 compose 描述(由 deploy.sh 自动同步到服务器)
+
+### 发布流程(每次代码更新)
+
+```bash
+# 1. 构建 amd64 镜像 + 本地验证 + 推送到 ACR(打 latest 与 git short sha 两个 tag)
+./scripts/build.sh
+
+# 2. SSH 到服务器:同步 compose/env、拉镜像、滚动重启、健康检查
+./scripts/deploy.sh
+```
+
+`deploy.sh` 默认部署当前 git short sha 版本,可通过 `IMAGE_TAG` 覆盖:
+
+```bash
+IMAGE_TAG=<某个历史tag> ./scripts/deploy.sh   # 回滚到指定版本
+SSH_HOST=other-host ./scripts/deploy.sh       # 部署到其他服务器
+```
+
+### 部署目录约定
+
+服务器侧目录:`/opt/sms-filing-platform/`,与已有项目(如 `/opt/sms/`)完全隔离,使用独立的 docker network `sms-filing-network` 与 volume `postgres-data`,不影响服务器上其他项目。
+
+### 健康检查
+
+`deploy.sh` 会轮询 `http://<server>:30100/api/v1/utils/health-check/`,收到 HTTP 200 才算成功;失败时会打印 `docker compose ps` 与最近日志便于定位。
+
+### 常用运维命令
+
+```bash
+# 查看日志
+ssh sms 'cd /opt/sms-filing-platform && docker compose -f docker-compose-deploy.yml logs -f'
+
+# 重启服务
+ssh sms 'cd /opt/sms-filing-platform && docker compose -f docker-compose-deploy.yml restart'
+
+# 进入容器
+ssh sms 'docker exec -it sms-filing-backend bash'
+```
+
 ## 环境变量
 
 关键变量(详见各 `.env` 文件):

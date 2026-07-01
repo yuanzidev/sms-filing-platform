@@ -128,7 +128,9 @@ push_image() {
     local service_name=$1
     local image_name=$2
     local tag=${TAG:-latest}
-    local local_full="${LOCAL_IMAGE_PREFIX}-${image_name}:${tag}"
+    # 本地镜像名:docker compose build 生成 <project>-<service>:tag
+    # 远程镜像名:${PRIVATE_REGISTRY}/${image_name}:tag
+    local local_full="${LOCAL_IMAGE_PREFIX}-${service_name}:${tag}"
     local push_log
 
     # 推送 tag 列表:latest + 版本 tag(若与 latest 不同)

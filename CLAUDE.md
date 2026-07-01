@@ -137,7 +137,7 @@ POSTGRES_DB=sms_filing
 
 # 安全
 SECRET_KEY=changethis-insecure-secret-key  # 生产环境必改
-FIRST_SUPERUSER=admin@sms-filing.local
+FIRST_SUPERUSER=admin@sms-filing.example.com
 FIRST_SUPERUSER_PASSWORD=changethis
 ```
 
