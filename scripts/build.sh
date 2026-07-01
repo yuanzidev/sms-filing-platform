@@ -25,8 +25,15 @@ COMPOSE_FILE="docker-compose.yml"
 ENV_FILE_LOCAL=".env.deploy.local"   # 本地测试环境
 ENV_FILE_PROD=".env.deploy"          # 生产环境
 
-# 私有仓库配置
-PRIVATE_REGISTRY="docker.runyz.com"
+# 私有仓库配置 (阿里云 ACR 华东1 个人版)
+PRIVATE_REGISTRY="crpi-nnm7kvwebfzqh8so.cn-hangzhou.personal.cr.aliyuncs.com/feixinyun"
+
+# 本地 compose 项目前缀(docker compose build 产生的镜像名为 <前缀>-<service>)
+LOCAL_IMAGE_PREFIX="${COMPOSE_PROJECT_NAME:-sms-filing-platform}"
+
+# 版本 tag:默认使用 git short sha,可通过 IMAGE_TAG 环境变量覆盖
+# 推送时除 latest 外,会同时推送这个版本 tag,便于回滚
+VERSION_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD 2>/dev/null || echo unknown)}"
 
 # 打印函数
 print_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
@@ -116,58 +123,70 @@ validate_images() {
     print_success "镜像验证通过"
 }
 
-# 推送单个镜像
+# 推送单个镜像(latest + 版本 tag)
 push_image() {
     local service_name=$1
     local image_name=$2
     local tag=${TAG:-latest}
-    local full_image_name="${image_name}:${tag}"
-    local registry_image="${PRIVATE_REGISTRY}/${image_name}:${tag}"
+    local local_full="${LOCAL_IMAGE_PREFIX}-${image_name}:${tag}"
     local push_log
 
-    print_info "推送镜像: $service_name ($full_image_name -> $registry_image)"
+    # 推送 tag 列表:latest + 版本 tag(若与 latest 不同)
+    local tags_to_push=("$tag")
+    if [ -n "$VERSION_TAG" ] && [ "$VERSION_TAG" != "$tag" ]; then
+        tags_to_push+=("$VERSION_TAG")
+    fi
+
+    print_info "推送镜像: $service_name ($local_full -> ${PRIVATE_REGISTRY}/${image_name}:{${tags_to_push[*]}})"
 
     # 检查本地镜像是否存在
-    if ! docker image inspect "$full_image_name" &> /dev/null; then
-        print_error "镜像 $full_image_name 不存在"
+    if ! docker image inspect "$local_full" &> /dev/null; then
+        print_error "镜像 $local_full 不存在"
         return 1
     fi
 
-    # 打标签并推送
-    if ! docker tag "$full_image_name" "$registry_image"; then
-        print_error "镜像 $full_image_name 打标签失败"
-        return 1
-    fi
+    local remote_tag registry_image push_status
+    for remote_tag in "${tags_to_push[@]}"; do
+        registry_image="${PRIVATE_REGISTRY}/${image_name}:${remote_tag}"
 
-    push_log="$(mktemp -t sms-filing-push-${service_name}.XXXXXX)"
-    set +e
-    docker push "$registry_image" 2>&1 | tee "$push_log"
-    local push_status=${PIPESTATUS[0]}
-    set -e
-
-    if [ $push_status -ne 0 ]; then
-        print_error "  $service_name 推送失败"
-        if grep -q "413 Request Entity Too Large" "$push_log"; then
-            print_error "  发现 413 错误：仓库限制上传大小，请调整仓库侧 client_max_body_size"
-        elif grep -q "dial tcp: lookup" "$push_log"; then
-            print_error "  发现 DNS 解析失败：请检查构建机 DNS 或网络连通性"
+        # 打标签
+        if ! docker tag "$local_full" "$registry_image"; then
+            print_error "镜像 $local_full 打标签 ${registry_image} 失败"
+            return 1
         fi
-        print_error "  推送日志（最近 30 行）："
-        tail -n 30 "$push_log" || true
-        rm -f "$push_log"
-        return 1
-    fi
 
-    if grep -q "413 Request Entity Too Large" "$push_log"; then
-        print_error "  检测到 413 错误：仓库限制上传大小"
-        print_error "  推送日志（最近 30 行）："
-        tail -n 30 "$push_log" || true
-        rm -f "$push_log"
-        return 1
-    fi
+        # 推送
+        push_log="$(mktemp -t sms-filing-push-${service_name}.XXXXXX)"
+        set +e
+        docker push "$registry_image" 2>&1 | tee "$push_log"
+        push_status=${PIPESTATUS[0]}
+        set -e
 
-    rm -f "$push_log"
-    print_success "  $service_name 推送成功"
+        if [ $push_status -ne 0 ]; then
+            print_error "  $service_name:$remote_tag 推送失败"
+            if grep -q "413 Request Entity Too Large" "$push_log"; then
+                print_error "  发现 413 错误：仓库限制上传大小，请调整仓库侧 client_max_body_size"
+            elif grep -q "dial tcp: lookup" "$push_log"; then
+                print_error "  发现 DNS 解析失败：请检查构建机 DNS 或网络连通性"
+            fi
+            print_error "  推送日志（最近 30 行）："
+            tail -n 30 "$push_log" || true
+            rm -f "$push_log"
+            return 1
+        fi
+
+        if grep -q "413 Request Entity Too Large" "$push_log"; then
+            print_error "  检测到 413 错误：仓库限制上传大小"
+            print_error "  推送日志（最近 30 行）："
+            tail -n 30 "$push_log" || true
+            rm -f "$push_log"
+            return 1
+        fi
+
+        rm -f "$push_log"
+    done
+
+    print_success "  $service_name 推送成功 (tags: ${tags_to_push[*]})"
 }
 
 # 推送所有镜像
@@ -208,6 +227,12 @@ show_access_info() {
     print_info "已推送的镜像:"
     echo -e "  ${GREEN}• ${PRIVATE_REGISTRY}/${DOCKER_IMAGE_BACKEND:-sms-filing-backend}:${tag}${NC}"
     echo -e "  ${GREEN}• ${PRIVATE_REGISTRY}/${DOCKER_IMAGE_FRONTEND:-sms-filing-frontend}:${tag}${NC}"
+    if [ -n "$VERSION_TAG" ] && [ "$VERSION_TAG" != "$tag" ]; then
+        echo
+        print_info "版本 tag (便于回滚):"
+        echo -e "  ${GREEN}• ${PRIVATE_REGISTRY}/${DOCKER_IMAGE_BACKEND:-sms-filing-backend}:${VERSION_TAG}${NC}"
+        echo -e "  ${GREEN}• ${PRIVATE_REGISTRY}/${DOCKER_IMAGE_FRONTEND:-sms-filing-frontend}:${VERSION_TAG}${NC}"
+    fi
     echo
 }
 

@@ -24,7 +24,7 @@ services:
 
   # 后端服务（从私有仓库拉取）
   backend:
-    image: docker.runyz.com/${DOCKER_IMAGE_BACKEND:-sms-filing-backend}:${TAG:-latest}
+    image: crpi-nnm7kvwebfzqh8so.cn-hangzhou.personal.cr.aliyuncs.com/feixinyun/${DOCKER_IMAGE_BACKEND:-sms-filing-backend}:${TAG:-latest}
     container_name: sms-filing-backend
     restart: always
     depends_on:
@@ -66,7 +66,7 @@ services:
 
   # 前端服务（从私有仓库拉取）
   frontend:
-    image: docker.runyz.com/${DOCKER_IMAGE_FRONTEND:-sms-filing-frontend}:${TAG:-latest}
+    image: crpi-nnm7kvwebfzqh8so.cn-hangzhou.personal.cr.aliyuncs.com/feixinyun/${DOCKER_IMAGE_FRONTEND:-sms-filing-frontend}:${TAG:-latest}
     container_name: sms-filing-frontend
     restart: always
     depends_on:
