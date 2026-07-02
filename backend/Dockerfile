@@ -1,4 +1,4 @@
-FROM docker.m.daocloud.io/library/python:3.12
+FROM docker.m.daocloud.io/library/python:3.14
 
 ENV PYTHONUNBUFFERED=1
 
