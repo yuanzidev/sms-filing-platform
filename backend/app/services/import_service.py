@@ -135,8 +135,7 @@ def confirm_import(
     success_count = 0
     errors: list[dict] = []
 
-    from app.models import FilingRecord, FileAttachmentCreate, PortInfo, QualificationInfo
-    from app.crud.file_attachment import create_file_attachment
+    from app.models import FileAttachment, FilingRecord, PortInfo, QualificationInfo
 
     rows = list(ws.iter_rows(min_row=2, values_only=True))
     batch_size = 200
@@ -199,7 +198,7 @@ def confirm_import(
                     key = f"images/{date.today().isoformat()}/{uuid.uuid4().hex}{ext}"
                     storage.upload(key, img_data, "image/png")
 
-                    fa = FileAttachmentCreate(
+                    attachment = FileAttachment(
                         original_name=f"cell_{row_idx}_{img_col}{ext}",
                         stored_path=key,
                         file_size=len(img_data),
@@ -207,12 +206,14 @@ def confirm_import(
                         md5_hash=md5_hash,
                         entity_type="port_info",
                         entity_id=pi.id,
+                        uploader_id=operator_id,
                     )
-                    create_file_attachment(session=session, create=fa, uploader_id=operator_id)
+                    session.add(attachment)
 
                 success_count += 1
 
             except Exception as e:
+                session.rollback()
                 errors.append({"row": row_idx, "message": str(e)})
 
         session.commit()
