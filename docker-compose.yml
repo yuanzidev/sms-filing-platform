@@ -85,8 +85,27 @@ services:
     ports:
       - "30100:3000"
 
+  # MinIO 对象存储
+  minio:
+    image: minio/minio
+    container_name: sms-filing-minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-sms_filing}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-changethis}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - sms-filing-network
+
 volumes:
   postgres-data:
+    driver: local
+  minio-data:
     driver: local
 
 networks:
