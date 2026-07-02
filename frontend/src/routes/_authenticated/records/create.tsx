@@ -1,20 +1,15 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { RecordForm, type RecordFormValues } from '@/features/records/components/record-form/record-form'
-import { useCreateRecord } from '@/hooks/use-records'
+import { createRecord } from '@/lib/mock/store'
 
 function CreateRecordPage() {
   const navigate = useNavigate()
-  const createRecord = useCreateRecord()
 
   async function handleSubmit(values: RecordFormValues) {
-    try {
-      const record = await createRecord.mutateAsync(values)
-      toast.success('报备记录创建成功')
-      navigate({ to: '/records/$recordId/detail', params: { recordId: record.id } })
-    } catch {
-      toast.error('创建失败，请重试')
-    }
+    const record = createRecord(values as unknown as Record<string, unknown>)
+    toast.success('报备记录创建成功')
+    navigate({ to: '/records/$recordId/detail', params: { recordId: record.id } })
   }
 
   return (

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { getMainPorts } from '@/lib/mock/store'
 import type { MainPort } from '@/lib/mock/data/ports'
-import { useMainPorts } from '@/hooks/use-ports'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { SearchForm, type SearchField } from '@/components/shared/search-form'
 import { StatusTag } from '@/components/shared/status-tag'
@@ -26,57 +26,40 @@ const searchFields: SearchField[] = [
   { name: 'province', label: '省份', type: 'text' },
 ]
 
-interface MainPortRow {
-  id: string
-  port_number: string
-  carrier: string
-  port_range: string
-  province: string
-  city: string
-  port_type: string
-  status: string
-  sub_port_count: number
-  created_at: string
-}
-
-const columns: ColumnDef<MainPortRow>[] = [
-  { accessorKey: 'port_number', header: '端口号' },
-  { accessorKey: 'carrier', header: '运营商' },
-  { accessorKey: 'port_range', header: '端口范围' },
-  { accessorKey: 'province', header: '省份' },
-  { accessorKey: 'city', header: '城市' },
-  { accessorKey: 'port_type', header: '端口类型' },
-  {
-    accessorKey: 'status',
-    header: '状态',
-    cell: ({ getValue }) => <StatusTag status={getValue() as string} />,
-  },
-  { accessorKey: 'sub_port_count', header: '子端口数' },
-  {
-    id: 'actions',
-    header: '操作',
-    cell: ({ row }) => {
-      const navigate = useNavigate()
-      return (
-        <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/ports/main/$portId/detail', params: { portId: row.original.id } })}>
-          <Eye className="mr-1 h-4 w-4" />查看
-        </Button>
-      )
-    },
-  },
-]
-
 export function MainPortListPage() {
   const [filters, setFilters] = useState<Record<string, string>>({})
   const [page, setPage] = useState(1)
   const pageSize = 10
 
-  const { data, isLoading, error } = useMainPorts({ ...filters, page, pageSize })
+  const { data, total } = getMainPorts(filters, page, pageSize)
 
-  const rows = useMemo(() => (data?.data ?? []) as MainPortRow[], [data])
-  const total = data?.total ?? 0
-
-  if (error) return <div className="p-6 text-muted-foreground">加载失败：{error.message}</div>
+  const columns: ColumnDef<MainPort>[] = useMemo(() => [
+    { accessorKey: 'port_number', header: '端口号' },
+    { accessorKey: 'carrier', header: '运营商' },
+    { accessorKey: 'port_range', header: '端口范围' },
+    { accessorKey: 'province', header: '省份' },
+    { accessorKey: 'city', header: '城市' },
+    { accessorKey: 'port_type', header: '端口类型' },
+    {
+      accessorKey: 'status',
+      header: '状态',
+      cell: ({ getValue }) => <StatusTag status={getValue() as string} />,
+    },
+    { accessorKey: 'sub_port_count', header: '子端口数' },
+    { accessorKey: 'created_at', header: '创建时间' },
+    {
+      id: 'actions',
+      header: '操作',
+      cell: ({ row }) => {
+        const navigate = useNavigate()
+        return (
+          <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/ports/main/$portId/detail', params: { portId: row.original.id } })}>
+            <Eye className="mr-1 h-4 w-4" />查看
+          </Button>
+        )
+      },
+    },
+  ], [])
 
   return (
     <div className="space-y-4 p-6">
@@ -84,8 +67,7 @@ export function MainPortListPage() {
       <SearchForm fields={searchFields} onSearch={(f) => { setFilters(f); setPage(1) }} />
       <DataTable
         columns={columns}
-        data={rows}
-        loading={isLoading}
+        data={data}
         page={page}
         pageSize={pageSize}
         total={total}

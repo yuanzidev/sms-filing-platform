@@ -1,19 +1,15 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { RecordDetail } from '@/features/records/components/record-detail/record-detail'
-import { useRecord } from '@/hooks/use-records'
+import { getRecord } from '@/lib/mock/store'
 import { Pencil } from 'lucide-react'
 
 function RecordDetailPage() {
   const { recordId } = Route.useParams()
-  const { data: record, isLoading, error } = useRecord(recordId)
+  const record = getRecord(recordId)
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center p-12 text-muted-foreground">加载中...</div>
-  }
-
-  if (error || !record) {
-    return <div className="flex items-center justify-center p-12 text-muted-foreground">加载失败：{error?.message ?? '记录不存在'}</div>
+  if (!record) {
+    return <div className="flex items-center justify-center p-12 text-muted-foreground">记录不存在</div>
   }
 
   return (

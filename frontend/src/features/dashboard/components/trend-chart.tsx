@@ -1,4 +1,5 @@
-import { useDashboardTrends } from '@/hooks/use-dashboard'
+import { useMemo } from 'react'
+import { generateTrendData } from '@/lib/mock/data/dashboard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   BarChart,
@@ -11,52 +12,7 @@ import {
 } from 'recharts'
 
 export function TrendChart() {
-  const { data, isLoading, isError } = useDashboardTrends(30)
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">近30日报备趋势</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-            加载中...
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (isError || !data) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">近30日报备趋势</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex h-[300px] items-center justify-center text-sm text-red-500">
-            加载趋势数据失败，请稍后重试。
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (data.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">近30日报备趋势</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-            暂无数据
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
+  const data = useMemo(() => generateTrendData(30), [])
 
   return (
     <Card>

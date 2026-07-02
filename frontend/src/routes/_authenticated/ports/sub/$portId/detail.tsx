@@ -1,17 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { SubPortDetail } from '@/features/ports/sub/components/sub-port-detail'
-import { useSubPort } from '@/hooks/use-ports'
+import { getSubPort } from '@/lib/mock/store'
 
 function SubPortDetailPage() {
   const { portId } = Route.useParams()
-  const { data: port, isLoading, error } = useSubPort(portId)
+  const port = getSubPort(portId)
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center p-12 text-muted-foreground">加载中...</div>
-  }
-
-  if (error || !port) {
-    return <div className="flex items-center justify-center p-12 text-muted-foreground">加载失败：{error?.message ?? '子端口不存在'}</div>
+  if (!port) {
+    return <div className="flex items-center justify-center p-12 text-muted-foreground">子端口不存在</div>
   }
 
   return (

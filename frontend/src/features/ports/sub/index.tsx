@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { getSubPorts } from '@/lib/mock/store'
 import type { SubPort } from '@/lib/mock/data/ports'
-import { useSubPorts } from '@/hooks/use-ports'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { SearchForm, type SearchField } from '@/components/shared/search-form'
 import { StatusTag } from '@/components/shared/status-tag'
@@ -26,20 +26,7 @@ const searchFields: SearchField[] = [
   { name: 'enterprise_name', label: '企业名称', type: 'text' },
 ]
 
-interface SubPortRow {
-  id: string
-  port_number: string
-  carrier: string
-  main_port_number: string
-  enterprise_name: string
-  sms_signature: string
-  business_type: string
-  status: string
-  record_number: string | null
-  updated_at: string
-}
-
-const columns: ColumnDef<SubPortRow>[] = [
+const columns: ColumnDef<SubPort>[] = [
   { accessorKey: 'port_number', header: '端口号' },
   { accessorKey: 'carrier', header: '运营商' },
   { accessorKey: 'main_port_number', header: '所属主端口' },
@@ -70,12 +57,7 @@ export function SubPortListPage() {
   const [page, setPage] = useState(1)
   const pageSize = 10
 
-  const { data, isLoading, error } = useSubPorts({ ...filters, page, pageSize })
-
-  const rows = useMemo(() => (data?.data ?? []) as SubPortRow[], [data])
-  const total = data?.total ?? 0
-
-  if (error) return <div className="p-6 text-muted-foreground">加载失败：{error.message}</div>
+  const { data, total } = getSubPorts(filters, page, pageSize)
 
   return (
     <div className="space-y-4 p-6">
@@ -83,8 +65,7 @@ export function SubPortListPage() {
       <SearchForm fields={searchFields} onSearch={(f) => { setFilters(f); setPage(1) }} />
       <DataTable
         columns={columns}
-        data={rows}
-        loading={isLoading}
+        data={data as SubPort[]}
         page={page}
         pageSize={pageSize}
         total={total}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
-import { useRecords, useDeleteRecord } from '@/hooks/use-records'
+import { getRecords, deleteRecord } from '@/lib/mock/store'
 import { RecordSearchForm } from '@/features/records/components/record-search-form'
 import { RecordsTable } from '@/features/records/components/records-table'
 import {
@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import type { RecordFilters } from '@/lib/api/records'
+import type { FilingRecord } from '@/lib/mock/data/records'
 
 const PAGE_SIZE = 10
 
@@ -23,9 +23,7 @@ export function RecordListPage() {
   const [filters, setFilters] = useState<Record<string, string>>({})
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  const queryFilters: RecordFilters = { ...filters, page, pageSize: PAGE_SIZE }
-  const { data: result, isLoading, isError, error } = useRecords(queryFilters)
-  const deleteMutation = useDeleteRecord()
+  const { data, total } = getRecords(filters, page, PAGE_SIZE)
 
   const handleSearch = (values: Record<string, string>) => {
     setFilters(values)
@@ -37,17 +35,11 @@ export function RecordListPage() {
     setPage(1)
   }
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = () => {
     if (!deleteId) return
-    try {
-      await deleteMutation.mutateAsync(deleteId)
-    } finally {
-      setDeleteId(null)
-    }
+    deleteRecord(deleteId)
+    setDeleteId(null)
   }
-
-  const data = result?.data ?? []
-  const total = result?.total ?? 0
 
   return (
     <div className="space-y-4 p-6">
@@ -56,21 +48,14 @@ export function RecordListPage() {
       <RecordSearchForm onSearch={handleSearch} onReset={handleReset} />
 
       <div className="flex items-center justify-between">
-        <div>
-          {isLoading && <span className="text-sm text-muted-foreground">加载中...</span>}
-          {isError && (
-            <span className="text-sm text-destructive">
-              加载失败：{(error as Error)?.message ?? '未知错误'}
-            </span>
-          )}
-        </div>
+        <div />
         <Button asChild>
           <Link to="/records/create">新建报备</Link>
         </Button>
       </div>
 
       <RecordsTable
-        data={data}
+        data={data as FilingRecord[]}
         page={page}
         pageSize={PAGE_SIZE}
         total={total}
@@ -89,7 +74,7 @@ export function RecordListPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteConfirm}>
-              {deleteMutation.isPending ? '删除中...' : '删除'}
+              删除
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

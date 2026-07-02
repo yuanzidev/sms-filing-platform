@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import type { ApiDataItem } from '@/lib/mock/data/api-data'
-import { useApiData } from '@/hooks/use-api-data'
+import { getApiData } from '@/lib/mock/store'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { SearchForm, type SearchField } from '@/components/shared/search-form'
 import { StatusTag } from '@/components/shared/status-tag'
@@ -62,10 +62,8 @@ export function ApiDataListPage() {
   const [rawDialog, setRawDialog] = useState<{ open: boolean; item?: ApiDataRow }>({ open: false })
   const pageSize = 10
 
-  const { data, isLoading, error } = useApiData({ ...filters, page, pageSize })
-
-  const rows = useMemo(() => (data?.data ?? []) as ApiDataRow[], [data])
-  const total = data?.total ?? 0
+  const { data, total } = getApiData(filters, page, pageSize)
+  const rows = data as ApiDataRow[]
 
   const columns: ColumnDef<ApiDataRow>[] = useMemo(() => [
     { accessorKey: 'import_time', header: '导入时间' },
@@ -98,8 +96,6 @@ export function ApiDataListPage() {
       ),
     },
   ], [])
-
-  if (error) return <div className="p-6 text-muted-foreground">加载失败：{error.message}</div>
 
   return (
     <div className="space-y-4 p-6">
