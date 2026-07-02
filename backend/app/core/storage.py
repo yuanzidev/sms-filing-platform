@@ -1,12 +1,10 @@
 """Storage backend abstraction with local and MinIO implementations."""
-import io
-import os
-import uuid
 from abc import ABC, abstractmethod
 from pathlib import Path
 
 import boto3
 from botocore.config import Config as BotoConfig
+from botocore.exceptions import ClientError
 
 from app.core.config import settings
 
@@ -84,7 +82,7 @@ class MinioStorage(StorageBackend):
     def _ensure_bucket(self) -> None:
         try:
             self.client.head_bucket(Bucket=self.bucket)
-        except Exception:
+        except ClientError:
             self.client.create_bucket(Bucket=self.bucket)
 
     def upload(self, key: str, data: bytes, content_type: str) -> str:
@@ -111,8 +109,15 @@ class MinioStorage(StorageBackend):
         self.client.delete_object(Bucket=self.bucket, Key=key)
 
 
+_storage: StorageBackend | None = None
+
+
 def get_storage() -> StorageBackend:
-    """Factory: return the configured storage backend."""
-    if settings.STORAGE_BACKEND == "minio":
-        return MinioStorage()
-    return LocalFileStorage()
+    """Factory: return the configured storage backend (cached singleton)."""
+    global _storage
+    if _storage is None:
+        if settings.STORAGE_BACKEND == "minio":
+            _storage = MinioStorage()
+        else:
+            _storage = LocalFileStorage()
+    return _storage
