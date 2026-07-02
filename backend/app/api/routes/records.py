@@ -3,7 +3,7 @@ import io
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlmodel import SQLModel
 
@@ -106,6 +106,11 @@ class ExportRequest(SQLModel):
     business_type: str | None = None
 
 
+class ImportConfirmRequest(SQLModel):
+    file_token: str
+    field_mapping: dict[str, str]  # {col_index: field_name}
+
+
 @router.post("/export")
 def export_records(*, session: SessionDep, body: ExportRequest) -> Any:
     """Export filing records as Excel based on export group config."""
@@ -133,6 +138,38 @@ def export_records(*, session: SessionDep, body: ExportRequest) -> Any:
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/import/upload")
+def import_upload(
+    *, session: SessionDep, current_user: CurrentUser, file: UploadFile = File(...)
+) -> Any:
+    """Upload Excel file for preview before import."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
+
+    content = file.file.read()
+    if len(content) > settings.MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="File exceeds 50MB limit")
+
+    from app.services.import_service import parse_excel_preview
+    result = parse_excel_preview(content, file.filename)
+    return result
+
+
+@router.post("/import/confirm")
+def import_confirm(
+    *, session: SessionDep, current_user: CurrentUser, body: ImportConfirmRequest
+) -> Any:
+    """Confirm import with field mapping. Writes data to database."""
+    from app.services.import_service import confirm_import
+    result = confirm_import(
+        session=session,
+        file_token=body.file_token,
+        field_mapping=body.field_mapping,
+        operator_id=current_user.id,
+    )
+    return result
 
 
 @router.delete("/{id}")
