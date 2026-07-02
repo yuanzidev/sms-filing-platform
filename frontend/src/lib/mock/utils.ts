@@ -45,6 +45,7 @@ export function sortByField<T>(
   return [...items].sort((a, b) => {
     const av = a[field]
     const bv = b[field]
+    if (av == null && bv == null) return 0
     if (av == null) return 1
     if (bv == null) return -1
     if (av < bv) return order === 'asc' ? -1 : 1
