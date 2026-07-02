@@ -6,7 +6,7 @@ import type { ApiDataItem } from '../mock/data/api-data'
  */
 export interface ApiDataFilters {
   page?: number
-  pageSize?: number
+  page_size?: number
   api_name?: string
   data_type?: string
   enterprise_name?: string
@@ -21,7 +21,7 @@ export interface ApiDataResponse {
   data: ApiDataItem[]
   total: number
   page: number
-  pageSize: number
+  page_size: number
 }
 
 /**
