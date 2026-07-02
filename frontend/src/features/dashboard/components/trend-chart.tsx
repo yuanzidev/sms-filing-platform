@@ -27,7 +27,10 @@ export function TrendChart() {
               <XAxis
                 dataKey="date"
                 tick={{ fontSize: 12 }}
-                tickFormatter={(val: string) => val.slice(5)}
+                tickFormatter={(val: string | number) => {
+                  const str = String(val)
+                  return str.length >= 7 ? str.slice(5) : str
+                }}
                 className="text-muted-foreground"
               />
               <YAxis

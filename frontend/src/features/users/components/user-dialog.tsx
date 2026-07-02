@@ -29,8 +29,10 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { createUser, updateUser, type User } from '@/lib/api/users'
-import { getRoles, type Role } from '@/lib/api/roles'
+import { createUser, updateUser } from '@/lib/mock/store'
+import { getRoles } from '@/lib/mock/store'
+import type { User } from '@/lib/api/users'
+import type { Role } from '@/lib/api/roles'
 
 /**
  * 用户表单验证模式
@@ -80,55 +82,35 @@ export function UserDialog({ open, onOpenChange, user, onSuccess }: UserDialogPr
         },
     })
 
-    const loadRoles = async () => {
-        /**
-         * 目的: 获取可用角色列表, 用于填充下拉选项
-         * :return Promise<void>
-         */
-        try {
-            const response = await getRoles()
-            setRoles(response.data)
-        } catch (error) {
-            console.error('加载角色失败:', error)
-        }
+    const loadRoles = () => {
+        const response = getRoles()
+        setRoles(response.data)
     }
 
-    const onSubmit = async (data: UserFormData) => {
-        /**
-         * 目的: 处理用户创建/更新提交
-         * :param data 表单数据
-         * :return Promise<void>
-         */
+    const onSubmit = (data: UserFormData) => {
         setLoading(true)
-        try {
-            // 将空的 role_id 转换为 undefined，这样不会发送该字段
-            const submitData = {
-                ...data,
-                role_id: data.role_id || undefined,
-            }
 
-            if (user) {
-                // 编辑用户
-                await updateUser(user.id, submitData)
-                toast.success('用户更新成功')
-            } else {
-                // 创建用户
-                if (!data.password) {
-                    toast.error('创建用户时必须设置密码')
-                    setLoading(false)
-                    return
-                }
-                await createUser(submitData as any)
-                toast.success('用户创建成功')
-            }
-            onSuccess()
-            onOpenChange(false)
-            form.reset()
-        } catch (error: any) {
-            toast.error(error.response?.data?.detail || '操作失败')
-        } finally {
-            setLoading(false)
+        const submitData = {
+            ...data,
+            role_id: data.role_id || undefined,
         }
+
+        if (user) {
+            updateUser(user.id, submitData)
+            toast.success('用户更新成功')
+        } else {
+            if (!data.password) {
+                toast.error('创建用户时必须设置密码')
+                setLoading(false)
+                return
+            }
+            createUser(submitData as Record<string, unknown>)
+            toast.success('用户创建成功')
+        }
+        onSuccess()
+        onOpenChange(false)
+        form.reset()
+        setLoading(false)
     }
 
     useEffect(() => {

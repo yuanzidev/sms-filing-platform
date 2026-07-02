@@ -1,0 +1,68 @@
+import type { LoginLog } from '@/lib/api/login-logs'
+
+export const mockLoginLogs: LoginLog[] = [
+  {
+    id: 'log-0001',
+    username: 'admin',
+    status: 'success',
+    ip_address: '192.168.1.100',
+    user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/126.0.0.0',
+    login_time: '2026-07-02T08:00:00',
+  },
+  {
+    id: 'log-0002',
+    username: 'zhangsan',
+    status: 'success',
+    ip_address: '192.168.1.101',
+    user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edge/126.0.0.0',
+    login_time: '2026-07-02T08:30:00',
+  },
+  {
+    id: 'log-0003',
+    username: 'lisi',
+    status: 'success',
+    ip_address: '10.0.0.55',
+    user_agent: 'Mozilla/5.0 (X11; Linux x86_64) Firefox/128.0',
+    login_time: '2026-07-01T16:45:00',
+  },
+  {
+    id: 'log-0004',
+    username: 'unknown',
+    status: 'failed',
+    ip_address: '172.16.0.88',
+    user_agent: 'python-requests/2.31.0',
+    login_time: '2026-07-01T15:20:00',
+  },
+  {
+    id: 'log-0005',
+    username: 'admin',
+    status: 'success',
+    ip_address: '192.168.1.100',
+    user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/126.0.0.0',
+    login_time: '2026-07-01T09:15:00',
+  },
+  {
+    id: 'log-0006',
+    username: 'wangwu',
+    status: 'failed',
+    ip_address: '192.168.2.50',
+    user_agent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1) Mobile/15E148',
+    login_time: '2026-06-30T22:10:00',
+  },
+  {
+    id: 'log-0007',
+    username: 'zhangsan',
+    status: 'success',
+    ip_address: '192.168.1.101',
+    user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edge/126.0.0.0',
+    login_time: '2026-06-30T14:00:00',
+  },
+  {
+    id: 'log-0008',
+    username: 'admin',
+    status: 'success',
+    ip_address: '192.168.1.100',
+    user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/125.0.0.0',
+    login_time: '2026-06-30T08:00:00',
+  },
+]

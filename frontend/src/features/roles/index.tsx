@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Plus, RefreshCw, Edit, Trash2, Users } from 'lucide-react'
 import { toast } from 'sonner'
-import { getRoles, deleteRole, type Role } from '@/lib/api/roles'
+import { getRoles, deleteRole } from '@/lib/mock/store'
+import type { Role } from '@/lib/api/roles'
 import { RoleDialog } from './components/role-dialog'
 import {
     AlertDialog,
@@ -37,32 +38,22 @@ export function RolesPage() {
     /**
      * 加载角色列表
      */
-    const loadRoles = async () => {
+    const loadRoles = () => {
         setLoading(true)
-        try {
-            const response = await getRoles()
-            setRoles(response.data)
-        } catch (error: any) {
-            toast.error('加载角色列表失败')
-            console.error('加载角色失败:', error)
-        } finally {
-            setLoading(false)
-        }
+        const response = getRoles()
+        setRoles(response.data)
+        setLoading(false)
     }
 
     /**
      * 删除角色
      */
-    const handleDeleteRole = async (role: Role) => {
-        try {
-            await deleteRole(role.id)
-            toast.success('角色删除成功')
-            loadRoles()
-            setDeleteDialogOpen(false)
-            setRoleToDelete(undefined)
-        } catch (error: any) {
-            toast.error(error.response?.data?.detail || '删除角色失败')
-        }
+    const handleDeleteRole = (role: Role) => {
+        deleteRole(role.id)
+        toast.success('角色删除成功')
+        loadRoles()
+        setDeleteDialogOpen(false)
+        setRoleToDelete(undefined)
     }
 
     /**

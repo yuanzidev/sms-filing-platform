@@ -1,17 +1,36 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/authStore'
 import { LoginService, UsersService, type LoginAccessTokenData, type UserRegister, type UserPublic, type ApiError } from '@/lib/auth'
 import { handleError } from '@/utils/handle-error'
 import api from '@/lib/api'
 
+const DEMO_TOKEN = 'demo-static-token-for-display'
+
+const isDemoMode = (): boolean => {
+    return localStorage.getItem('access_token') === DEMO_TOKEN
+}
+
+const demoUser: UserPublic = {
+    id: 'demo-0001',
+    email: 'demo@sms-filing.example.com',
+    username: 'demo',
+    full_name: '演示用户',
+    is_active: true,
+    is_superuser: true,
+    status: 'active',
+    role: { id: 'role-0001', name: '超级管理员', description: '演示模式默认角色' },
+    created_at: '2026-01-01T00:00:00',
+    updated_at: '2026-01-01T00:00:00',
+}
+
 /**
  * 检查后端服务是否可用
- * @returns Promise<boolean> 后端服务是否可用
  */
 const checkBackendHealth = async (): Promise<boolean> => {
+    if (isDemoMode()) return true
     try {
         const response = await api.get('/api/v1/utils/health-check/', { timeout: 5000 })
         return response.status === 200
@@ -23,9 +42,9 @@ const checkBackendHealth = async (): Promise<boolean> => {
 
 /**
  * 验证token是否有效
- * @returns Promise<boolean> token是否有效
  */
 const validateToken = async (): Promise<boolean> => {
+    if (isDemoMode()) return true
     const token = localStorage.getItem('access_token')
     if (!token) return false
 
@@ -41,57 +60,54 @@ const validateToken = async (): Promise<boolean> => {
 
 /**
  * 检查用户是否已登录（包含后端验证）
- * @returns Promise<boolean> 是否已登录
  */
 const isLoggedIn = async (): Promise<boolean> => {
-    // 首先检查后端服务是否可用
+    if (isDemoMode()) return true
     const isBackendHealthy = await checkBackendHealth()
     if (!isBackendHealthy) {
         toast.error('后端服务不可用，请检查服务状态')
         return false
     }
-
-    // 验证token有效性
     return await validateToken()
 }
 
 /**
  * 同步版本的登录检查（用于组件渲染）
- * @returns boolean 是否已登录
  */
 const isLoggedInSync = (): boolean => {
     return localStorage.getItem('access_token') !== null
 }
 
-/**
- * 认证Hook
- * 提供登录、注册、登出等功能
- */
 const useAuth = () => {
     const [error, setError] = useState<string | null>(null)
     const [isBackendAvailable, setIsBackendAvailable] = useState<boolean | null>(null)
     const navigate = useNavigate()
     const queryClient = useQueryClient()
     const { auth } = useAuthStore()
+    const demo = useMemo(() => isDemoMode(), [])
 
-    // 检查后端服务状态
+    // 检查后端服务状态（demo模式跳过）
     const { data: backendHealth, error: backendError } = useQuery({
         queryKey: ['backendHealth'],
         queryFn: checkBackendHealth,
-        retry: 3,
-        retryDelay: 1000,
-        staleTime: 30000, // 30秒
+        retry: false,
+        staleTime: 30000,
+        enabled: !demo,
     })
 
     // 处理后端健康检查结果
     useEffect(() => {
+        if (demo) {
+            setIsBackendAvailable(true)
+            return
+        }
         if (backendHealth !== undefined) {
             setIsBackendAvailable(backendHealth)
             if (!backendHealth) {
                 toast.error('后端服务不可用，请检查服务状态')
             }
         }
-    }, [backendHealth])
+    }, [backendHealth, demo])
 
     // 处理后端连接错误
     useEffect(() => {
@@ -101,15 +117,19 @@ const useAuth = () => {
         }
     }, [backendError])
 
-    // 获取当前用户信息
-    const { data: user, isLoading: userLoading, error: userError } = useQuery<UserPublic | null, Error>({
+    // 获取当前用户信息（demo模式返回静态数据）
+    const userQuery = useQuery<UserPublic | null, Error>({
         queryKey: ['currentUser'],
         queryFn: UsersService.readUserMe,
-        enabled: isLoggedInSync() && isBackendAvailable === true,
+        enabled: !demo && isLoggedInSync() && isBackendAvailable === true,
         retry: false,
     })
 
-    // 记录用户信息获取错误（401 错误统一由 QueryCache 处理）
+    const user = demo ? demoUser : userQuery.data
+    const userLoading = demo ? false : userQuery.isLoading
+    const userError = demo ? null : userQuery.error
+
+    // 记录用户信息获取错误
     useEffect(() => {
         if (userError) {
             console.error('Failed to fetch user:', userError)

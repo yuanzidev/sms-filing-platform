@@ -4,6 +4,12 @@
 import { mockRecords, type FilingRecord } from './data/records'
 import { mainPorts, subPorts, type MainPort, type SubPort } from './data/ports'
 import { apiDataItems } from './data/api-data'
+import { mockUsers } from './data/users'
+import { mockRoles } from './data/roles'
+import { mockLoginLogs } from './data/login-logs'
+import type { User } from '@/lib/api/users'
+import type { Role } from '@/lib/api/roles'
+import type { LoginLog } from '@/lib/api/login-logs'
 
 // ============================================================
 // Records store
@@ -194,4 +200,143 @@ export function getApiData(filters: Record<string, string>, page: number, pageSi
   const data = filtered.slice(start, start + pageSize)
 
   return { data, total }
+}
+
+// ============================================================
+// Users — mutable in-memory store
+// ============================================================
+
+let users: User[] = structuredClone(mockUsers) as User[]
+
+let nextUserNum = users.length + 1
+
+export function getUsers(): { data: User[]; count: number } {
+  return { data: [...users], count: users.length }
+}
+
+export function getUser(id: string): User | undefined {
+  return users.find((u) => u.id === id)
+}
+
+export function createUser(input: Record<string, unknown>): User {
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  const roleId = input.role_id as string | undefined
+  const role = roleId ? getRole(roleId) : undefined
+  const user: User = {
+    id: `usr-${String(nextUserNum++).padStart(4, '0')}`,
+    email: (input.email as string) ?? '',
+    username: (input.username as string) ?? '',
+    full_name: (input.full_name as string) ?? '',
+    is_active: true,
+    is_superuser: false,
+    status: 'active',
+    role: role ? { id: role.id, name: role.name, description: role.description } : undefined,
+    created_at: now,
+    updated_at: now,
+  }
+  users.unshift(user)
+  return user
+}
+
+export function updateUser(id: string, input: Record<string, unknown>): User | undefined {
+  const idx = users.findIndex((u) => u.id === id)
+  if (idx === -1) return undefined
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  const roleId = input.role_id as string | undefined
+  const updates: Record<string, unknown> = { ...input, updated_at: now }
+  if (roleId !== undefined) {
+    const role = roleId ? getRole(roleId) : undefined
+    updates.role = role ? { id: role.id, name: role.name, description: role.description } : undefined
+    delete updates.role_id
+  }
+  users[idx] = { ...users[idx], ...updates } as User
+  return users[idx]
+}
+
+export function deleteUser(id: string): boolean {
+  const idx = users.findIndex((u) => u.id === id)
+  if (idx === -1) return false
+  users.splice(idx, 1)
+  return true
+}
+
+export function enableUser(id: string): User | undefined {
+  return updateUser(id, { status: 'active', is_active: true })
+}
+
+export function disableUser(id: string): User | undefined {
+  return updateUser(id, { status: 'inactive', is_active: false })
+}
+
+export function resetUserPassword(_id: string, _newPassword: string): { message: string } {
+  return { message: '密码重置成功' }
+}
+
+// ============================================================
+// Roles — mutable in-memory store
+// ============================================================
+
+let roles: Role[] = structuredClone(mockRoles) as Role[]
+
+let nextRoleNum = roles.length + 1
+
+export function getRoles(): { data: Role[]; count: number } {
+  return { data: [...roles], count: roles.length }
+}
+
+export function getRole(id: string): Role | undefined {
+  return roles.find((r) => r.id === id)
+}
+
+export function createRole(input: Record<string, unknown>): Role {
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  const role: Role = {
+    id: `role-${String(nextRoleNum++).padStart(4, '0')}`,
+    name: (input.name as string) ?? '',
+    description: (input.description as string) ?? '',
+    permissions: (input.permissions as string[]) ?? [],
+    host_permissions: (input.host_permissions as string[]) ?? [],
+    user_count: 0,
+    created_at: now,
+    updated_at: now,
+  }
+  roles.unshift(role)
+  return role
+}
+
+export function updateRole(id: string, input: Record<string, unknown>): Role | undefined {
+  const idx = roles.findIndex((r) => r.id === id)
+  if (idx === -1) return undefined
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  roles[idx] = { ...roles[idx], ...input, updated_at: now } as Role
+  return roles[idx]
+}
+
+export function deleteRole(id: string): boolean {
+  const idx = roles.findIndex((r) => r.id === id)
+  if (idx === -1) return false
+  roles.splice(idx, 1)
+  return true
+}
+
+// ============================================================
+// Login Logs — mutable in-memory store
+// ============================================================
+
+let loginLogs: LoginLog[] = structuredClone(mockLoginLogs) as LoginLog[]
+
+export function getLoginLogs(): { data: LoginLog[]; count: number } {
+  return { data: [...loginLogs], count: loginLogs.length }
+}
+
+export function deleteLoginLog(id: string): boolean {
+  const idx = loginLogs.findIndex((l) => l.id === id)
+  if (idx === -1) return false
+  loginLogs.splice(idx, 1)
+  return true
+}
+
+export function clearLoginLogs(): { message: string } {
+  loginLogs = []
+  return { message: '日志清理成功' }
 }

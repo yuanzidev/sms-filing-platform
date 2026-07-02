@@ -7,7 +7,8 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { getUsers, deleteUser, enableUser, disableUser, resetUserPassword, type User } from '@/lib/api/users'
+import { getUsers, deleteUser, enableUser, disableUser, resetUserPassword } from '@/lib/mock/store'
+import type { User } from '@/lib/api/users'
 import { UserDialog } from './components/user-dialog'
 import { columns } from './components/users-columns'
 import { UsersTable } from './components/users-table'
@@ -27,74 +28,52 @@ export function UsersPage() {
   /**
    * 加载用户列表
    */
-  const loadUsers = async () => {
+  const loadUsers = () => {
     setLoading(true)
-    try {
-      const response = await getUsers()
-      setUsers(response.data)
-    } catch (error: any) {
-      toast.error('加载用户列表失败')
-      console.error('加载用户失败:', error)
-    } finally {
-      setLoading(false)
-    }
+    const response = getUsers()
+    setUsers(response.data)
+    setLoading(false)
   }
 
   /**
    * 删除用户
    */
-  const handleDeleteUser = async (userId: string) => {
-    try {
-      await deleteUser(userId)
-      toast.success('用户删除成功')
-      loadUsers()
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || '删除用户失败')
-    }
+  const handleDeleteUser = (userId: string) => {
+    deleteUser(userId)
+    toast.success('用户删除成功')
+    loadUsers()
   }
 
   /**
    * 启用用户
    */
-  const handleEnableUser = async (userId: string) => {
-    try {
-      await enableUser(userId)
-      toast.success('用户已启用')
-      loadUsers()
-    } catch (error: any) {
-      toast.error('启用用户失败')
-    }
+  const handleEnableUser = (userId: string) => {
+    enableUser(userId)
+    toast.success('用户已启用')
+    loadUsers()
   }
 
   /**
    * 禁用用户
    */
-  const handleDisableUser = async (userId: string) => {
-    try {
-      await disableUser(userId)
-      toast.success('用户已禁用')
-      loadUsers()
-    } catch (error: any) {
-      toast.error('禁用用户失败')
-    }
+  const handleDisableUser = (userId: string) => {
+    disableUser(userId)
+    toast.success('用户已禁用')
+    loadUsers()
   }
 
   /**
    * 重置用户密码
    */
-  const handleResetPassword = async (userId: string) => {
+  const handleResetPassword = (userId: string) => {
     if (!newPassword) {
       toast.error('请输入新密码')
       return
     }
-    try {
-      await resetUserPassword(userId, newPassword)
-      toast.success('密码重置成功')
-      setPasswordDialogOpen(false)
-      setNewPassword('')
-    } catch (error: any) {
-      toast.error('密码重置失败')
-    }
+    resetUserPassword(userId, newPassword)
+    toast.success('密码重置成功')
+    setPasswordDialogOpen(false)
+    setNewPassword('')
   }
 
   /**

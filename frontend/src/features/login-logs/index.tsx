@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { RefreshCw, Trash2, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { getLoginLogs, deleteLoginLog, clearLoginLogs, type LoginLog } from '@/lib/api/login-logs'
+import { getLoginLogs, deleteLoginLog, clearLoginLogs } from '@/lib/mock/store'
+import type { LoginLog } from '@/lib/api/login-logs'
 import { formatCN } from '@/lib/time'
 import {
     AlertDialog,
@@ -34,44 +35,30 @@ export function LoginLogsPage() {
     /**
      * 加载登录日志列表
      */
-    const loadLogs = async () => {
+    const loadLogs = () => {
         setLoading(true)
-        try {
-            const response = await getLoginLogs()
-            setLogs(response.data)
-        } catch (error: any) {
-            toast.error('加载登录日志失败')
-            console.error('加载日志失败:', error)
-        } finally {
-            setLoading(false)
-        }
+        const response = getLoginLogs()
+        setLogs(response.data)
+        setLoading(false)
     }
 
     /**
      * 删除单条日志
      */
-    const handleDeleteLog = async (logId: string) => {
-        try {
-            await deleteLoginLog(logId)
-            toast.success('日志删除成功')
-            loadLogs()
-        } catch (error: any) {
-            toast.error('删除日志失败')
-        }
+    const handleDeleteLog = (logId: string) => {
+        deleteLoginLog(logId)
+        toast.success('日志删除成功')
+        loadLogs()
     }
 
     /**
      * 清理所有日志
      */
-    const handleClearLogs = async () => {
-        try {
-            await clearLoginLogs()
-            toast.success('日志清理成功')
-            loadLogs()
-            setClearDialogOpen(false)
-        } catch (error: any) {
-            toast.error('清理日志失败')
-        }
+    const handleClearLogs = () => {
+        clearLoginLogs()
+        toast.success('日志清理成功')
+        loadLogs()
+        setClearDialogOpen(false)
     }
 
     /**

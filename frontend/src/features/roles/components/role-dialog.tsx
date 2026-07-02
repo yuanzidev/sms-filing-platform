@@ -23,7 +23,8 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
-import { createRole, updateRole, type Role } from '@/lib/api/roles'
+import { createRole, updateRole } from '@/lib/mock/store'
+import type { Role } from '@/lib/api/roles'
 
 /**
  * 角色表单验证模式
@@ -84,26 +85,19 @@ export function RoleDialog({ open, onOpenChange, role, onSuccess }: RoleDialogPr
     ]
 
     // 表单提交处理
-    const onSubmit = async (data: RoleFormData) => {
+    const onSubmit = (data: RoleFormData) => {
         setLoading(true)
-        try {
-            if (role) {
-                // 编辑角色
-                await updateRole(role.id, data)
-                toast.success('角色更新成功')
-            } else {
-                // 创建角色
-                await createRole(data)
-                toast.success('角色创建成功')
-            }
-            onSuccess()
-            onOpenChange(false)
-            form.reset()
-        } catch (error: any) {
-            toast.error(error.response?.data?.detail || '操作失败')
-        } finally {
-            setLoading(false)
+        if (role) {
+            updateRole(role.id, data as Record<string, unknown>)
+            toast.success('角色更新成功')
+        } else {
+            createRole(data as Record<string, unknown>)
+            toast.success('角色创建成功')
         }
+        onSuccess()
+        onOpenChange(false)
+        form.reset()
+        setLoading(false)
     }
 
     // 对话框打开时重置表单
