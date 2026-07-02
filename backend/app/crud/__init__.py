@@ -32,6 +32,13 @@ from .port import (
     update_main_port,
     update_sub_port,
 )
+from .record import (
+    create_filing_record,
+    delete_filing_record,
+    get_filing_record,
+    list_filing_records,
+    update_filing_record,
+)
 
 __all__ = [
     "authenticate",
@@ -60,4 +67,9 @@ __all__ = [
     "list_sub_ports",
     "update_sub_port",
     "delete_sub_port",
+    "create_filing_record",
+    "get_filing_record",
+    "list_filing_records",
+    "update_filing_record",
+    "delete_filing_record",
 ]
