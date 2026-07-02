@@ -1,5 +1,8 @@
 import {
   IconLayoutDashboard,
+  IconFileDescription,
+  IconPlugConnected,
+  IconApi,
   IconSettings,
   IconUserCog,
   IconUsers,
@@ -25,9 +28,24 @@ export const sidebarData: SidebarData = {
       title: '主要功能',
       items: [
         {
-          title: '首页',
+          title: '工作台',
           url: '/',
           icon: IconLayoutDashboard,
+        },
+        {
+          title: '报备管理',
+          url: '/records',
+          icon: IconFileDescription,
+        },
+        {
+          title: '端口管理',
+          url: '/ports/main',
+          icon: IconPlugConnected,
+        },
+        {
+          title: 'API 接入管理',
+          url: '/api-data',
+          icon: IconApi,
         },
       ],
     },
