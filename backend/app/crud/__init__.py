@@ -39,6 +39,13 @@ from .record import (
     list_filing_records,
     update_filing_record,
 )
+from .dashboard import (
+    get_carrier_distribution,
+    get_recent_changes,
+    get_stats,
+    get_status_distribution,
+    get_trends,
+)
 
 __all__ = [
     "authenticate",
@@ -72,4 +79,9 @@ __all__ = [
     "list_filing_records",
     "update_filing_record",
     "delete_filing_record",
+    "get_stats",
+    "get_trends",
+    "get_carrier_distribution",
+    "get_status_distribution",
+    "get_recent_changes",
 ]
