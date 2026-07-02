@@ -14,6 +14,12 @@ from .role import (
     get_role_by_name,
     update_role,
 )
+from .file_attachment import (
+    create_file_attachment,
+    delete_file_attachment,
+    get_file_attachment,
+    get_file_attachments_by_entity,
+)
 
 __all__ = [
     "authenticate",
@@ -28,4 +34,8 @@ __all__ = [
     "get_role_by_id",
     "get_role_by_name",
     "update_role",
+    "create_file_attachment",
+    "delete_file_attachment",
+    "get_file_attachment",
+    "get_file_attachments_by_entity",
 ]
