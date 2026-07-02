@@ -95,15 +95,16 @@ interface Props {
 
 export function UsersActionDialog({ currentRow, open, onOpenChange }: Props) {
   const isEdit = !!currentRow
-  const form = useForm<UserForm>({
-    resolver: zodResolver(formSchema),
+  const form = useForm({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(formSchema) as any,
     defaultValues: isEdit
       ? {
           ...currentRow,
           password: '',
           confirmPassword: '',
           isEdit,
-        }
+        } as any
       : {
           firstName: '',
           lastName: '',
@@ -145,11 +146,11 @@ export function UsersActionDialog({ currentRow, open, onOpenChange }: Props) {
           <Form {...form}>
             <form
               id='user-form'
-              onSubmit={form.handleSubmit(onSubmit)}
+              onSubmit={form.handleSubmit(onSubmit as any)}
               className='space-y-4 p-0.5'
             >
               <FormField
-                control={form.control}
+                control={form.control as any}
                 name='firstName'
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
@@ -169,7 +170,7 @@ export function UsersActionDialog({ currentRow, open, onOpenChange }: Props) {
                 )}
               />
               <FormField
-                control={form.control}
+                control={form.control as any}
                 name='lastName'
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
@@ -189,7 +190,7 @@ export function UsersActionDialog({ currentRow, open, onOpenChange }: Props) {
                 )}
               />
               <FormField
-                control={form.control}
+                control={form.control as any}
                 name='username'
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
@@ -208,7 +209,7 @@ export function UsersActionDialog({ currentRow, open, onOpenChange }: Props) {
                 )}
               />
               <FormField
-                control={form.control}
+                control={form.control as any}
                 name='email'
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
@@ -227,7 +228,7 @@ export function UsersActionDialog({ currentRow, open, onOpenChange }: Props) {
                 )}
               />
               <FormField
-                control={form.control}
+                control={form.control as any}
                 name='phoneNumber'
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
@@ -246,7 +247,7 @@ export function UsersActionDialog({ currentRow, open, onOpenChange }: Props) {
                 )}
               />
               <FormField
-                control={form.control}
+                control={form.control as any}
                 name='role'
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
@@ -268,7 +269,7 @@ export function UsersActionDialog({ currentRow, open, onOpenChange }: Props) {
                 )}
               />
               <FormField
-                control={form.control}
+                control={form.control as any}
                 name='password'
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
@@ -287,7 +288,7 @@ export function UsersActionDialog({ currentRow, open, onOpenChange }: Props) {
                 )}
               />
               <FormField
-                control={form.control}
+                control={form.control as any}
                 name='confirmPassword'
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>

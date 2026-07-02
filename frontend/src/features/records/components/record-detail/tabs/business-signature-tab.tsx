@@ -1,6 +1,5 @@
 import type { FilingRecord } from '@/lib/mock/data/records'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { StatusTag } from '@/components/shared/status-tag'
 
 interface Props { record: FilingRecord }
 

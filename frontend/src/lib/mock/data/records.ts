@@ -107,6 +107,7 @@ export interface TemplateItem {
 export interface DiversionItem {
   id: string
   content: string
+  ratio: number
   number_type: string
   number: string
   number_usage: string
@@ -126,10 +127,6 @@ export interface AttachmentItem {
 // ============================================================
 // Mock data generation utilities
 // ============================================================
-
-function pick<T>(arr: readonly T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]
-}
 
 function pad(n: number, width: number = 4): string {
   return String(n).padStart(width, '0')
@@ -231,7 +228,6 @@ const certNumbers: readonly string[] = [
 ]
 
 const carriers: readonly Carrier[] = ['移动', '联通', '电信']
-const statuses: readonly RecordStatus[] = ['草稿', '已报备', '变更中', '停用']
 const statusWeights: readonly RecordStatus[] = [
   '已报备', '已报备', '已报备', '已报备',
   '草稿', '草稿',
@@ -326,14 +322,6 @@ const smsSignatures: readonly string[] = [
   '中信网络', '浪潮云', '亿榕信息', '巨龙信息',
 ]
 
-function generateMainPort(index: number): string {
-  return mainPortNumbers[index % mainPortNumbers.length]
-}
-
-function generateSubPort(index: number): string {
-  return subPortNumbers[index % subPortNumbers.length]
-}
-
 // ============================================================
 // Main generation function
 // ============================================================
@@ -403,6 +391,7 @@ export function generateRecords(): FilingRecord[] {
       diversions.push({
         id: `div-${pad(i + 1)}-${pad(d + 1, 2)}`,
         content: `分流链接${d + 1} - ${enterprise.slice(0, 4)}`,
+        ratio: Math.floor(100 / diversionCount),
         number_type: ['固话', '手机', '400'][d % 3],
         number: phoneNumbers[(i + d) % phoneNumbers.length],
         number_usage: ['售前咨询', '售后服务', '投诉建议'][d % 3],

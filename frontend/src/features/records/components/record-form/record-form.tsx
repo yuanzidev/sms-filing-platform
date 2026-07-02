@@ -189,7 +189,8 @@ interface RecordFormProps {
 
 export function RecordForm({ initialValues, onSubmit, submitLabel = '提交' }: RecordFormProps) {
   const form = useForm<RecordFormValues>({
-    resolver: zodResolver(recordFormSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(recordFormSchema) as any,
     defaultValues: { ...defaultValues, ...initialValues },
   })
 
@@ -197,7 +198,7 @@ export function RecordForm({ initialValues, onSubmit, submitLabel = '提交' }: 
 
   return (
     <FormProvider {...form}>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form onSubmit={handleSubmit(onSubmit as any)}>
         <AnchorFormLayout sections={sections}>
           <div className="space-y-6">
             <div id="section-basic"><BasicInfoSection /></div>

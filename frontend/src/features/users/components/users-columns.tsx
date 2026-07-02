@@ -108,7 +108,7 @@ export const columns = (actions: ColumnActions): ColumnDef<User>[] => [
         </div>
       )
     },
-    filterFn: (row, id, value) => {
+    filterFn: (row, _id, value) => {
       const role = row.original.role
       return value.includes(role?.name || '')
     },

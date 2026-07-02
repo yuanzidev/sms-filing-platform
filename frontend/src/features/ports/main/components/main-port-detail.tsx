@@ -1,7 +1,6 @@
 import type { MainPort } from '@/lib/mock/data/ports'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusTag } from '@/components/shared/status-tag'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 interface Props { port: MainPort; subPortCount: number }
 

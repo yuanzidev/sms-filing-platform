@@ -64,7 +64,7 @@ export function MainPortListPage() {
   return (
     <div className="space-y-4 p-6">
       <h1 className="text-2xl font-bold">主端口管理</h1>
-      <SearchForm fields={searchFields} onSearch={(f) => { setFilters(f); setPage(1) }} />
+      <SearchForm fields={searchFields} onSearch={(f) => { setFilters(f); setPage(1) }} onReset={() => { setFilters({}); setPage(1) }} />
       <DataTable
         columns={columns}
         data={data}

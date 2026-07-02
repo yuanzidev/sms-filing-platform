@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
-import { AlertCircle, RefreshCw, Wifi, WifiOff } from 'lucide-react'
+import { AlertCircle, RefreshCw, WifiOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ServiceUnavailableErrorProps {

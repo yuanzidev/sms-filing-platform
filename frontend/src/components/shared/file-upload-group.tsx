@@ -32,7 +32,7 @@ export function FileUploadGroup({ items, onUpload, onRemove }: FileUploadGroupPr
             <span className="text-sm font-medium">
               {typeLabels[item.type] ?? item.type}
             </span>
-            <span className="text-sm text-muted-foreground">{item.name}</span>
+            <span className="text-sm text-muted-foreground">{item.file_name}</span>
             <StatusTag status={item.status} />
           </div>
           <div className="flex items-center gap-1">

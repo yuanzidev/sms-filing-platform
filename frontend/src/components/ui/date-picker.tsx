@@ -9,14 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { DayPickerRangeProps } from "react-day-picker"
+import type { DayPickerRangeProps } from "react-day-picker"
 
 type DateRange = DayPickerRangeProps['selected']
 

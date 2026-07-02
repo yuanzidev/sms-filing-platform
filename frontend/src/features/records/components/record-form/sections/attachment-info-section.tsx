@@ -12,10 +12,10 @@ export function AttachmentInfoSection() {
       <CardContent>
         <FileUploadGroup
           items={attachments}
-          onUpload={(type) => {
+          onUpload={(_type) => {
             // Phase 1: UI only
           }}
-          onRemove={(type) => {
+          onRemove={(_type) => {
             // Phase 1: UI only
           }}
         />

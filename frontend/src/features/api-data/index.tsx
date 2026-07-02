@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import type { ApiDataItem } from '@/lib/mock/data/api-data'
 import { getApiData } from '@/lib/mock/store'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { SearchForm, type SearchField } from '@/components/shared/search-form'
@@ -63,7 +62,7 @@ export function ApiDataListPage() {
   const pageSize = 10
 
   const { data, total } = getApiData(filters, page, pageSize)
-  const rows = data as ApiDataRow[]
+  const rows = data as unknown as ApiDataRow[]
 
   const columns: ColumnDef<ApiDataRow>[] = useMemo(() => [
     { accessorKey: 'import_time', header: '导入时间' },
@@ -100,11 +99,10 @@ export function ApiDataListPage() {
   return (
     <div className="space-y-4 p-6">
       <h1 className="text-2xl font-bold">API数据展示</h1>
-      <SearchForm fields={searchFields} onSearch={(f) => { setFilters(f); setPage(1) }} />
+      <SearchForm fields={searchFields} onSearch={(f) => { setFilters(f); setPage(1) }} onReset={() => { setFilters({}); setPage(1) }} />
       <DataTable
         columns={columns}
         data={rows}
-        loading={isLoading}
         page={page}
         pageSize={pageSize}
         total={total}
