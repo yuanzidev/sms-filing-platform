@@ -1,8 +1,11 @@
 """Filing records API routes."""
+import io
 import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from sqlmodel import SQLModel
 
 from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
 from app.crud.record import (
@@ -92,6 +95,44 @@ def update_record(*, session: SessionDep, id: uuid.UUID, update: FilingRecordUpd
         raise HTTPException(status_code=404, detail="报备记录不存在")
     db_obj = update_filing_record(session=session, db_obj=db_obj, update=update)
     return _record_to_public(db_obj, session)
+
+
+class ExportRequest(SQLModel):
+    export_group_id: uuid.UUID
+    carrier: str | None = None
+    status: str | None = None
+    enterprise_name: str | None = None
+    province: str | None = None
+    business_type: str | None = None
+
+
+@router.post("/export")
+def export_records(*, session: SessionDep, body: ExportRequest) -> Any:
+    """Export filing records as Excel based on export group config."""
+    from app.services.export import generate_export
+
+    filters = {}
+    if body.carrier:
+        filters["carrier"] = body.carrier
+    if body.status:
+        filters["status"] = body.status
+    if body.enterprise_name:
+        filters["enterprise_name"] = body.enterprise_name
+    if body.province:
+        filters["province"] = body.province
+    if body.business_type:
+        filters["business_type"] = body.business_type
+
+    output = generate_export(session, body.export_group_id, filters)
+
+    from datetime import date
+    filename = f"filing_records_{date.today().isoformat()}.xlsx"
+
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.delete("/{id}")
