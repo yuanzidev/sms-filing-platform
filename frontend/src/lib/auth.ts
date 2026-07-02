@@ -4,11 +4,21 @@ import api from './api'
  * 用户信息接口
  */
 export interface UserPublic {
-    id: number
+    id: string
     email: string
+    username: string
     is_active: boolean
     is_superuser: boolean
     full_name?: string
+    status: string
+    last_login?: string
+    role?: {
+        id: string
+        name: string
+        description?: string
+    } | null
+    created_at: string
+    updated_at: string
 }
 
 /**

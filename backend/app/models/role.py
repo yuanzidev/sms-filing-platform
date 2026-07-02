@@ -4,10 +4,12 @@ Date: 2025-12-11
 Description: 
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 from sqlmodel import Field, Relationship, SQLModel
+
+from app.core.timezone import utcnow
 
 
 class RoleBase(SQLModel):
@@ -37,8 +39,8 @@ class RoleUpdate(SQLModel):
 class Role(RoleBase, table=True):
     """角色数据库模型"""
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
     users: List["User"] = Relationship(back_populates="role")
 
 

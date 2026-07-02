@@ -7,7 +7,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import func, select
+from sqlmodel import SQLModel, func, select
 
 from app import crud
 from app.api.deps import (
@@ -194,7 +194,9 @@ def read_user_by_id(
     """
     Get a specific user by id.
     """
-    user = session.get(User, user_id)
+    user = crud.get_user_by_id(session=session, user_id=user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
     if user == current_user:
         return user
     if not current_user.is_superuser:
@@ -220,7 +222,7 @@ def update_user(
     Update a user.
     """
 
-    db_user = session.get(User, user_id)
+    db_user = crud.get_user_by_id(session=session, user_id=user_id)
     if not db_user:
         raise HTTPException(
             status_code=404,
@@ -244,15 +246,14 @@ def delete_user(
     """
     删除用户
     """
-    user = session.get(User, user_id)
+    user = crud.get_user_by_id(session=session, user_id=user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     if user == current_user:
         raise HTTPException(
             status_code=403, detail="超级用户不能删除自己"
         )
-    session.delete(user)
-    session.commit()
+    crud.delete_user(session=session, db_user=user)
     return Message(message="用户删除成功")
 
 
@@ -263,10 +264,10 @@ def reset_user_password(
     """
     重置用户密码
     """
-    user = session.get(User, user_id)
+    user = crud.get_user_by_id(session=session, user_id=user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    
+
     from app.core.security import get_password_hash
     user.hashed_password = get_password_hash(password_data.new_password)
     session.add(user)
@@ -274,21 +275,25 @@ def reset_user_password(
     return Message(message="密码重置成功")
 
 
+class UserStatusUpdate(SQLModel):
+    status: UserStatus
+
+
 @router.patch("/{user_id}/status", dependencies=[Depends(get_current_active_superuser)])
 def update_user_status(
-    session: SessionDep, user_id: uuid.UUID, status: UserStatus
+    session: SessionDep, user_id: uuid.UUID, body: UserStatusUpdate
 ) -> Message:
     """
     更新用户状态
     """
-    user = session.get(User, user_id)
+    user = crud.get_user_by_id(session=session, user_id=user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    
-    user.status = status
+
+    user.status = body.status
     session.add(user)
     session.commit()
-    return Message(message=f"用户状态已更新为 {status.value}")
+    return Message(message=f"用户状态已更新为 {body.status.value}")
 
 
 @router.patch("/{user_id}/enable", dependencies=[Depends(get_current_active_superuser)])
@@ -296,10 +301,10 @@ def enable_user(session: SessionDep, user_id: uuid.UUID) -> Message:
     """
     启用用户
     """
-    user = session.get(User, user_id)
+    user = crud.get_user_by_id(session=session, user_id=user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    
+
     user.status = UserStatus.ACTIVE
     user.is_active = True
     session.add(user)
@@ -312,10 +317,10 @@ def disable_user(session: SessionDep, user_id: uuid.UUID) -> Message:
     """
     禁用用户
     """
-    user = session.get(User, user_id)
+    user = crud.get_user_by_id(session=session, user_id=user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    
+
     user.status = UserStatus.INACTIVE
     user.is_active = False
     session.add(user)

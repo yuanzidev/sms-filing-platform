@@ -45,7 +45,7 @@ class Settings(BaseSettings):
 
     BACKEND_CORS_ORIGINS: Annotated[
         list[str] | str, BeforeValidator(parse_cors)
-    ] = "*"
+    ] = "http://localhost:5173,http://localhost:3000,http://localhost"
 
     @computed_field  # type: ignore[prop-decorator]
     @property

@@ -139,7 +139,7 @@ def read_role_by_id(role_id: uuid.UUID, session: SessionDep) -> Any:
     """
     根据ID获取角色
     """
-    role = session.get(Role, role_id)
+    role = crud.get_role_by_id(session=session, role_id=role_id)
     if not role:
         raise HTTPException(
             status_code=404,
@@ -188,7 +188,7 @@ def update_role(
     """
     更新角色
     """
-    role = session.get(Role, role_id)
+    role = crud.get_role_by_id(session=session, role_id=role_id)
     if not role:
         raise HTTPException(
             status_code=404,
@@ -231,7 +231,7 @@ def delete_role(session: SessionDep, role_id: uuid.UUID) -> Message:
     """
     删除角色
     """
-    role = session.get(Role, role_id)
+    role = crud.get_role_by_id(session=session, role_id=role_id)
     if not role:
         raise HTTPException(status_code=404, detail="角色不存在")
 
@@ -243,6 +243,5 @@ def delete_role(session: SessionDep, role_id: uuid.UUID) -> Message:
             detail="无法删除角色，仍有用户使用该角色",
         )
 
-    session.delete(role)
-    session.commit()
-    return Message(message="角色删除成功") 
+    crud.delete_role(session=session, db_role=role)
+    return Message(message="角色删除成功")

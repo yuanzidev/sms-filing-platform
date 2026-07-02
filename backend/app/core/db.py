@@ -3,6 +3,9 @@ Author: yuanzi
 Date: 2025-12-11
 Description: 
 """
+from datetime import datetime, timezone
+
+from sqlalchemy import event
 from sqlmodel import Session, create_engine, select, SQLModel
 
 from app import crud
@@ -10,6 +13,15 @@ from app.core.config import settings
 from app.models import User, UserCreate
 
 engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
+
+
+@event.listens_for(Session, "before_flush")
+def _auto_updated_at(session, flush_context, instances):
+    """在 flush 前自动更新所有脏对象的 updated_at 字段"""
+    now = datetime.now(timezone.utc)
+    for obj in session.dirty:
+        if hasattr(obj, "updated_at"):
+            obj.updated_at = now
 
 
 # make sure all SQLModel models are imported (app.models) before initializing DB

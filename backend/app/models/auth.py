@@ -14,7 +14,7 @@ class Token(SQLModel):
 
 class TokenPayload(SQLModel):
     """JWT令牌载荷模型"""
-    sub: str | None = None
+    sub: str
 
 
 class Message(SQLModel):

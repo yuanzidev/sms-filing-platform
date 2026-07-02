@@ -13,7 +13,6 @@
     "knip": "knip"
   },
   "dependencies": {
-    "@clerk/clerk-react": "^5.32.1",
     "@hookform/resolvers": "^5.1.1",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-avatar": "^1.1.10",
@@ -60,7 +59,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",
-    "@faker-js/faker": "^9.8.0",
     "@tanstack/eslint-plugin-query": "^5.81.2",
     "@tanstack/react-query-devtools": "^5.81.2",
     "@tanstack/react-router-devtools": "^1.121.34",

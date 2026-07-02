@@ -5,7 +5,7 @@ SMS 报备管理平台后端服务,基于 FastAPI + SQLModel + PostgreSQL。
 ## 环境要求
 
 ### 必需环境
-* **Python**: >=3.10
+* **Python**: >=3.12
 * **[uv](https://docs.astral.sh/uv/)**: Python 包和环境管理工具
 * **PostgreSQL**: 数据库服务
 
@@ -51,7 +51,7 @@ POSTGRES_DB=sms_filing
 
 # 安全配置
 SECRET_KEY=changethis  # 生产环境请使用强随机密钥
-FIRST_SUPERUSER=admin@sms-filing.local
+FIRST_SUPERUSER=admin@sms-filing.example.com
 FIRST_SUPERUSER_PASSWORD=changethis
 
 ENVIRONMENT=local

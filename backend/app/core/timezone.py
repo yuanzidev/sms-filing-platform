@@ -9,6 +9,11 @@ import re
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+
+def utcnow() -> datetime:
+    """返回时区感知的 UTC 当前时间"""
+    return datetime.now(timezone.utc)
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)

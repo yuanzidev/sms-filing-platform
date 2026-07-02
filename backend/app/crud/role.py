@@ -52,3 +52,14 @@ def get_role_by_name(*, session: Session, name: str) -> Role | None:
     statement = select(Role).where(Role.name == name)
     session_role = session.exec(statement).first()
     return session_role
+
+
+def get_role_by_id(*, session: Session, role_id: uuid.UUID) -> Role | None:
+    """通过ID获取角色"""
+    return session.get(Role, role_id)
+
+
+def delete_role(*, session: Session, db_role: Role) -> None:
+    """删除角色"""
+    session.delete(db_role)
+    session.commit()

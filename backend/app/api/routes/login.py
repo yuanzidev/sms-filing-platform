@@ -40,17 +40,17 @@ def login_access_token(
     )
     
     # 记录登录日志
-    from datetime import datetime
+    from datetime import datetime, timezone
     log_data = {
         "username": form_data.username,
         "status": "success" if user and user.is_active else "failed",
         "ip_address": request.client.host if request.client else "unknown",
         "user_agent": request.headers.get("user-agent", "unknown"),
     }
-    
+
     if user and user.is_active:
         # 更新用户最后登录时间
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now(timezone.utc)
         session.add(user)
         session.commit()
         

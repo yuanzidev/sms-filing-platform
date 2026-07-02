@@ -9,7 +9,7 @@ from typing import List, Union
 
 from sqlmodel import Field, Relationship, SQLModel
 
-# 使用字符串引用避免循环导入
+from app.core.timezone import utcnow
 
 
 class LoginLogBase(SQLModel):
@@ -18,11 +18,6 @@ class LoginLogBase(SQLModel):
     status: str = Field(max_length=50)  # success, failed
     ip_address: str = Field(max_length=45)
     user_agent: str | None = Field(default=None, max_length=1000)
-
-
-def utcnow() -> datetime:
-    # Return timezone-aware UTC now
-    return datetime.now(timezone.utc)
 
 
 class LoginLog(LoginLogBase, table=True):

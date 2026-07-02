@@ -4,12 +4,14 @@ Date: 2025-12-11
 Description: 
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import List
 
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
+
+from app.core.timezone import utcnow
 
 from .role import Role, RolePublic
 # 使用字符串引用避免循环导入
@@ -78,8 +80,8 @@ class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     hashed_password: str
     role_id: uuid.UUID | None = Field(foreign_key="role.id", nullable=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
     role: Role | None = Relationship(back_populates="users")
     login_logs: List["LoginLog"] = Relationship(back_populates="user")
 

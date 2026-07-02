@@ -1,28 +1,35 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { isLoggedIn } from '@/hooks/use-auth'
+import { isLoggedIn, isLoggedInSync } from '@/hooks/use-auth'
 
 interface AuthGuardProps {
     children: React.ReactNode
 }
 
-/**
- * 认证保护组件
- * 检查用户是否已登录，未登录则重定向到登录页
- * @param children 子组件
- */
 export function AuthGuard({ children }: AuthGuardProps) {
     const navigate = useNavigate()
+    const [checked, setChecked] = useState(false)
 
     useEffect(() => {
-        if (!isLoggedIn()) {
-            navigate({ to: '/sign-in' })
-        }
+        let cancelled = false
+        isLoggedIn().then(ok => {
+            if (!cancelled && !ok) {
+                navigate({ to: '/sign-in' })
+            }
+            if (!cancelled) {
+                setChecked(true)
+            }
+        })
+        return () => { cancelled = true }
     }, [navigate])
 
-    if (!isLoggedIn()) {
+    if (!checked && !isLoggedInSync()) {
+        return null
+    }
+
+    if (!checked) {
         return null
     }
 
     return <>{children}</>
-} 
+}

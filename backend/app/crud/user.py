@@ -3,6 +3,7 @@ Author: yuanzi
 Date: 2025-12-11
 Description:
 """
+import uuid
 from typing import Any
 
 from sqlmodel import Session, select
@@ -41,6 +42,10 @@ def get_user_by_email(*, session: Session, email: str) -> User | None:
     return session_user
 
 
+def get_user_by_id(*, session: Session, user_id: uuid.UUID) -> User | None:
+    return session.get(User, user_id)
+
+
 def get_user_by_username(*, session: Session, username: str) -> User | None:
     statement = select(User).where(User.username == username)
     session_user = session.exec(statement).first()
@@ -69,3 +74,8 @@ def authenticate(*, session: Session, email: str, password: str) -> User | None:
     if not verify_password(password, db_user.hashed_password):
         return None
     return db_user
+
+
+def delete_user(*, session: Session, db_user: User) -> None:
+    session.delete(db_user)
+    session.commit()
