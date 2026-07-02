@@ -5,6 +5,7 @@ from app.api.routes import (
     login,
     login_logs,
     operation_logs,
+    ports,
     roles,
     users,
     utils,
@@ -17,4 +18,5 @@ api_router.include_router(roles.router)
 api_router.include_router(login_logs.router)
 api_router.include_router(operation_logs.router)
 api_router.include_router(files.router)
+api_router.include_router(ports.router)
 api_router.include_router(utils.router)
