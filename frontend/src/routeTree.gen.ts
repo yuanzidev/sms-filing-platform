@@ -25,12 +25,20 @@ import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authen
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedRecordsIndexRouteImport } from './routes/_authenticated/records/index'
+import { Route as AuthenticatedApiDataIndexRouteImport } from './routes/_authenticated/api-data/index'
 import { Route as AuthenticatedUsersRolesRouteImport } from './routes/_authenticated/users/roles'
 import { Route as AuthenticatedUsersLogsRouteImport } from './routes/_authenticated/users/logs'
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
 import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_authenticated/settings/display'
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
+import { Route as AuthenticatedRecordsCreateRouteImport } from './routes/_authenticated/records/create'
+import { Route as AuthenticatedPortsSubIndexRouteImport } from './routes/_authenticated/ports/sub/index'
+import { Route as AuthenticatedPortsMainIndexRouteImport } from './routes/_authenticated/ports/main/index'
+import { Route as AuthenticatedRecordsRecordIdEditRouteImport } from './routes/_authenticated/records/$recordId/edit'
+import { Route as AuthenticatedRecordsRecordIdDetailRouteImport } from './routes/_authenticated/records/$recordId/detail'
+import { Route as AuthenticatedPortsSubPortIdDetailRouteImport } from './routes/_authenticated/ports/sub/$portId/detail'
+import { Route as AuthenticatedPortsMainPortIdDetailRouteImport } from './routes/_authenticated/ports/main/$portId/detail'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
@@ -114,6 +122,12 @@ const AuthenticatedRecordsIndexRoute =
     path: '/records/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedApiDataIndexRoute =
+  AuthenticatedApiDataIndexRouteImport.update({
+    id: '/api-data/',
+    path: '/api-data/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedUsersRolesRoute = AuthenticatedUsersRolesRouteImport.update({
   id: '/users/roles',
   path: '/users/roles',
@@ -148,6 +162,48 @@ const AuthenticatedSettingsAccountRoute =
     path: '/account',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+const AuthenticatedRecordsCreateRoute =
+  AuthenticatedRecordsCreateRouteImport.update({
+    id: '/records/create',
+    path: '/records/create',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPortsSubIndexRoute =
+  AuthenticatedPortsSubIndexRouteImport.update({
+    id: '/ports/sub/',
+    path: '/ports/sub/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPortsMainIndexRoute =
+  AuthenticatedPortsMainIndexRouteImport.update({
+    id: '/ports/main/',
+    path: '/ports/main/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedRecordsRecordIdEditRoute =
+  AuthenticatedRecordsRecordIdEditRouteImport.update({
+    id: '/records/$recordId/edit',
+    path: '/records/$recordId/edit',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedRecordsRecordIdDetailRoute =
+  AuthenticatedRecordsRecordIdDetailRouteImport.update({
+    id: '/records/$recordId/detail',
+    path: '/records/$recordId/detail',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPortsSubPortIdDetailRoute =
+  AuthenticatedPortsSubPortIdDetailRouteImport.update({
+    id: '/ports/sub/$portId/detail',
+    path: '/ports/sub/$portId/detail',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPortsMainPortIdDetailRoute =
+  AuthenticatedPortsMainPortIdDetailRouteImport.update({
+    id: '/ports/main/$portId/detail',
+    path: '/ports/main/$portId/detail',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
@@ -162,15 +218,23 @@ export interface FileRoutesByFullPath {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
+  '/records/create': typeof AuthenticatedRecordsCreateRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/users/logs': typeof AuthenticatedUsersLogsRoute
   '/users/roles': typeof AuthenticatedUsersRolesRoute
+  '/api-data': typeof AuthenticatedApiDataIndexRoute
   '/records': typeof AuthenticatedRecordsIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
+  '/records/$recordId/detail': typeof AuthenticatedRecordsRecordIdDetailRoute
+  '/records/$recordId/edit': typeof AuthenticatedRecordsRecordIdEditRoute
+  '/ports/main': typeof AuthenticatedPortsMainIndexRoute
+  '/ports/sub': typeof AuthenticatedPortsSubIndexRoute
+  '/ports/main/$portId/detail': typeof AuthenticatedPortsMainPortIdDetailRoute
+  '/ports/sub/$portId/detail': typeof AuthenticatedPortsSubPortIdDetailRoute
 }
 export interface FileRoutesByTo {
   '/forgot-password': typeof authForgotPasswordRoute
@@ -184,15 +248,23 @@ export interface FileRoutesByTo {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
+  '/records/create': typeof AuthenticatedRecordsCreateRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/users/logs': typeof AuthenticatedUsersLogsRoute
   '/users/roles': typeof AuthenticatedUsersRolesRoute
+  '/api-data': typeof AuthenticatedApiDataIndexRoute
   '/records': typeof AuthenticatedRecordsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
+  '/records/$recordId/detail': typeof AuthenticatedRecordsRecordIdDetailRoute
+  '/records/$recordId/edit': typeof AuthenticatedRecordsRecordIdEditRoute
+  '/ports/main': typeof AuthenticatedPortsMainIndexRoute
+  '/ports/sub': typeof AuthenticatedPortsSubIndexRoute
+  '/ports/main/$portId/detail': typeof AuthenticatedPortsMainPortIdDetailRoute
+  '/ports/sub/$portId/detail': typeof AuthenticatedPortsSubPortIdDetailRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -209,15 +281,23 @@ export interface FileRoutesById {
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/records/create': typeof AuthenticatedRecordsCreateRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/_authenticated/users/logs': typeof AuthenticatedUsersLogsRoute
   '/_authenticated/users/roles': typeof AuthenticatedUsersRolesRoute
+  '/_authenticated/api-data/': typeof AuthenticatedApiDataIndexRoute
   '/_authenticated/records/': typeof AuthenticatedRecordsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
+  '/_authenticated/records/$recordId/detail': typeof AuthenticatedRecordsRecordIdDetailRoute
+  '/_authenticated/records/$recordId/edit': typeof AuthenticatedRecordsRecordIdEditRoute
+  '/_authenticated/ports/main/': typeof AuthenticatedPortsMainIndexRoute
+  '/_authenticated/ports/sub/': typeof AuthenticatedPortsSubIndexRoute
+  '/_authenticated/ports/main/$portId/detail': typeof AuthenticatedPortsMainPortIdDetailRoute
+  '/_authenticated/ports/sub/$portId/detail': typeof AuthenticatedPortsSubPortIdDetailRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -234,15 +314,23 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/'
+    | '/records/create'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
     | '/settings/notifications'
     | '/users/logs'
     | '/users/roles'
+    | '/api-data'
     | '/records'
     | '/settings/'
     | '/users'
+    | '/records/$recordId/detail'
+    | '/records/$recordId/edit'
+    | '/ports/main'
+    | '/ports/sub'
+    | '/ports/main/$portId/detail'
+    | '/ports/sub/$portId/detail'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/forgot-password'
@@ -256,15 +344,23 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/'
+    | '/records/create'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
     | '/settings/notifications'
     | '/users/logs'
     | '/users/roles'
+    | '/api-data'
     | '/records'
     | '/settings'
     | '/users'
+    | '/records/$recordId/detail'
+    | '/records/$recordId/edit'
+    | '/ports/main'
+    | '/ports/sub'
+    | '/ports/main/$portId/detail'
+    | '/ports/sub/$portId/detail'
   id:
     | '__root__'
     | '/_authenticated'
@@ -280,15 +376,23 @@ export interface FileRouteTypes {
     | '/(errors)/500'
     | '/(errors)/503'
     | '/_authenticated/'
+    | '/_authenticated/records/create'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/display'
     | '/_authenticated/settings/notifications'
     | '/_authenticated/users/logs'
     | '/_authenticated/users/roles'
+    | '/_authenticated/api-data/'
     | '/_authenticated/records/'
     | '/_authenticated/settings/'
     | '/_authenticated/users/'
+    | '/_authenticated/records/$recordId/detail'
+    | '/_authenticated/records/$recordId/edit'
+    | '/_authenticated/ports/main/'
+    | '/_authenticated/ports/sub/'
+    | '/_authenticated/ports/main/$portId/detail'
+    | '/_authenticated/ports/sub/$portId/detail'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -419,6 +523,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRecordsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/api-data/': {
+      id: '/_authenticated/api-data/'
+      path: '/api-data'
+      fullPath: '/api-data'
+      preLoaderRoute: typeof AuthenticatedApiDataIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/users/roles': {
       id: '/_authenticated/users/roles'
       path: '/users/roles'
@@ -461,6 +572,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsAccountRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
+    '/_authenticated/records/create': {
+      id: '/_authenticated/records/create'
+      path: '/records/create'
+      fullPath: '/records/create'
+      preLoaderRoute: typeof AuthenticatedRecordsCreateRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ports/sub/': {
+      id: '/_authenticated/ports/sub/'
+      path: '/ports/sub'
+      fullPath: '/ports/sub'
+      preLoaderRoute: typeof AuthenticatedPortsSubIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ports/main/': {
+      id: '/_authenticated/ports/main/'
+      path: '/ports/main'
+      fullPath: '/ports/main'
+      preLoaderRoute: typeof AuthenticatedPortsMainIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/records/$recordId/edit': {
+      id: '/_authenticated/records/$recordId/edit'
+      path: '/records/$recordId/edit'
+      fullPath: '/records/$recordId/edit'
+      preLoaderRoute: typeof AuthenticatedRecordsRecordIdEditRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/records/$recordId/detail': {
+      id: '/_authenticated/records/$recordId/detail'
+      path: '/records/$recordId/detail'
+      fullPath: '/records/$recordId/detail'
+      preLoaderRoute: typeof AuthenticatedRecordsRecordIdDetailRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ports/sub/$portId/detail': {
+      id: '/_authenticated/ports/sub/$portId/detail'
+      path: '/ports/sub/$portId/detail'
+      fullPath: '/ports/sub/$portId/detail'
+      preLoaderRoute: typeof AuthenticatedPortsSubPortIdDetailRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ports/main/$portId/detail': {
+      id: '/_authenticated/ports/main/$portId/detail'
+      path: '/ports/main/$portId/detail'
+      fullPath: '/ports/main/$portId/detail'
+      preLoaderRoute: typeof AuthenticatedPortsMainPortIdDetailRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -490,19 +650,38 @@ const AuthenticatedSettingsRouteRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedRecordsCreateRoute: typeof AuthenticatedRecordsCreateRoute
   AuthenticatedUsersLogsRoute: typeof AuthenticatedUsersLogsRoute
   AuthenticatedUsersRolesRoute: typeof AuthenticatedUsersRolesRoute
+  AuthenticatedApiDataIndexRoute: typeof AuthenticatedApiDataIndexRoute
   AuthenticatedRecordsIndexRoute: typeof AuthenticatedRecordsIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
+  AuthenticatedRecordsRecordIdDetailRoute: typeof AuthenticatedRecordsRecordIdDetailRoute
+  AuthenticatedRecordsRecordIdEditRoute: typeof AuthenticatedRecordsRecordIdEditRoute
+  AuthenticatedPortsMainIndexRoute: typeof AuthenticatedPortsMainIndexRoute
+  AuthenticatedPortsSubIndexRoute: typeof AuthenticatedPortsSubIndexRoute
+  AuthenticatedPortsMainPortIdDetailRoute: typeof AuthenticatedPortsMainPortIdDetailRoute
+  AuthenticatedPortsSubPortIdDetailRoute: typeof AuthenticatedPortsSubPortIdDetailRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedRecordsCreateRoute: AuthenticatedRecordsCreateRoute,
   AuthenticatedUsersLogsRoute: AuthenticatedUsersLogsRoute,
   AuthenticatedUsersRolesRoute: AuthenticatedUsersRolesRoute,
+  AuthenticatedApiDataIndexRoute: AuthenticatedApiDataIndexRoute,
   AuthenticatedRecordsIndexRoute: AuthenticatedRecordsIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
+  AuthenticatedRecordsRecordIdDetailRoute:
+    AuthenticatedRecordsRecordIdDetailRoute,
+  AuthenticatedRecordsRecordIdEditRoute: AuthenticatedRecordsRecordIdEditRoute,
+  AuthenticatedPortsMainIndexRoute: AuthenticatedPortsMainIndexRoute,
+  AuthenticatedPortsSubIndexRoute: AuthenticatedPortsSubIndexRoute,
+  AuthenticatedPortsMainPortIdDetailRoute:
+    AuthenticatedPortsMainPortIdDetailRoute,
+  AuthenticatedPortsSubPortIdDetailRoute:
+    AuthenticatedPortsSubPortIdDetailRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
