@@ -20,6 +20,18 @@ from .file_attachment import (
     get_file_attachment,
     get_file_attachments_by_entity,
 )
+from .port import (
+    create_main_port,
+    create_sub_port,
+    delete_main_port,
+    delete_sub_port,
+    get_main_port,
+    get_sub_port,
+    list_main_ports,
+    list_sub_ports,
+    update_main_port,
+    update_sub_port,
+)
 
 __all__ = [
     "authenticate",
@@ -38,4 +50,14 @@ __all__ = [
     "delete_file_attachment",
     "get_file_attachment",
     "get_file_attachments_by_entity",
+    "create_main_port",
+    "get_main_port",
+    "list_main_ports",
+    "update_main_port",
+    "delete_main_port",
+    "create_sub_port",
+    "get_sub_port",
+    "list_sub_ports",
+    "update_sub_port",
+    "delete_sub_port",
 ]
