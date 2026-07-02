@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
+    api_access,
     dashboard,
     export_groups,
     files,
@@ -25,4 +26,5 @@ api_router.include_router(ports.router)
 api_router.include_router(records.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(export_groups.router)
+api_router.include_router(api_access.router)
 api_router.include_router(utils.router)
