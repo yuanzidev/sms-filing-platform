@@ -13,6 +13,13 @@ export interface RecordFilters {
   sms_signature?: string
   carrier?: string
   status?: string
+  province?: string
+  city?: string
+  business_type?: string
+  record_number?: string
+  handler_name?: string
+  start_date?: string
+  end_date?: string
 }
 
 /**
