@@ -6,7 +6,7 @@ import type { MainPort, SubPort } from '../mock/data/ports'
  */
 export interface MainPortFilters {
   page?: number
-  pageSize?: number
+  page_size?: number
   carrier?: string
   status?: string
   province?: string
@@ -19,7 +19,7 @@ export interface MainPortsResponse {
   data: MainPort[]
   total: number
   page: number
-  pageSize: number
+  page_size: number
 }
 
 /**
@@ -27,7 +27,7 @@ export interface MainPortsResponse {
  */
 export interface SubPortFilters {
   page?: number
-  pageSize?: number
+  page_size?: number
   main_port_id?: string
   carrier?: string
   status?: string
@@ -41,7 +41,7 @@ export interface SubPortsResponse {
   data: SubPort[]
   total: number
   page: number
-  pageSize: number
+  page_size: number
 }
 
 /**
@@ -81,5 +81,53 @@ export const getSubPorts = async (params?: SubPortFilters): Promise<SubPortsResp
  */
 export const getSubPort = async (id: string): Promise<SubPort> => {
   const response = await api.get(`/api/v1/ports/sub/${id}`)
+  return response.data
+}
+
+/**
+ * 创建主端口
+ */
+export const createMainPort = async (data: Partial<MainPort>): Promise<MainPort> => {
+  const response = await api.post('/api/v1/ports/main', data)
+  return response.data
+}
+
+/**
+ * 更新主端口
+ */
+export const updateMainPort = async (id: string, data: Partial<MainPort>): Promise<MainPort> => {
+  const response = await api.patch(`/api/v1/ports/main/${id}`, data)
+  return response.data
+}
+
+/**
+ * 删除主端口
+ */
+export const deleteMainPort = async (id: string): Promise<{ message: string }> => {
+  const response = await api.delete(`/api/v1/ports/main/${id}`)
+  return response.data
+}
+
+/**
+ * 创建子端口
+ */
+export const createSubPort = async (data: Partial<SubPort>): Promise<SubPort> => {
+  const response = await api.post('/api/v1/ports/sub', data)
+  return response.data
+}
+
+/**
+ * 更新子端口
+ */
+export const updateSubPort = async (id: string, data: Partial<SubPort>): Promise<SubPort> => {
+  const response = await api.patch(`/api/v1/ports/sub/${id}`, data)
+  return response.data
+}
+
+/**
+ * 删除子端口
+ */
+export const deleteSubPort = async (id: string): Promise<{ message: string }> => {
+  const response = await api.delete(`/api/v1/ports/sub/${id}`)
   return response.data
 }

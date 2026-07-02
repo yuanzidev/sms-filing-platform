@@ -6,7 +6,7 @@ import type { FilingRecord } from '../mock/data/records'
  */
 export interface RecordFilters {
   page?: number
-  pageSize?: number
+  page_size?: number
   enterprise_name?: string
   main_port?: string
   sub_port?: string
@@ -29,7 +29,7 @@ export interface RecordsResponse {
   data: FilingRecord[]
   total: number
   page: number
-  pageSize: number
+  page_size: number
 }
 
 /**
@@ -80,5 +80,65 @@ export const updateRecord = async (id: string, data: Partial<FilingRecord>): Pro
  */
 export const deleteRecord = async (id: string): Promise<{ message: string }> => {
   const response = await api.delete(`/api/v1/records/${id}`)
+  return response.data
+}
+
+export interface ImportUploadResponse {
+  headers: string[]
+  preview_rows: Record<string, unknown>[]
+  image_columns: Record<string, string>
+  total_rows: number
+  image_count: number
+  file_token: string
+}
+
+export interface ImportConfirmRequest {
+  file_token: string
+  field_mapping: Record<string, string>
+}
+
+export interface ImportConfirmResponse {
+  success_count: number
+  error_count: number
+  errors: { row: number; message: string }[]
+  import_batch: string
+}
+
+export interface ExportRequest {
+  export_group_id: string
+  carrier?: string
+  status?: string
+  enterprise_name?: string
+  province?: string
+  business_type?: string
+}
+
+/**
+ * 上传 Excel 文件进行预览解析
+ */
+export const uploadImport = async (file: File): Promise<ImportUploadResponse> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  const response = await api.post('/api/v1/records/import/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return response.data
+}
+
+/**
+ * 确认导入（传入字段映射）
+ */
+export const confirmImport = async (body: ImportConfirmRequest): Promise<ImportConfirmResponse> => {
+  const response = await api.post('/api/v1/records/import/confirm', body)
+  return response.data
+}
+
+/**
+ * 按分组模板导出报备记录
+ */
+export const exportRecords = async (body: ExportRequest): Promise<Blob> => {
+  const response = await api.post('/api/v1/records/export', body, {
+    responseType: 'blob',
+  })
   return response.data
 }

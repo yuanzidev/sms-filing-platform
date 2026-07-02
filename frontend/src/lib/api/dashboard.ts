@@ -1,5 +1,5 @@
 import api from '../api'
-import type { Carrier } from '../mock/data/records'
+import type { Carrier, FilingRecord } from '../mock/data/records'
 
 /**
  * 仪表盘统计数据
@@ -61,6 +61,23 @@ export const getDashboardTrends = async (days?: number): Promise<TrendDataPoint[
  * @returns 运营商分布
  */
 export const getCarrierDistribution = async (): Promise<CarrierDistribution[]> => {
-  const response = await api.get('/api/v1/dashboard/carrier-distribution')
+  const response = await api.get('/api/v1/dashboard/carrier-dist')
+  return response.data
+}
+
+/**
+ * 获取状态分布数据
+ */
+export const getStatusDistribution = async (): Promise<StatusDistribution[]> => {
+  const response = await api.get('/api/v1/dashboard/status-dist')
+  return response.data
+}
+
+/**
+ * 获取最近变更记录
+ * @param limit 返回数量
+ */
+export const getRecentChanges = async (limit?: number): Promise<FilingRecord[]> => {
+  const response = await api.get('/api/v1/dashboard/recent-changes', { params: { limit } })
   return response.data
 }
