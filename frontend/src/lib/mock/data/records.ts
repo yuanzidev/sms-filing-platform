@@ -135,14 +135,30 @@ function pad(n: number, width: number = 4): string {
   return String(n).padStart(width, '0')
 }
 
+/** Format a Date as local YYYY-MM-DD string (avoids toISOString timezone shift) */
+function fmtDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Format a Date as local YYYY-MM-DD HH:mm:ss string */
+function fmtDatetime(d: Date): string {
+  const h = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  const s = String(d.getSeconds()).padStart(2, '0')
+  return `${fmtDate(d)} ${h}:${min}:${s}`
+}
+
 function randomDate(start: Date, end: Date): string {
   const d = new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()))
-  return d.toISOString().slice(0, 10)
+  return fmtDate(d)
 }
 
 function randomDatetime(start: Date, end: Date): string {
   const d = new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()))
-  return d.toISOString().replace('T', ' ').slice(0, 19)
+  return fmtDatetime(d)
 }
 
 // ============================================================
@@ -355,7 +371,7 @@ export function generateRecords(): FilingRecord[] {
       // Expiring in 3 days
       const expiring = new Date(today)
       expiring.setDate(expiring.getDate() + 3)
-      authEndDate = expiring.toISOString().slice(0, 10)
+      authEndDate = fmtDate(expiring)
     } else {
       authEndDate = randomDate(today, new Date(2027, 6, 2))
     }
