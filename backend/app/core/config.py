@@ -64,6 +64,23 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = ""
     POSTGRES_DB: str = ""
 
+    # MinIO / S3-compatible object storage
+    MINIO_ENDPOINT: str = "localhost:9000"
+    MINIO_ACCESS_KEY: str = "sms_filing"
+    MINIO_SECRET_KEY: str = "changethis"
+    MINIO_BUCKET: str = "sms-filing"
+    MINIO_SECURE: bool = False
+
+    # Storage backend: "local" for development, "minio" for production
+    STORAGE_BACKEND: Literal["local", "minio"] = "local"
+
+    # File upload limits
+    MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50MB
+    MAX_IMAGE_SIZE: int = 10 * 1024 * 1024   # 10MB
+
+    # Local storage fallback directory
+    LOCAL_STORAGE_DIR: str = "./storage"
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn:
