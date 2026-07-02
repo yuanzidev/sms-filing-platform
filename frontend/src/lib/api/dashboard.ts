@@ -10,7 +10,8 @@ export interface DashboardStats {
   updated_this_month: number
   incomplete: number
   expiring_soon: number
-  with_ports: number
+  main_port_count: number
+  sub_port_count: number
 }
 
 /**

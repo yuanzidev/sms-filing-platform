@@ -2,6 +2,7 @@
 from datetime import date, datetime, timezone, timedelta
 from typing import Any
 
+from sqlalchemy.orm import selectinload
 from sqlmodel import Session, func, select
 
 from app.models import FilingRecord, PortInfo, MainPort, SubPort
@@ -37,10 +38,17 @@ def get_stats(session: Session) -> dict[str, Any]:
     main_port_count = session.exec(select(func.count()).select_from(MainPort)).one()
     sub_port_count = session.exec(select(func.count()).select_from(SubPort)).one()
 
+    incomplete = session.exec(
+        select(func.count()).select_from(FilingRecord).where(
+            FilingRecord.status != "已报备"
+        )
+    ).one()
+
     return {
         "total_records": total,
         "new_this_month": new_this_month,
         "updated_this_month": updated_this_month,
+        "incomplete": incomplete,
         "expiring_soon": expiring_soon,
         "main_port_count": main_port_count,
         "sub_port_count": sub_port_count,
@@ -98,6 +106,10 @@ def get_recent_changes(session: Session, limit: int = 10) -> list[FilingRecord]:
     """Get most recently modified filing records."""
     stmt = (
         select(FilingRecord)
+        .options(
+            selectinload(FilingRecord.port_info),
+            selectinload(FilingRecord.qualification_info),
+        )
         .order_by(FilingRecord.updated_at.desc())
         .limit(limit)
     )

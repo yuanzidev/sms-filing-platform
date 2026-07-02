@@ -2,6 +2,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Query
+from sqlmodel import SQLModel
 
 from app.api.deps import SessionDep
 from app.crud.dashboard import (
@@ -11,32 +12,22 @@ from app.crud.dashboard import (
     get_status_distribution,
     get_recent_changes,
 )
-from app.models import FilingRecordPublic, PortInfoPublic, QualificationInfoPublic
+from app.services import record_to_public
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
-def _record_to_public(db_obj) -> FilingRecordPublic:
-    pi_data = PortInfoPublic.model_validate(db_obj.port_info).model_dump() if db_obj.port_info else None
-    qi_data = QualificationInfoPublic.model_validate(db_obj.qualification_info).model_dump() if db_obj.qualification_info else None
-
-    return FilingRecordPublic(
-        id=db_obj.id,
-        record_number=db_obj.record_number,
-        status=db_obj.status,
-        source_file=db_obj.source_file,
-        import_batch=db_obj.import_batch,
-        port_info_id=db_obj.port_info_id,
-        qualification_info_id=db_obj.qualification_info_id,
-        operator_id=db_obj.operator_id,
-        created_at=db_obj.created_at,
-        updated_at=db_obj.updated_at,
-        port_info=PortInfoPublic(**pi_data) if pi_data else None,
-        qualification_info=QualificationInfoPublic(**qi_data) if qi_data else None,
-    )
+class DashboardStatsPublic(SQLModel):
+    total_records: int
+    new_this_month: int
+    updated_this_month: int
+    incomplete: int
+    expiring_soon: int
+    main_port_count: int
+    sub_port_count: int
 
 
-@router.get("/stats")
+@router.get("/stats", response_model=DashboardStatsPublic)
 def dashboard_stats(session: SessionDep) -> Any:
     return get_stats(session)
 
@@ -59,4 +50,4 @@ def dashboard_status_dist(session: SessionDep) -> Any:
 @router.get("/recent-changes")
 def dashboard_recent_changes(session: SessionDep, limit: int = Query(10, ge=1, le=50)) -> Any:
     records = get_recent_changes(session, limit=limit)
-    return [_record_to_public(r) for r in records]
+    return [record_to_public(r) for r in records]

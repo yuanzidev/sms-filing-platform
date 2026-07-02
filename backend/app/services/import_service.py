@@ -69,6 +69,9 @@ def parse_excel_preview(file_content: bytes, filename: str) -> dict[str, Any]:
     file_token = uuid.uuid4().hex
     temp_path = temp_dir / f"{file_token}.xlsx"
     temp_path.write_bytes(file_content)
+    # Save original filename alongside temp file for confirm_import
+    meta_path = temp_dir / f"{file_token}.meta"
+    meta_path.write_text(filename)
 
     wb.close()
     return {
@@ -97,6 +100,9 @@ def confirm_import(
     temp_path = temp_dir / f"{file_token}.xlsx"
     if not temp_path.exists():
         raise FileNotFoundError("Import file expired, please re-upload")
+
+    meta_path = temp_dir / f"{file_token}.meta"
+    original_filename = meta_path.read_text() if meta_path.exists() else temp_path.name
 
     wb = openpyxl.load_workbook(str(temp_path))
     ws = wb.active
@@ -144,6 +150,7 @@ def confirm_import(
         batch_rows = rows[batch_start:batch_start + batch_size]
         for row_offset, row in enumerate(batch_rows):
             row_idx = batch_start + row_offset + 2  # 1-based, header is row 1
+            savepoint = session.begin_nested()  # Create savepoint for this row
             try:
                 pi_data: dict[str, Any] = {}
                 qi_data: dict[str, Any] = {}
@@ -186,7 +193,7 @@ def confirm_import(
                     qualification_info_id=qi.id,
                     operator_id=operator_id,
                     import_batch=import_batch,
-                    source_file=temp_path.name,
+                    source_file=original_filename,
                 )
                 session.add(fr)
                 session.flush()
@@ -213,16 +220,18 @@ def confirm_import(
                 success_count += 1
 
             except Exception as e:
-                session.rollback()
+                savepoint.rollback()  # Only roll back this single row
                 errors.append({"row": row_idx, "message": str(e)})
 
         session.commit()
 
     wb.close()
 
-    # Clean up temp file
+    # Clean up temp file and metadata
     try:
         temp_path.unlink()
+        if meta_path.exists():
+            meta_path.unlink()
     except Exception:
         pass
 

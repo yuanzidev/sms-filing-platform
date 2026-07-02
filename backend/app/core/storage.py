@@ -1,4 +1,5 @@
 """Storage backend abstraction with local and MinIO implementations."""
+import threading
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -110,14 +111,17 @@ class MinioStorage(StorageBackend):
 
 
 _storage: StorageBackend | None = None
+_lock = threading.Lock()
 
 
 def get_storage() -> StorageBackend:
     """Factory: return the configured storage backend (cached singleton)."""
     global _storage
     if _storage is None:
-        if settings.STORAGE_BACKEND == "minio":
-            _storage = MinioStorage()
-        else:
-            _storage = LocalFileStorage()
+        with _lock:
+            if _storage is None:  # Double-check after acquiring lock
+                if settings.STORAGE_BACKEND == "minio":
+                    _storage = MinioStorage()
+                else:
+                    _storage = LocalFileStorage()
     return _storage

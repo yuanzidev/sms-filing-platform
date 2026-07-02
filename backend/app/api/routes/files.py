@@ -42,7 +42,10 @@ def upload_file(
     storage = get_storage()
     storage.upload(key, content, content_type)
 
-    entity_uuid = uuid.UUID(entity_id) if entity_id else uuid.uuid4()
+    try:
+        entity_uuid = uuid.UUID(entity_id) if entity_id else uuid.uuid4()
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid entity_id format, must be a valid UUID")
 
     from app.crud.file_attachment import create_file_attachment
     fa_in = FileAttachmentCreate(
