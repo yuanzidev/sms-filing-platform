@@ -90,6 +90,7 @@ export interface FilingRecord {
   updated_at: string
   port_info: PortInfo | null
   qualification_info: QualificationInfo | null
+  attachments?: FileAttachmentPublic[]
 }
 
 export interface FilingRecordListResponse {

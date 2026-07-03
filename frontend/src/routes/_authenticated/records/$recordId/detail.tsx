@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { RecordDetail } from '@/features/records/components/record-detail/record-detail'
 import { getRecord } from '@/lib/api/records'
@@ -7,10 +7,15 @@ import { Pencil } from 'lucide-react'
 
 function RecordDetailPage() {
   const { recordId } = Route.useParams()
+  const queryClient = useQueryClient()
   const { data: record, isLoading } = useQuery({
     queryKey: ['records', recordId],
     queryFn: () => getRecord(recordId),
   })
+
+  const onAttachmentsChange = () => {
+    queryClient.invalidateQueries({ queryKey: ['records', recordId] })
+  }
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-12 text-muted-foreground">加载中...</div>
@@ -31,7 +36,7 @@ function RecordDetailPage() {
           </Button>
         </Link>
       </div>
-      <RecordDetail record={record} />
+      <RecordDetail record={record} onAttachmentsChange={onAttachmentsChange} />
     </div>
   )
 }

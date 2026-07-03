@@ -10,9 +10,10 @@ import { ChangeLogTab } from './tabs/change-log-tab'
 
 interface RecordDetailProps {
   record: FilingRecord
+  onAttachmentsChange?: () => void
 }
 
-export function RecordDetail({ record }: RecordDetailProps) {
+export function RecordDetail({ record, onAttachmentsChange }: RecordDetailProps) {
   return (
     <Tabs defaultValue="basic" className="w-full">
       <TabsList className="w-full justify-start overflow-x-auto">
@@ -29,7 +30,7 @@ export function RecordDetail({ record }: RecordDetailProps) {
       <TabsContent value="contact-auth"><ContactAuthTab record={record} /></TabsContent>
       <TabsContent value="business-signature"><BusinessSignatureTab record={record} /></TabsContent>
       <TabsContent value="template-diversion"><TemplateDiversionTab record={record} /></TabsContent>
-      <TabsContent value="attachments"><AttachmentsTab record={record} /></TabsContent>
+      <TabsContent value="attachments"><AttachmentsTab record={record} onAttachmentsChange={onAttachmentsChange ?? (() => {})} /></TabsContent>
       <TabsContent value="change-log"><ChangeLogTab record={record} /></TabsContent>
     </Tabs>
   )
