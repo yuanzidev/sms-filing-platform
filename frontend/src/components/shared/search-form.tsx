@@ -20,6 +20,8 @@ interface SearchFormProps {
   onReset: () => void
 }
 
+const EMPTY_SENTINEL = '__all__'
+
 export function SearchForm({ fields, onSearch, onReset }: SearchFormProps) {
   const [values, setValues] = useState<Record<string, string>>({})
   const [advancedOpen, setAdvancedOpen] = useState(false)
@@ -27,8 +29,13 @@ export function SearchForm({ fields, onSearch, onReset }: SearchFormProps) {
   const basicFields = fields.filter((f) => !f.advanced)
   const advancedFields = fields.filter((f) => f.advanced)
 
+  const selectValue = (name: string) => {
+    const v = values[name]
+    return v === '' ? EMPTY_SENTINEL : (v ?? '')
+  }
+
   const handleChange = (name: string, value: string) => {
-    setValues((prev) => ({ ...prev, [name]: value }))
+    setValues((prev) => ({ ...prev, [name]: value === EMPTY_SENTINEL ? '' : value }))
   }
 
   const handleSearch = () => {
@@ -51,7 +58,7 @@ export function SearchForm({ fields, onSearch, onReset }: SearchFormProps) {
             <Label htmlFor={field.name}>{field.label}</Label>
             {field.type === 'select' ? (
               <Select
-                value={values[field.name] ?? ''}
+                value={selectValue(field.name)}
                 onValueChange={(v) => handleChange(field.name, v)}
               >
                 <SelectTrigger className="w-[140px]">
@@ -59,7 +66,7 @@ export function SearchForm({ fields, onSearch, onReset }: SearchFormProps) {
                 </SelectTrigger>
                 <SelectContent>
                   {(field.options ?? []).map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    <SelectItem key={opt.value} value={opt.value || EMPTY_SENTINEL}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -94,7 +101,7 @@ export function SearchForm({ fields, onSearch, onReset }: SearchFormProps) {
                   <Label htmlFor={field.name}>{field.label}</Label>
                   {field.type === 'select' ? (
                     <Select
-                      value={values[field.name] ?? ''}
+                      value={selectValue(field.name)}
                       onValueChange={(v) => handleChange(field.name, v)}
                     >
                       <SelectTrigger className="w-[140px]">
@@ -102,7 +109,7 @@ export function SearchForm({ fields, onSearch, onReset }: SearchFormProps) {
                       </SelectTrigger>
                       <SelectContent>
                         {(field.options ?? []).map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          <SelectItem key={opt.value} value={opt.value || EMPTY_SENTINEL}>{opt.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
