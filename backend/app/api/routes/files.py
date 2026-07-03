@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
-from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
+from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
 from app.core.storage import get_storage
 from app.models import FileAttachmentCreate, FileAttachmentPublic, Message
@@ -15,7 +15,7 @@ from app.models import FileAttachmentCreate, FileAttachmentPublic, Message
 router = APIRouter(prefix="/files", tags=["files"])
 
 
-@router.post("/upload", dependencies=[Depends(get_current_active_superuser)])
+@router.post("/upload")
 def upload_file(
     *,
     session: SessionDep,
@@ -89,7 +89,7 @@ def download_file(*, session: SessionDep, id: uuid.UUID) -> Any:
     return Response(content=content, media_type=fa.mime_type)
 
 
-@router.delete("/{id}", dependencies=[Depends(get_current_active_superuser)])
+@router.delete("/{id}")
 def delete_file(
     *, session: SessionDep, id: uuid.UUID
 ) -> Message:
