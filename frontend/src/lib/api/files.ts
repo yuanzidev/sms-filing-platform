@@ -15,7 +15,6 @@ export const uploadFile = async (
   formData.append('entity_id', entityId)
 
   const response = await api.post('/api/v1/files/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 60000,
   })
   return response.data

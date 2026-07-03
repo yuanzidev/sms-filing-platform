@@ -51,7 +51,7 @@ export function FileUploadGroup({
   }
 
   const handleDownload = (item: FileAttachmentPublic) => {
-    getFileUrl(item.id).then((url) => window.open(url, '_blank'))
+    getFileUrl(item.id).then((url) => window.open(url, '_blank')).catch(() => setError('下载失败'))
   }
 
   if (files.length === 0) {
@@ -157,7 +157,13 @@ function FileThumbnail({ file }: { file: FileAttachmentPublic }) {
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
-    getFileUrl(file.id).then(setUrl).catch(() => setFailed(true))
+    let cancelled = false
+    getFileUrl(file.id).then((u) => {
+      if (!cancelled) setUrl(u)
+    }).catch(() => {
+      if (!cancelled) setFailed(true)
+    })
+    return () => { cancelled = true }
   }, [file.id])
 
   if (failed || !url) {
