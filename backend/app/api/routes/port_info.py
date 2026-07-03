@@ -1,8 +1,12 @@
 """Port info management routes."""
+import io
 import uuid
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from openpyxl import Workbook
 
 from app.api.deps import SessionDep, get_current_active_superuser
 from app.crud.port_info import (
@@ -25,6 +29,51 @@ router = APIRouter(
     tags=["port-info"],
     dependencies=[Depends(get_current_active_superuser)],
 )
+
+_PORT_INFO_HEADERS = [
+    "运营商",
+    "操作类型",
+    "主端口号",
+    "子端口号",
+    "码号使用范围",
+    "接入省",
+    "接入地市",
+    "端口类型",
+    "端口入网时间",
+    "是否允许自行扩展",
+    "业务属性",
+    "业务类型",
+    "业务细类",
+    "具体用途",
+    "短信签名",
+    "是否网关签名",
+    "运营商接入机房及设备",
+    "企业接入机房及设备",
+    "是否具有授权书",
+    "授权开始日期",
+    "授权结束日期",
+    "短信模板内容",
+]
+
+
+@router.get("/template")
+def download_port_info_template() -> Any:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "端口信息导入模板"
+    for col_idx, header in enumerate(_PORT_INFO_HEADERS, 1):
+        ws.cell(row=1, column=col_idx, value=header)
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    filename = "端口信息导入模板.xlsx"
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+        },
+    )
 
 
 @router.get("", response_model=PortInfosPublic)
