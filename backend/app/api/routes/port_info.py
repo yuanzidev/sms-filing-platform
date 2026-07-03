@@ -164,7 +164,13 @@ def import_port_infos(
             s = str(v).strip()
             if not s:
                 return None
-            return date.fromisoformat(s)
+            try:
+                return date.fromisoformat(s)
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"第{row_idx}行: 日期格式无效，请使用 YYYY-MM-DD 格式",
+                )
 
         carrier = cell("carrier")
         if not carrier:
