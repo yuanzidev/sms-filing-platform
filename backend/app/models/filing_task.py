@@ -10,8 +10,8 @@ from app.core.timezone import utcnow
 
 class FilingTaskBase(SQLModel):
     task_name: str = Field(max_length=256)
-    qualification_ids: list[uuid.UUID] = Field(sa_column=Column(JSON))
-    port_ids: list[uuid.UUID] = Field(sa_column=Column(JSON))
+    qualification_ids: list[str] = Field(sa_column=Column(JSON))
+    port_ids: list[str] = Field(sa_column=Column(JSON))
     export_group_id: uuid.UUID = Field(foreign_key="export_group.id")
     group_by_field: str | None = Field(default=None, max_length=64)
     file_path: str | None = Field(default=None, max_length=512)
@@ -51,8 +51,8 @@ class FilingTaskPublic(SQLModel):
 
 
 class FilingTaskDetail(FilingTaskPublic):
-    qualification_ids: list[uuid.UUID]
-    port_ids: list[uuid.UUID]
+    qualification_ids: list[str]
+    port_ids: list[str]
     file_path: str | None
     download_url: str | None
 

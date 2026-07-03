@@ -24,9 +24,9 @@ import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-p
 import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authenticated/settings/route'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
-import { Route as AuthenticatedFilingManagementIndexRouteImport } from './routes/_authenticated/filing-management/index'
 import { Route as AuthenticatedQualificationsIndexRouteImport } from './routes/_authenticated/qualifications/index'
 import { Route as AuthenticatedPortInfoIndexRouteImport } from './routes/_authenticated/port-info/index'
+import { Route as AuthenticatedFilingManagementIndexRouteImport } from './routes/_authenticated/filing-management/index'
 import { Route as AuthenticatedApiDataIndexRouteImport } from './routes/_authenticated/api-data/index'
 import { Route as AuthenticatedUsersRolesRouteImport } from './routes/_authenticated/users/roles'
 import { Route as AuthenticatedUsersLogsRouteImport } from './routes/_authenticated/users/logs'
@@ -35,10 +35,6 @@ import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_auth
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedFilingManagementCreateRouteImport } from './routes/_authenticated/filing-management/create'
-import { Route as AuthenticatedPortsSubIndexRouteImport } from './routes/_authenticated/ports/sub/index'
-import { Route as AuthenticatedPortsMainIndexRouteImport } from './routes/_authenticated/ports/main/index'
-import { Route as AuthenticatedPortsSubPortIdDetailRouteImport } from './routes/_authenticated/ports/sub/$portId/detail'
-import { Route as AuthenticatedPortsMainPortIdDetailRouteImport } from './routes/_authenticated/ports/main/$portId/detail'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
@@ -116,12 +112,6 @@ const AuthenticatedSettingsIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
-const AuthenticatedFilingManagementIndexRoute =
-  AuthenticatedFilingManagementIndexRouteImport.update({
-    id: '/filing-management/',
-    path: '/filing-management/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedQualificationsIndexRoute =
   AuthenticatedQualificationsIndexRouteImport.update({
     id: '/qualifications/',
@@ -132,6 +122,12 @@ const AuthenticatedPortInfoIndexRoute =
   AuthenticatedPortInfoIndexRouteImport.update({
     id: '/port-info/',
     path: '/port-info/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFilingManagementIndexRoute =
+  AuthenticatedFilingManagementIndexRouteImport.update({
+    id: '/filing-management/',
+    path: '/filing-management/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedApiDataIndexRoute =
@@ -180,30 +176,6 @@ const AuthenticatedFilingManagementCreateRoute =
     path: '/filing-management/create',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedPortsSubIndexRoute =
-  AuthenticatedPortsSubIndexRouteImport.update({
-    id: '/ports/sub/',
-    path: '/ports/sub/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedPortsMainIndexRoute =
-  AuthenticatedPortsMainIndexRouteImport.update({
-    id: '/ports/main/',
-    path: '/ports/main/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedPortsSubPortIdDetailRoute =
-  AuthenticatedPortsSubPortIdDetailRouteImport.update({
-    id: '/ports/sub/$portId/detail',
-    path: '/ports/sub/$portId/detail',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedPortsMainPortIdDetailRoute =
-  AuthenticatedPortsMainPortIdDetailRouteImport.update({
-    id: '/ports/main/$portId/detail',
-    path: '/ports/main/$portId/detail',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
@@ -226,15 +198,11 @@ export interface FileRoutesByFullPath {
   '/users/logs': typeof AuthenticatedUsersLogsRoute
   '/users/roles': typeof AuthenticatedUsersRolesRoute
   '/api-data': typeof AuthenticatedApiDataIndexRoute
+  '/filing-management': typeof AuthenticatedFilingManagementIndexRoute
   '/port-info': typeof AuthenticatedPortInfoIndexRoute
   '/qualifications': typeof AuthenticatedQualificationsIndexRoute
-  '/filing-management': typeof AuthenticatedFilingManagementIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
-  '/ports/main': typeof AuthenticatedPortsMainIndexRoute
-  '/ports/sub': typeof AuthenticatedPortsSubIndexRoute
-  '/ports/main/$portId/detail': typeof AuthenticatedPortsMainPortIdDetailRoute
-  '/ports/sub/$portId/detail': typeof AuthenticatedPortsSubPortIdDetailRoute
 }
 export interface FileRoutesByTo {
   '/forgot-password': typeof authForgotPasswordRoute
@@ -256,15 +224,11 @@ export interface FileRoutesByTo {
   '/users/logs': typeof AuthenticatedUsersLogsRoute
   '/users/roles': typeof AuthenticatedUsersRolesRoute
   '/api-data': typeof AuthenticatedApiDataIndexRoute
+  '/filing-management': typeof AuthenticatedFilingManagementIndexRoute
   '/port-info': typeof AuthenticatedPortInfoIndexRoute
   '/qualifications': typeof AuthenticatedQualificationsIndexRoute
-  '/filing-management': typeof AuthenticatedFilingManagementIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
-  '/ports/main': typeof AuthenticatedPortsMainIndexRoute
-  '/ports/sub': typeof AuthenticatedPortsSubIndexRoute
-  '/ports/main/$portId/detail': typeof AuthenticatedPortsMainPortIdDetailRoute
-  '/ports/sub/$portId/detail': typeof AuthenticatedPortsSubPortIdDetailRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -289,15 +253,11 @@ export interface FileRoutesById {
   '/_authenticated/users/logs': typeof AuthenticatedUsersLogsRoute
   '/_authenticated/users/roles': typeof AuthenticatedUsersRolesRoute
   '/_authenticated/api-data/': typeof AuthenticatedApiDataIndexRoute
+  '/_authenticated/filing-management/': typeof AuthenticatedFilingManagementIndexRoute
   '/_authenticated/port-info/': typeof AuthenticatedPortInfoIndexRoute
   '/_authenticated/qualifications/': typeof AuthenticatedQualificationsIndexRoute
-  '/_authenticated/filing-management/': typeof AuthenticatedFilingManagementIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
-  '/_authenticated/ports/main/': typeof AuthenticatedPortsMainIndexRoute
-  '/_authenticated/ports/sub/': typeof AuthenticatedPortsSubIndexRoute
-  '/_authenticated/ports/main/$portId/detail': typeof AuthenticatedPortsMainPortIdDetailRoute
-  '/_authenticated/ports/sub/$portId/detail': typeof AuthenticatedPortsSubPortIdDetailRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -322,15 +282,11 @@ export interface FileRouteTypes {
     | '/users/logs'
     | '/users/roles'
     | '/api-data'
+    | '/filing-management'
     | '/port-info'
     | '/qualifications'
-    | '/filing-management'
     | '/settings/'
     | '/users'
-    | '/ports/main'
-    | '/ports/sub'
-    | '/ports/main/$portId/detail'
-    | '/ports/sub/$portId/detail'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/forgot-password'
@@ -352,15 +308,11 @@ export interface FileRouteTypes {
     | '/users/logs'
     | '/users/roles'
     | '/api-data'
+    | '/filing-management'
     | '/port-info'
     | '/qualifications'
-    | '/filing-management'
     | '/settings'
     | '/users'
-    | '/ports/main'
-    | '/ports/sub'
-    | '/ports/main/$portId/detail'
-    | '/ports/sub/$portId/detail'
   id:
     | '__root__'
     | '/_authenticated'
@@ -384,15 +336,11 @@ export interface FileRouteTypes {
     | '/_authenticated/users/logs'
     | '/_authenticated/users/roles'
     | '/_authenticated/api-data/'
+    | '/_authenticated/filing-management/'
     | '/_authenticated/port-info/'
     | '/_authenticated/qualifications/'
-    | '/_authenticated/filing-management/'
     | '/_authenticated/settings/'
     | '/_authenticated/users/'
-    | '/_authenticated/ports/main/'
-    | '/_authenticated/ports/sub/'
-    | '/_authenticated/ports/main/$portId/detail'
-    | '/_authenticated/ports/sub/$portId/detail'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -516,13 +464,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsIndexRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
-    '/_authenticated/filing-management/': {
-      id: '/_authenticated/filing-management/'
-      path: '/filing-management'
-      fullPath: '/filing-management'
-      preLoaderRoute: typeof AuthenticatedFilingManagementIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/qualifications/': {
       id: '/_authenticated/qualifications/'
       path: '/qualifications'
@@ -535,6 +476,13 @@ declare module '@tanstack/react-router' {
       path: '/port-info'
       fullPath: '/port-info'
       preLoaderRoute: typeof AuthenticatedPortInfoIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/filing-management/': {
+      id: '/_authenticated/filing-management/'
+      path: '/filing-management'
+      fullPath: '/filing-management'
+      preLoaderRoute: typeof AuthenticatedFilingManagementIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/api-data/': {
@@ -593,34 +541,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFilingManagementCreateRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/ports/sub/': {
-      id: '/_authenticated/ports/sub/'
-      path: '/ports/sub'
-      fullPath: '/ports/sub'
-      preLoaderRoute: typeof AuthenticatedPortsSubIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/ports/main/': {
-      id: '/_authenticated/ports/main/'
-      path: '/ports/main'
-      fullPath: '/ports/main'
-      preLoaderRoute: typeof AuthenticatedPortsMainIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/ports/sub/$portId/detail': {
-      id: '/_authenticated/ports/sub/$portId/detail'
-      path: '/ports/sub/$portId/detail'
-      fullPath: '/ports/sub/$portId/detail'
-      preLoaderRoute: typeof AuthenticatedPortsSubPortIdDetailRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/ports/main/$portId/detail': {
-      id: '/_authenticated/ports/main/$portId/detail'
-      path: '/ports/main/$portId/detail'
-      fullPath: '/ports/main/$portId/detail'
-      preLoaderRoute: typeof AuthenticatedPortsMainPortIdDetailRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
   }
 }
 
@@ -654,33 +574,25 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedUsersLogsRoute: typeof AuthenticatedUsersLogsRoute
   AuthenticatedUsersRolesRoute: typeof AuthenticatedUsersRolesRoute
   AuthenticatedApiDataIndexRoute: typeof AuthenticatedApiDataIndexRoute
+  AuthenticatedFilingManagementIndexRoute: typeof AuthenticatedFilingManagementIndexRoute
   AuthenticatedPortInfoIndexRoute: typeof AuthenticatedPortInfoIndexRoute
   AuthenticatedQualificationsIndexRoute: typeof AuthenticatedQualificationsIndexRoute
-  AuthenticatedFilingManagementIndexRoute: typeof AuthenticatedFilingManagementIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
-  AuthenticatedPortsMainIndexRoute: typeof AuthenticatedPortsMainIndexRoute
-  AuthenticatedPortsSubIndexRoute: typeof AuthenticatedPortsSubIndexRoute
-  AuthenticatedPortsMainPortIdDetailRoute: typeof AuthenticatedPortsMainPortIdDetailRoute
-  AuthenticatedPortsSubPortIdDetailRoute: typeof AuthenticatedPortsSubPortIdDetailRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
-  AuthenticatedFilingManagementCreateRoute: AuthenticatedFilingManagementCreateRoute,
+  AuthenticatedFilingManagementCreateRoute:
+    AuthenticatedFilingManagementCreateRoute,
   AuthenticatedUsersLogsRoute: AuthenticatedUsersLogsRoute,
   AuthenticatedUsersRolesRoute: AuthenticatedUsersRolesRoute,
   AuthenticatedApiDataIndexRoute: AuthenticatedApiDataIndexRoute,
+  AuthenticatedFilingManagementIndexRoute:
+    AuthenticatedFilingManagementIndexRoute,
   AuthenticatedPortInfoIndexRoute: AuthenticatedPortInfoIndexRoute,
   AuthenticatedQualificationsIndexRoute: AuthenticatedQualificationsIndexRoute,
-  AuthenticatedFilingManagementIndexRoute: AuthenticatedFilingManagementIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
-  AuthenticatedPortsMainIndexRoute: AuthenticatedPortsMainIndexRoute,
-  AuthenticatedPortsSubIndexRoute: AuthenticatedPortsSubIndexRoute,
-  AuthenticatedPortsMainPortIdDetailRoute:
-    AuthenticatedPortsMainPortIdDetailRoute,
-  AuthenticatedPortsSubPortIdDetailRoute:
-    AuthenticatedPortsSubPortIdDetailRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

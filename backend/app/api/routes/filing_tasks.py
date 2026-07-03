@@ -282,6 +282,8 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
     if not create.qualification_ids:
         raise HTTPException(status_code=400, detail="至少选择一个资质")
 
+    qual_id_strs = [str(qid) for qid in create.qualification_ids]
+
     qualifications = list(
         session.exec(
             select(QualificationInfo).where(QualificationInfo.id.in_(create.qualification_ids))  # type: ignore
@@ -330,7 +332,8 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
         raise HTTPException(status_code=500, detail=f"文件上传失败: {e}")
 
     # 7. Update task record with final values
-    task.port_ids = selected_port_ids
+    task.qualification_ids = qual_id_strs
+    task.port_ids = [str(pid) for pid in selected_port_ids]
     task.port_count = len(selected_ports)
     task.qualification_count = len(qualifications)
     task.file_path = file_key

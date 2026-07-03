@@ -25,7 +25,7 @@ def create_filing_task(
     task_name = create.task_name or f"BEI-{date.today().strftime('%Y%m%d')}-{_task_name_sequence(session):03d}"
     db_obj = FilingTask(
         task_name=task_name,
-        qualification_ids=create.qualification_ids,
+        qualification_ids=[str(qid) for qid in create.qualification_ids],
         port_ids=[],  # will be set by the route after random port selection
         export_group_id=create.export_group_id,
         group_by_field=create.group_by_field,
