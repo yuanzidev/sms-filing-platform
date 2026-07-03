@@ -2,6 +2,11 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { Search } from '@/components/search'
+import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -174,32 +179,49 @@ export function FilingCreatePage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/filing-management' })}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h1 className="text-2xl font-bold">新建报备</h1>
-      </div>
+    <>
+      <Header fixed>
+        <Search />
+        <div className='ml-auto flex items-center space-x-4'>
+          <ThemeSwitch />
+          <ProfileDropdown />
+        </div>
+      </Header>
 
-      {/* Step indicator */}
-      <div className="flex items-center gap-2">
-        {([1, 2, 3] as Step[]).map((s, i) => (
-          <div key={s} className="flex items-center gap-2">
-            <div
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
-                step >= s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-              }`}
-            >
-              {step > s ? '✓' : s}
+      <Main>
+        <div className='mb-2 flex flex-wrap items-center justify-between space-y-2'>
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/filing-management' })}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h2 className='text-2xl font-bold tracking-tight'>新建报备</h2>
+              <p className='text-muted-foreground'>
+                选择资质、配置导出参数并生成报备任务
+              </p>
             </div>
-            <span className={`text-sm ${step >= s ? 'font-medium' : 'text-muted-foreground'}`}>
-              {s === 1 ? '选择资质' : s === 2 ? '配置导出' : '确认生成'}
-            </span>
-            {i < 2 && <div className="mx-2 h-px w-8 bg-border" />}
           </div>
-        ))}
-      </div>
+        </div>
+
+        <div className="space-y-6">
+          {/* Step indicator */}
+          <div className="flex items-center gap-2">
+            {([1, 2, 3] as Step[]).map((s, i) => (
+              <div key={s} className="flex items-center gap-2">
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
+                    step >= s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                  }`}
+                >
+                  {step > s ? '✓' : s}
+                </div>
+                <span className={`text-sm ${step >= s ? 'font-medium' : 'text-muted-foreground'}`}>
+                  {s === 1 ? '选择资质' : s === 2 ? '配置导出' : '确认生成'}
+                </span>
+                {i < 2 && <div className="mx-2 h-px w-8 bg-border" />}
+              </div>
+            ))}
+          </div>
 
       {/* Step 1: Select qualifications */}
       {step === 1 && (
@@ -349,6 +371,8 @@ export function FilingCreatePage() {
           </CardContent>
         </Card>
       )}
-    </div>
+        </div>
+      </Main>
+    </>
   )
 }

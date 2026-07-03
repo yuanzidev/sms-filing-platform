@@ -2,8 +2,14 @@ import { useState, useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { Search } from '@/components/search'
+import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Plus, RefreshCw } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { getFilingTasks, deleteFilingTask, getFilingTaskDownloadUrl } from '@/lib/api/filing-tasks'
 import type { FilingTask } from '@/lib/api/types'
@@ -132,79 +138,106 @@ export function FilingManagementPage() {
   ], [])
 
   return (
-    <div className="space-y-4 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">报备管理</h1>
-        <Button asChild>
-          <Link to="/filing-management/create">新建报备</Link>
-        </Button>
-      </div>
+    <>
+      <Header fixed>
+        <Search />
+        <div className='ml-auto flex items-center space-x-4'>
+          <ThemeSwitch />
+          <ProfileDropdown />
+        </div>
+      </Header>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border p-4">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm text-muted-foreground">开始日期</label>
-          <Input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="w-40"
-          />
+      <Main>
+        <div className='mb-2 flex flex-wrap items-center justify-between space-y-2'>
+          <div>
+            <h2 className='text-2xl font-bold tracking-tight'>报备管理</h2>
+            <p className='text-muted-foreground'>
+              管理报备任务，查看导出文件并支持按日期和关键词筛选
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['filing-tasks'] })}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              刷新
+            </Button>
+            <Button asChild>
+              <Link to="/filing-management/create">
+                <Plus className="mr-2 h-4 w-4" />
+                新建报备
+              </Link>
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-sm text-muted-foreground">结束日期</label>
-          <Input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="w-40"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-sm text-muted-foreground">关键词</label>
-          <Input
-            type="text"
-            placeholder="搜索任务名称"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            className="w-48"
-          />
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleSearch}>
-            搜索
-          </Button>
-          <Button variant="ghost" size="sm" onClick={handleReset}>
-            重置
-          </Button>
-        </div>
-      </div>
 
-      <DataTable
-        columns={columns}
-        data={tasks}
-        page={page}
-        pageSize={PAGE_SIZE}
-        total={total}
-        onPageChange={setPage}
-      />
+        {/* Filters */}
+        <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border p-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-muted-foreground">开始日期</label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-40"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-muted-foreground">结束日期</label>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-40"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-muted-foreground">关键词</label>
+            <Input
+              type="text"
+              placeholder="搜索任务名称"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              className="w-48"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleSearch}>
+              搜索
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleReset}>
+              重置
+            </Button>
+          </div>
+        </div>
 
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
-            <AlertDialogDescription>
-              确定要删除该报备任务吗？此操作不可撤销，对应的导出文件也将被删除。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>
-              删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+        <DataTable
+          columns={columns}
+          data={tasks}
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={total}
+          onPageChange={setPage}
+        />
+
+        <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认删除</AlertDialogTitle>
+              <AlertDialogDescription>
+                确定要删除该报备任务吗？此操作不可撤销，对应的导出文件也将被删除。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>
+                删除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </Main>
+    </>
   )
 }
