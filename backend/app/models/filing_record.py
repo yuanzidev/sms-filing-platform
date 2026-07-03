@@ -1,6 +1,7 @@
 """Filing record model — joins port_info and qualification_info with status tracking."""
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -52,6 +53,7 @@ class FilingRecordPublic(FilingRecordBase):
     updated_at: datetime
     port_info: PortInfoPublic | None = None
     qualification_info: QualificationInfoPublic | None = None
+    attachments: list[Any] = []
 
 
 class FilingRecordsPublic(SQLModel):

@@ -65,7 +65,26 @@ def read_record(*, session: SessionDep, id: uuid.UUID) -> Any:
     db_obj = get_filing_record(session=session, id=id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="报备记录不存在")
-    return record_to_public(db_obj)
+    result = record_to_public(db_obj)
+    attachments = get_file_attachments_by_entity(
+        session=session, entity_type="filing_record", entity_id=id
+    )
+    result.attachments = [
+        {
+            "id": fa.id,
+            "original_name": fa.original_name,
+            "stored_path": fa.stored_path,
+            "file_size": fa.file_size,
+            "mime_type": fa.mime_type,
+            "md5_hash": fa.md5_hash,
+            "entity_type": fa.entity_type,
+            "entity_id": str(fa.entity_id),
+            "uploader_id": str(fa.uploader_id) if fa.uploader_id else None,
+            "created_at": fa.created_at.isoformat(),
+        }
+        for fa in attachments
+    ]
+    return result
 
 
 @router.patch("/{id}", response_model=FilingRecordPublic)
