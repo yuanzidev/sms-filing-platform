@@ -269,3 +269,18 @@ export interface ApiAccessDataResponse {
 export interface MessageResponse {
   message: string
 }
+
+// ─── File Attachments ──────────────────────────────────────
+
+export interface FileAttachmentPublic {
+  id: string
+  original_name: string
+  stored_path: string
+  file_size: number
+  mime_type: string
+  md5_hash: string
+  entity_type: string
+  entity_id: string
+  uploader_id: string | null
+  created_at: string
+}
