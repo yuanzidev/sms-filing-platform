@@ -49,8 +49,6 @@ export const downloadPortInfoTemplate = async (): Promise<void> => {
 export const importPortInfos = async (file: File): Promise<{ count: number; message: string }> => {
   const formData = new FormData()
   formData.append('file', file)
-  const response = await api.post('/api/v1/port-info/import', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+  const response = await api.post('/api/v1/port-info/import', formData)
   return response.data
 }

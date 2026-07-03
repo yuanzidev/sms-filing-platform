@@ -48,8 +48,6 @@ export const downloadQualificationTemplate = async (): Promise<void> => {
 export const importQualifications = async (file: File): Promise<{ count: number; message: string }> => {
   const formData = new FormData()
   formData.append('file', file)
-  const response = await api.post('/api/v1/qualifications/import', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+  const response = await api.post('/api/v1/qualifications/import', formData)
   return response.data
 }
