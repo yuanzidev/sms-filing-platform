@@ -33,14 +33,9 @@ export const sidebarData: SidebarData = {
           icon: IconLayoutDashboard,
         },
         {
-          title: '报备管理',
+          title: '报备记录',
           url: '/records',
           icon: IconFileDescription,
-        },
-        {
-          title: 'API 接入管理',
-          url: '/api-data',
-          icon: IconApi,
         },
         {
           title: '资质管理',
@@ -48,9 +43,14 @@ export const sidebarData: SidebarData = {
           icon: IconFileDescription,
         },
         {
-          title: '端口信息管理',
+          title: '端口管理',
           url: '/port-info',
           icon: IconPlugConnected,
+        },
+        {
+          title: 'API 接入管理',
+          url: '/api-data',
+          icon: IconApi,
         },
       ],
     },
