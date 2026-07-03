@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { type ColumnDef } from '@tanstack/react-table'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, RefreshCw, Edit, Trash2, Building2 } from 'lucide-react'
+import { Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
+import { DataTable } from '@/components/shared/data-table/data-table'
 import { getQualifications, deleteQualification } from '@/lib/api/qualifications'
 import type { QualificationInfo } from '@/lib/api/types'
 import { QualificationDialog } from './components/qualification-dialog'
@@ -23,7 +24,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
+const PAGE_SIZE = 10
+
 export function QualificationsPage() {
+  const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<QualificationInfo | undefined>()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -31,8 +35,8 @@ export function QualificationsPage() {
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['qualifications'],
-    queryFn: () => getQualifications({ page_size: 100 }),
+    queryKey: ['qualifications', { page, page_size: PAGE_SIZE }],
+    queryFn: () => getQualifications({ page, page_size: PAGE_SIZE }),
   })
 
   const deleteMutation = useMutation({
@@ -47,6 +51,31 @@ export function QualificationsPage() {
   })
 
   const qualifications = data?.data ?? []
+  const total = data?.total ?? 0
+
+  const columns = useMemo<ColumnDef<QualificationInfo>[]>(() => [
+    { accessorKey: 'enterprise_name', header: '企业名称' },
+    { accessorKey: 'submit_unit', header: '提交单位', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'cert_number', header: '证件号码', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'responsible_name', header: '负责人', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'handler_name', header: '经办人', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'app_platform_name', header: '平台', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'created_at', header: '创建时间' },
+    {
+      id: 'actions',
+      header: '操作',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={() => { setSelected(row.original); setDialogOpen(true) }}>
+            编辑
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => { setToDelete(row.original); setDeleteDialogOpen(true) }}>
+            删除
+          </Button>
+        </div>
+      ),
+    },
+  ], [])
 
   return (
     <>
@@ -82,56 +111,14 @@ export function QualificationsPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {qualifications.map((q) => (
-            <Card key={q.id}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{q.enterprise_name}</CardTitle>
-                  <div className="flex space-x-1">
-                    <Button variant="ghost" size="sm" onClick={() => { setSelected(q); setDialogOpen(true) }}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => { setToDelete(q); setDeleteDialogOpen(true) }}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <CardDescription>
-                  {q.submit_unit || '未指定提交单位'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">证件号码:</span>
-                    <span>{q.cert_number || '-'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">负责人:</span>
-                    <span>{q.responsible_name || '-'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">经办人:</span>
-                    <span>{q.handler_name || '-'}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Building2 className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">
-                      平台: {q.app_platform_name || '-'}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {qualifications.length === 0 && !isLoading && (
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">暂无资质信息</p>
-          </div>
-        )}
+        <DataTable
+          columns={columns}
+          data={qualifications}
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={total}
+          onPageChange={setPage}
+        />
       </Main>
 
       <QualificationDialog

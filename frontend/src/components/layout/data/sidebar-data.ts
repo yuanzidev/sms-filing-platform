@@ -38,14 +38,19 @@ export const sidebarData: SidebarData = {
           icon: IconFileDescription,
         },
         {
-          title: '端口管理',
-          url: '/ports/main',
-          icon: IconPlugConnected,
-        },
-        {
           title: 'API 接入管理',
           url: '/api-data',
           icon: IconApi,
+        },
+        {
+          title: '资质管理',
+          url: '/qualifications',
+          icon: IconFileDescription,
+        },
+        {
+          title: '端口信息管理',
+          url: '/port-info',
+          icon: IconPlugConnected,
         },
       ],
     },
@@ -66,16 +71,6 @@ export const sidebarData: SidebarData = {
           title: '登录日志',
           url: '/users/logs',
           icon: IconList,
-        },
-        {
-          title: '资质管理',
-          url: '/qualifications',
-          icon: IconFileDescription,
-        },
-        {
-          title: '端口信息管理',
-          url: '/port-info',
-          icon: IconPlugConnected,
         },
         {
           title: '个人设置',

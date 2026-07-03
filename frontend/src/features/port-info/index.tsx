@@ -1,15 +1,16 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { type ColumnDef } from '@tanstack/react-table'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, RefreshCw, Edit, Trash2 } from 'lucide-react'
+import { Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
+import { DataTable } from '@/components/shared/data-table/data-table'
 import { getPortInfos, deletePortInfo } from '@/lib/api/port-info'
 import type { PortInfo } from '@/lib/api/types'
 import { PortInfoDialog } from './components/port-info-dialog'
@@ -24,7 +25,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
+const PAGE_SIZE = 10
+
 export function PortInfoPage() {
+  const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<PortInfo | undefined>()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -32,8 +36,8 @@ export function PortInfoPage() {
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['port-info'],
-    queryFn: () => getPortInfos({ page_size: 100 }),
+    queryKey: ['port-info', { page, page_size: PAGE_SIZE }],
+    queryFn: () => getPortInfos({ page, page_size: PAGE_SIZE }),
   })
 
   const deleteMutation = useMutation({
@@ -48,6 +52,40 @@ export function PortInfoPage() {
   })
 
   const portInfos = data?.data ?? []
+  const total = data?.total ?? 0
+
+  const columns = useMemo<ColumnDef<PortInfo>[]>(() => [
+    {
+      id: 'port_number',
+      header: '端口号',
+      accessorFn: (row) => row.main_port_number || row.sub_port_number || '-',
+    },
+    {
+      accessorKey: 'carrier',
+      header: '运营商',
+      cell: ({ getValue }) => <Badge variant="outline">{getValue() as string}</Badge>,
+    },
+    { accessorKey: 'business_type', header: '业务类型', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'province', header: '省份', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'city', header: '城市', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'sms_signature', header: '短信签名', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'port_type', header: '端口类型', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'created_at', header: '创建时间' },
+    {
+      id: 'actions',
+      header: '操作',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={() => { setSelected(row.original); setDialogOpen(true) }}>
+            编辑
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => { setToDelete(row.original); setDeleteDialogOpen(true) }}>
+            删除
+          </Button>
+        </div>
+      ),
+    },
+  ], [])
 
   return (
     <>
@@ -83,56 +121,14 @@ export function PortInfoPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {portInfos.map((p) => (
-            <Card key={p.id}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">
-                    {p.main_port_number || p.sub_port_number || '未指定端口'}
-                  </CardTitle>
-                  <div className="flex space-x-1">
-                    <Button variant="ghost" size="sm" onClick={() => { setSelected(p); setDialogOpen(true) }}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => { setToDelete(p); setDeleteDialogOpen(true) }}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <CardDescription>
-                  {p.business_type || '未指定业务类型'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">运营商:</span>
-                    <Badge variant="outline">{p.carrier}</Badge>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">省份:</span>
-                    <span>{p.province || '-'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">城市:</span>
-                    <span>{p.city || '-'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">短信签名:</span>
-                    <span className="truncate max-w-[160px]">{p.sms_signature || '-'}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {portInfos.length === 0 && !isLoading && (
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">暂无端口信息</p>
-          </div>
-        )}
+        <DataTable
+          columns={columns}
+          data={portInfos}
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={total}
+          onPageChange={setPage}
+        />
       </Main>
 
       <PortInfoDialog
