@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Upload, X, Loader2, FileText, Download } from 'lucide-react'
 import { uploadFile, deleteFile, getFileUrl } from '@/lib/api/files'
@@ -51,7 +51,7 @@ export function FileUploadGroup({
   }
 
   const handleDownload = (item: FileAttachmentPublic) => {
-    getFileUrl(item.id).then((url) => window.open(url, '_blank')).catch(() => setError('下载失败'))
+    window.open(getFileUrl(item.id), '_blank')
   }
 
   if (files.length === 0) {
@@ -153,18 +153,8 @@ export function FileUploadGroup({
 }
 
 function FileThumbnail({ file }: { file: FileAttachmentPublic }) {
-  const [url, setUrl] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    getFileUrl(file.id).then((u) => {
-      if (!cancelled) setUrl(u)
-    }).catch(() => {
-      if (!cancelled) setFailed(true)
-    })
-    return () => { cancelled = true }
-  }, [file.id])
+  const url = getFileUrl(file.id)
 
   if (failed || !url) {
     return <div className="h-14 w-14 rounded bg-muted animate-pulse" />

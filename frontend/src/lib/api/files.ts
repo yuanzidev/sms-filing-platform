@@ -21,14 +21,10 @@ export const uploadFile = async (
 }
 
 /**
- * 获取文件下载 URL（跟随重定向获取 presigned URL）
+ * 返回文件 URL（浏览器自动跟随重定向到 presigned/local URL）
  */
-export const getFileUrl = async (id: string): Promise<string> => {
-  const response = await api.get(`/api/v1/files/${id}`, {
-    maxRedirects: 0,
-    validateStatus: (status) => status === 307,
-  })
-  return response.headers['location'] || `/api/v1/files/${id}/download`
+export const getFileUrl = (id: string): string => {
+  return `/api/v1/files/${id}`
 }
 
 /**

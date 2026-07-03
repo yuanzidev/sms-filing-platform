@@ -91,7 +91,7 @@ def download_file(*, session: SessionDep, id: uuid.UUID) -> Any:
 
 @router.delete("/{id}")
 def delete_file(
-    *, session: SessionDep, id: uuid.UUID
+    *, session: SessionDep, current_user: CurrentUser, id: uuid.UUID
 ) -> Message:
     """Delete a file and its storage object."""
     from app.crud.file_attachment import delete_file_attachment, get_file_attachment
