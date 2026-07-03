@@ -52,6 +52,12 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-sms_filing}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sms_filing@123}
       SENTRY_DSN: ${SENTRY_DSN:-}
+      # MinIO / S3-compatible object storage
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-sms_filing}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-changethis}
+      MINIO_BUCKET: ${MINIO_BUCKET:-sms-filing}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
     networks:
       - sms-filing-network
     # 移除端口映射，后端服务只在容器内部网络可访问，通过前端 Nginx 代理访问
