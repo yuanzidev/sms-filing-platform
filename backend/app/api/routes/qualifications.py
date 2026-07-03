@@ -1,8 +1,11 @@
 """Qualification info management routes."""
+import io
 import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from openpyxl import Workbook
 
 from app.api.deps import SessionDep, get_current_active_superuser
 from app.crud.qualification import (
@@ -25,6 +28,41 @@ router = APIRouter(
     tags=["qualifications"],
     dependencies=[Depends(get_current_active_superuser)],
 )
+
+_QUALIFICATION_HEADERS = [
+    "企业名称",
+    "提交单位",
+    "运营商企业ID",
+    "单位证件类型",
+    "单位证件号码",
+    "APP/平台名称",
+    "集团编码",
+    "责任人姓名",
+    "责任人证件类型",
+    "责任人证件号码",
+    "责任人手机号",
+    "经办人姓名",
+    "经办人证件类型",
+    "经办人证件号码",
+    "经办人手机号",
+]
+
+
+@router.get("/template")
+def download_qualification_template() -> Any:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "资质导入模板"
+    for col_idx, header in enumerate(_QUALIFICATION_HEADERS, 1):
+        ws.cell(row=1, column=col_idx, value=header)
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=资质导入模板.xlsx"},
+    )
 
 
 @router.get("", response_model=QualificationInfosPublic)
