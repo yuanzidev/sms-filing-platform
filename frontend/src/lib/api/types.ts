@@ -265,6 +265,63 @@ export interface ApiAccessDataResponse {
   config: ApiAccessConfig
 }
 
+// ─── FilingTask ─────────────────────────────────────────────
+
+export interface FilingTask {
+  id: string
+  task_name: string
+  qualification_count: number
+  port_count: number
+  export_group_name: string
+  group_by_field: string | null
+  file_size: number | null
+  operator_name: string
+  created_at: string
+  // detail only:
+  qualification_ids?: string[]
+  port_ids?: string[]
+  file_path?: string | null
+  download_url?: string | null
+}
+
+export interface FilingTasksResponse {
+  data: FilingTask[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface CreateFilingTaskRequest {
+  qualification_ids: string[]
+  port_count?: number | null
+  export_group_id: string
+  group_by_field?: string | null
+}
+
+// ─── ExportGroup ─────────────────────────────────────────────
+
+export interface ExportGroupField {
+  id: string
+  group_id: string
+  field_name: string
+  field_label: string
+  sort_order: number
+}
+
+export interface ExportGroup {
+  id: string
+  name: string
+  description: string | null
+  fields: ExportGroupField[]
+  created_at: string
+  updated_at: string
+}
+
+export interface ExportGroupsResponse {
+  data: ExportGroup[]
+  count: number
+}
+
 // ─── Generic ───────────────────────────────────────────────
 
 export interface MessageResponse {

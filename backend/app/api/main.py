@@ -5,13 +5,13 @@ from app.api.routes import (
     dashboard,
     export_groups,
     files,
+    filing_tasks,
     login,
     login_logs,
     operation_logs,
     port_info,
     ports,
     qualifications,
-    records,
     roles,
     users,
     utils,
@@ -25,7 +25,7 @@ api_router.include_router(login_logs.router)
 api_router.include_router(operation_logs.router)
 api_router.include_router(files.router)
 api_router.include_router(ports.router)
-api_router.include_router(records.router)
+api_router.include_router(filing_tasks.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(export_groups.router)
 api_router.include_router(api_access.router)

@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { RefreshCw, Trash2, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { getLoginLogs, deleteLoginLog, clearLoginLogs, type LoginLog } from '@/lib/api/login-logs'
+import { getLoginLogs, deleteLoginLog, clearLoginLogs } from '@/lib/api/login-logs'
 import { formatCN } from '@/lib/time'
 import {
     AlertDialog,

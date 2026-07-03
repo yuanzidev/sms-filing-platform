@@ -146,98 +146,75 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="enterprise_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>企业名称 *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="企业全称" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="submit_unit"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>提交单位</FormLabel>
-                    <FormControl>
-                      <Input placeholder="提交单位" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="carrier_enterprise_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>运营商企业ID</FormLabel>
-                    <FormControl>
-                      <Input placeholder="企业唯一标识" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="cert_type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>证件类型</FormLabel>
-                    <FormControl>
-                      <Input placeholder="如: 营业执照" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="cert_number"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>证件号码</FormLabel>
-                    <FormControl>
-                      <Input placeholder="统一社会信用代码" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="app_platform_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>应用平台</FormLabel>
-                    <FormControl>
-                      <Input placeholder="应用/平台名称" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="group_code"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>集团编号</FormLabel>
-                    <FormControl>
-                      <Input placeholder="集团编码" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold mb-3">企业信息</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="enterprise_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>企业名称 *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="企业全称" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="cert_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>证件类型</FormLabel>
+                      <FormControl>
+                        <Input placeholder="如: 营业执照" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="cert_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>证件号码</FormLabel>
+                      <FormControl>
+                        <Input placeholder="统一社会信用代码" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="group_code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>集团编号</FormLabel>
+                      <FormControl>
+                        <Input placeholder="集团编码" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="app_platform_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>应用平台</FormLabel>
+                      <FormControl>
+                        <Input placeholder="应用/平台名称" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <div className="border-t pt-4">
@@ -251,19 +228,6 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
                       <FormLabel>姓名</FormLabel>
                       <FormControl>
                         <Input placeholder="负责人姓名" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="responsible_phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>联系电话</FormLabel>
-                      <FormControl>
-                        <Input placeholder="手机号码" {...field} value={field.value || ''} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -295,6 +259,19 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="responsible_phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>联系电话</FormLabel>
+                      <FormControl>
+                        <Input placeholder="手机号码" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </div>
 
@@ -309,19 +286,6 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
                       <FormLabel>姓名</FormLabel>
                       <FormControl>
                         <Input placeholder="经办人姓名" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="handler_phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>联系电话</FormLabel>
-                      <FormControl>
-                        <Input placeholder="手机号码" {...field} value={field.value || ''} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -348,6 +312,51 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
                       <FormLabel>证件号码</FormLabel>
                       <FormControl>
                         <Input placeholder="经办人证件号" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="handler_phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>联系电话</FormLabel>
+                      <FormControl>
+                        <Input placeholder="手机号码" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold mb-3">提交信息</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="submit_unit"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>提交单位</FormLabel>
+                      <FormControl>
+                        <Input placeholder="提交单位" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="carrier_enterprise_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>运营商企业ID</FormLabel>
+                      <FormControl>
+                        <Input placeholder="企业唯一标识" {...field} value={field.value || ''} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

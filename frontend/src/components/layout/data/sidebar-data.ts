@@ -33,8 +33,8 @@ export const sidebarData: SidebarData = {
           icon: IconLayoutDashboard,
         },
         {
-          title: '报备记录',
-          url: '/records',
+          title: '报备管理',
+          url: '/filing-management',
           icon: IconFileDescription,
         },
         {

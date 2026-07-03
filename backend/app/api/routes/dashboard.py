@@ -6,13 +6,13 @@ from sqlmodel import SQLModel
 
 from app.api.deps import SessionDep
 from app.crud.dashboard import (
-    get_stats,
-    get_trends,
     get_carrier_distribution,
-    get_status_distribution,
     get_recent_changes,
+    get_stats,
+    get_status_distribution,
+    get_trends,
 )
-from app.services import record_to_public
+from app.models.filing_task import FilingTaskPublic
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -49,5 +49,18 @@ def dashboard_status_dist(session: SessionDep) -> Any:
 
 @router.get("/recent-changes")
 def dashboard_recent_changes(session: SessionDep, limit: int = Query(10, ge=1, le=50)) -> Any:
-    records = get_recent_changes(session, limit=limit)
-    return [record_to_public(r) for r in records]
+    tasks = get_recent_changes(session, limit=limit)
+    return [
+        FilingTaskPublic(
+            id=t.id,
+            task_name=t.task_name,
+            qualification_count=t.qualification_count,
+            port_count=t.port_count,
+            export_group_name="",
+            group_by_field=t.group_by_field,
+            file_size=t.file_size,
+            operator_name="",
+            created_at=t.created_at,
+        )
+        for t in tasks
+    ]
