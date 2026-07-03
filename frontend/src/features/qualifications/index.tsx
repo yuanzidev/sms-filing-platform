@@ -7,12 +7,13 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
-import { Plus, RefreshCw } from 'lucide-react'
+import { Download, Plus, RefreshCw, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable } from '@/components/shared/data-table/data-table'
-import { getQualifications, deleteQualification } from '@/lib/api/qualifications'
+import { getQualifications, deleteQualification, downloadQualificationTemplate, importQualifications } from '@/lib/api/qualifications'
 import type { QualificationInfo } from '@/lib/api/types'
 import { QualificationDialog } from './components/qualification-dialog'
+import { ImportDialog } from '@/components/shared/import-dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +33,7 @@ export function QualificationsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [toDelete, setToDelete] = useState<QualificationInfo | undefined>()
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
@@ -96,6 +98,18 @@ export function QualificationsPage() {
             </p>
           </div>
           <div className="flex space-x-2">
+            <Button onClick={() => { setSelected(undefined); setDialogOpen(true) }}>
+              <Plus className="mr-2 h-4 w-4" />
+              新建资质
+            </Button>
+            <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              导入数据
+            </Button>
+            <Button variant="outline" onClick={() => downloadQualificationTemplate()}>
+              <Download className="mr-2 h-4 w-4" />
+              下载模板
+            </Button>
             <Button
               variant="outline"
               onClick={() => queryClient.invalidateQueries({ queryKey: ['qualifications'] })}
@@ -103,10 +117,6 @@ export function QualificationsPage() {
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               刷新
-            </Button>
-            <Button onClick={() => { setSelected(undefined); setDialogOpen(true) }}>
-              <Plus className="mr-2 h-4 w-4" />
-              新建资质
             </Button>
           </div>
         </div>
@@ -125,6 +135,15 @@ export function QualificationsPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         qualification={selected}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['qualifications'] })}
+      />
+
+      <ImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        title="资质信息"
+        onDownloadTemplate={downloadQualificationTemplate}
+        onImport={importQualifications}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ['qualifications'] })}
       />
 
