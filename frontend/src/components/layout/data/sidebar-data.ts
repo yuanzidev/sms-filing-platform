@@ -68,6 +68,16 @@ export const sidebarData: SidebarData = {
           icon: IconList,
         },
         {
+          title: '资质管理',
+          url: '/qualifications',
+          icon: IconFileDescription,
+        },
+        {
+          title: '端口信息管理',
+          url: '/port-info',
+          icon: IconPlugConnected,
+        },
+        {
           title: '个人设置',
           url: '/settings',
           icon: IconSettings,

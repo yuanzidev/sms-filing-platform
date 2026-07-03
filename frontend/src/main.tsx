@@ -86,31 +86,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
-async function enableMocking() {
-  if (import.meta.env.DEV) {
-    const { worker } = await import('./lib/mock/browser')
-    return worker.start({ onUnhandledRequest: 'bypass' })
-  }
-  return Promise.resolve()
-}
-
 // Render the app
-enableMocking().then(() => {
-  const rootElement = document.getElementById('root')!
-  if (!rootElement.innerHTML) {
-    const root = ReactDOM.createRoot(rootElement)
-    root.render(
-      <StrictMode>
-        <ErrorBoundary>
-          <QueryClientProvider client={queryClient}>
-            <ThemeProvider defaultTheme='light' storageKey='vite-ui-theme'>
-              <FontProvider>
-                <RouterProvider router={router} />
-              </FontProvider>
-            </ThemeProvider>
-          </QueryClientProvider>
-        </ErrorBoundary>
-      </StrictMode>
-    )
-  }
-})
+const rootElement = document.getElementById('root')!
+if (!rootElement.innerHTML) {
+  const root = ReactDOM.createRoot(rootElement)
+  root.render(
+    <StrictMode>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider defaultTheme='light' storageKey='vite-ui-theme'>
+            <FontProvider>
+              <RouterProvider router={router} />
+            </FontProvider>
+          </ThemeProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
+    </StrictMode>
+  )
+}

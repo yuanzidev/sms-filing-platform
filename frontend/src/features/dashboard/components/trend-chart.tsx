@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { generateTrendData } from '@/lib/mock/data/dashboard'
+import { useQuery } from '@tanstack/react-query'
+import { getDashboardTrends } from '@/lib/api/dashboard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   BarChart,
@@ -12,7 +12,10 @@ import {
 } from 'recharts'
 
 export function TrendChart() {
-  const data = useMemo(() => generateTrendData(30), [])
+  const { data } = useQuery({
+    queryKey: ['dashboard', 'trends'],
+    queryFn: () => getDashboardTrends(30),
+  })
 
   return (
     <Card>
@@ -22,7 +25,7 @@ export function TrendChart() {
       <CardContent>
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+            <BarChart data={data ?? []} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
                 dataKey="date"

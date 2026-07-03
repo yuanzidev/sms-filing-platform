@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
-import { createRole, updateRole } from '@/lib/mock/store'
+import { createRole, updateRole } from '@/lib/api/roles'
 import type { Role } from '@/lib/api/roles'
 
 /**
@@ -50,7 +50,29 @@ interface RoleDialogProps {
  * 提供角色信息的创建和编辑功能
  */
 export function RoleDialog({ open, onOpenChange, role, onSuccess }: RoleDialogProps) {
-    const [loading, setLoading] = useState(false)
+    const queryClient = useQueryClient()
+
+    const createMutation = useMutation({
+        mutationFn: (data: RoleFormData) => createRole(data),
+        onSuccess: () => {
+            toast.success('角色创建成功')
+            queryClient.invalidateQueries({ queryKey: ['roles'] })
+            onSuccess()
+            onOpenChange(false)
+        },
+        onError: () => toast.error('角色创建失败'),
+    })
+
+    const updateMutation = useMutation({
+        mutationFn: ({ id, data }: { id: string; data: RoleFormData }) => updateRole(id, data),
+        onSuccess: () => {
+            toast.success('角色更新成功')
+            queryClient.invalidateQueries({ queryKey: ['roles'] })
+            onSuccess()
+            onOpenChange(false)
+        },
+        onError: () => toast.error('角色更新失败'),
+    })
 
     const form = useForm<RoleFormData>({
         resolver: zodResolver(roleFormSchema),
@@ -86,24 +108,18 @@ export function RoleDialog({ open, onOpenChange, role, onSuccess }: RoleDialogPr
 
     // 表单提交处理
     const onSubmit = (data: RoleFormData) => {
-        setLoading(true)
         if (role) {
-            updateRole(role.id, data as Record<string, unknown>)
-            toast.success('角色更新成功')
+            updateMutation.mutate({ id: role.id, data })
         } else {
-            createRole(data as Record<string, unknown>)
-            toast.success('角色创建成功')
+            createMutation.mutate(data)
         }
-        onSuccess()
-        onOpenChange(false)
-        form.reset()
-        setLoading(false)
     }
+
+    const isPending = createMutation.isPending || updateMutation.isPending
 
     // 对话框打开时重置表单
     const handleOpenChange = (newOpen: boolean) => {
         if (newOpen) {
-            // 重置表单为当前角色数据或空数据
             if (role) {
                 form.reset({
                     name: role.name,
@@ -268,12 +284,12 @@ export function RoleDialog({ open, onOpenChange, role, onSuccess }: RoleDialogPr
                                 type="button"
                                 variant="outline"
                                 onClick={() => handleOpenChange(false)}
-                                disabled={loading}
+                                disabled={isPending}
                             >
                                 取消
                             </Button>
-                            <Button type="submit" disabled={loading}>
-                                {loading ? '处理中...' : (role ? '更新' : '创建')}
+                            <Button type="submit" disabled={isPending}>
+                                {isPending ? '处理中...' : (role ? '更新' : '创建')}
                             </Button>
                         </DialogFooter>
                     </form>

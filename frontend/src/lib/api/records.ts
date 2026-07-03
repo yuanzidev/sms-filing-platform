@@ -1,5 +1,5 @@
 import api from '../api'
-import type { FilingRecord } from '../mock/data/records'
+import type { FilingRecord, FilingRecordListResponse } from './types'
 
 /**
  * 报备记录查询参数
@@ -37,7 +37,7 @@ export interface RecordsResponse {
  * @param params 查询参数
  * @returns 报备记录列表和总数
  */
-export const getRecords = async (params?: RecordFilters): Promise<RecordsResponse> => {
+export const getRecords = async (params?: RecordFilters): Promise<FilingRecordListResponse> => {
   const response = await api.get('/api/v1/records', { params })
   return response.data
 }

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { StatusTag } from '@/components/shared/status-tag'
-import type { FilingRecord } from '@/lib/mock/data/records'
+import type { FilingRecord } from '@/lib/api/types'
 
 interface RecordsTableProps {
   data: FilingRecord[]
@@ -17,6 +17,7 @@ interface RecordsTableProps {
   enableRowSelection?: boolean
   onRowSelectionChange?: (selection: RowSelectionState) => void
   onDelete?: (id: string) => void
+  isLoading?: boolean
 }
 
 export function RecordsTable({
@@ -52,12 +53,36 @@ export function RecordsTable({
 
     cols.push(
       { accessorKey: 'record_number', header: '报备编号' },
-      { accessorKey: 'carrier', header: '运营商' },
-      { accessorKey: 'enterprise_name', header: '企业名称' },
-      { accessorKey: 'main_port', header: '主端口' },
-      { accessorKey: 'sub_port', header: '子端口' },
-      { accessorKey: 'sms_signature', header: '短信签名' },
-      { accessorKey: 'business_type', header: '业务类型' },
+      {
+        id: 'carrier',
+        header: '运营商',
+        accessorFn: (row) => row.port_info?.carrier ?? '-',
+      },
+      {
+        id: 'enterprise_name',
+        header: '企业名称',
+        accessorFn: (row) => row.qualification_info?.enterprise_name ?? '-',
+      },
+      {
+        id: 'main_port',
+        header: '主端口',
+        accessorFn: (row) => row.port_info?.main_port_number ?? '-',
+      },
+      {
+        id: 'sub_port',
+        header: '子端口',
+        accessorFn: (row) => row.port_info?.sub_port_number ?? '-',
+      },
+      {
+        id: 'sms_signature',
+        header: '短信签名',
+        accessorFn: (row) => row.port_info?.sms_signature ?? '-',
+      },
+      {
+        id: 'business_type',
+        header: '业务类型',
+        accessorFn: (row) => row.port_info?.business_type ?? '-',
+      },
       {
         accessorKey: 'status',
         header: '状态',

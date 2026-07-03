@@ -1,7 +1,12 @@
-import type { AttachmentItem } from '@/lib/mock/data/records'
 import { Button } from '@/components/ui/button'
 import { StatusTag } from '@/components/shared/status-tag'
 import { Upload, X } from 'lucide-react'
+
+interface AttachmentItem {
+  type: string
+  file_name: string
+  status: 'submitted' | 'approved' | 'rejected'
+}
 
 interface FileUploadGroupProps {
   items: AttachmentItem[]

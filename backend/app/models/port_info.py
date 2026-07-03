@@ -76,4 +76,6 @@ class PortInfoPublic(PortInfoBase):
 
 class PortInfosPublic(SQLModel):
     data: list[PortInfoPublic]
-    count: int
+    total: int
+    page: int
+    page_size: int

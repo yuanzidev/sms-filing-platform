@@ -1,4 +1,5 @@
-import { carrierDistribution } from '@/lib/mock/data/dashboard'
+import { useQuery } from '@tanstack/react-query'
+import { getCarrierDistribution } from '@/lib/api/dashboard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   PieChart,
@@ -12,6 +13,11 @@ import {
 const COLORS = ['#3b82f6', '#ef4444', '#22c55e']
 
 export function CarrierPieChart() {
+  const { data } = useQuery({
+    queryKey: ['dashboard', 'carrier-dist'],
+    queryFn: getCarrierDistribution,
+  })
+
   return (
     <Card>
       <CardHeader>
@@ -22,26 +28,19 @@ export function CarrierPieChart() {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={carrierDistribution}
+                data={data ?? []}
                 cx="50%"
                 cy="50%"
                 outerRadius={100}
                 dataKey="count"
                 nameKey="carrier"
-                label={(entry: any) =>
-                  `${entry.carrier} ${entry.count}`
-                }
+                label={(entry: any) => `${entry.carrier} ${entry.count}`}
               >
-                {carrierDistribution.map((_, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}
-                  />
+                {(data ?? []).map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip
-                formatter={(value: number, name: string) => [value, name]}
-              />
+              <Tooltip formatter={(value: number, name: string) => [value, name]} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>

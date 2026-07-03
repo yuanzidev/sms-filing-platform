@@ -1,4 +1,4 @@
-import type { SubPort } from '@/lib/mock/data/ports'
+import type { SubPort } from '@/lib/api/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusTag } from '@/components/shared/status-tag'
 
@@ -25,10 +25,8 @@ export function SubPortDetail({ port }: Props) {
           <StatusTag status={port.status} />
         </div>
         <Row label="所属主端口" value={port.main_port_number} />
-        <Row label="企业名称" value={port.enterprise_name} />
-        <Row label="短信签名" value={port.sms_signature} />
-        <Row label="业务类型" value={port.business_type} />
-        <Row label="报备编号" value={port.record_number} />
+        <Row label="报备记录ID" value={port.filing_record_id} />
+        <Row label="创建时间" value={port.created_at} />
         <Row label="更新时间" value={port.updated_at} />
       </CardContent>
     </Card>

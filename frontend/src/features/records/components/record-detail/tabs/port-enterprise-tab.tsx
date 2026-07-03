@@ -1,4 +1,4 @@
-import type { FilingRecord } from '@/lib/mock/data/records'
+import type { FilingRecord } from '@/lib/api/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface Props { record: FilingRecord }
@@ -18,31 +18,29 @@ export function PortEnterpriseTab({ record }: Props) {
       <Card>
         <CardHeader><CardTitle>端口信息</CardTitle></CardHeader>
         <CardContent>
-          <Row label="主端口" value={record.main_port} />
-          <Row label="子端口" value={record.sub_port} />
-          <Row label="端口范围" value={record.port_range} />
-          <Row label="端口类型" value={record.port_type} />
-          <Row label="开通日期" value={record.port_activation_date} />
-          <Row label="允许自扩展" value={record.allow_self_extension} />
+          <Row label="主端口" value={record.port_info?.main_port_number} />
+          <Row label="子端口" value={record.port_info?.sub_port_number} />
+          <Row label="端口范围" value={record.port_info?.port_range} />
+          <Row label="端口类型" value={record.port_info?.port_type} />
+          <Row label="开通日期" value={record.port_info?.port_activation_date} />
+          <Row label="允许自扩展" value={record.port_info?.allow_self_extension} />
         </CardContent>
       </Card>
       <Card>
         <CardHeader><CardTitle>企业信息</CardTitle></CardHeader>
         <CardContent>
-          <Row label="企业名称" value={record.enterprise_name} />
-          <Row label="证件类型" value={record.cert_type} />
-          <Row label="证件号码" value={record.cert_number} />
-          <Row label="客户类型" value={record.customer_type} />
-          <Row label="集团编号" value={record.group_code} />
-          <Row label="应用平台" value={record.app_platform_name} />
+          <Row label="企业名称" value={record.qualification_info?.enterprise_name} />
+          <Row label="证件类型" value={record.qualification_info?.cert_type} />
+          <Row label="证件号码" value={record.qualification_info?.cert_number} />
+          <Row label="集团编号" value={record.qualification_info?.group_code} />
+          <Row label="应用平台" value={record.qualification_info?.app_platform_name} />
         </CardContent>
       </Card>
       <Card>
         <CardHeader><CardTitle>区域信息</CardTitle></CardHeader>
         <CardContent>
-          <Row label="省份" value={record.province} />
-          <Row label="城市" value={record.city} />
-          <Row label="区县" value={record.district} />
+          <Row label="省份" value={record.port_info?.province} />
+          <Row label="城市" value={record.port_info?.city} />
         </CardContent>
       </Card>
     </div>

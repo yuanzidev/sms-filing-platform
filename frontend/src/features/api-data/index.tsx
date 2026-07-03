@@ -1,123 +1,229 @@
-import { useState, useMemo } from 'react'
-import { getApiData } from '@/lib/mock/store'
-import { DataTable } from '@/components/shared/data-table/data-table'
-import { SearchForm, type SearchField } from '@/components/shared/search-form'
-import { StatusTag } from '@/components/shared/status-tag'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { Search } from '@/components/search'
+import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import type { ColumnDef } from '@tanstack/react-table'
-import { Eye } from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Plus, RefreshCw, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  getApiAccessConfigs,
+  deleteApiAccessConfig,
+  getApiAccessData,
+} from '@/lib/api/api-data'
+import type { ApiAccessConfig } from '@/lib/api/types'
+import { ApiAccessDialog } from './components/api-access-dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
-const searchFields: SearchField[] = [
-  { name: 'api_name', label: 'API名称', type: 'select', options: [
-    { label: '全部', value: '' },
-    { label: 'sms_template_api_v1', value: 'sms_template_api_v1' },
-    { label: 'port_register_api_v2', value: 'port_register_api_v2' },
-    { label: 'enterprise_verify_api_v1', value: 'enterprise_verify_api_v1' },
-    { label: 'signature_register_api_v1', value: 'signature_register_api_v1' },
-    { label: 'blacklist_check_api_v1', value: 'blacklist_check_api_v1' },
-  ]},
-  { name: 'data_type', label: '数据类型', type: 'select', options: [
-    { label: '全部', value: '' },
-    { label: '模板报备', value: '模板报备' },
-    { label: '端口报备', value: '端口报备' },
-    { label: '企业认证', value: '企业认证' },
-    { label: '签名报备', value: '签名报备' },
-    { label: '黑名单校验', value: '黑名单校验' },
-  ]},
-  { name: 'status', label: '状态', type: 'select', options: [
-    { label: '全部', value: '' },
-    { label: '待处理', value: '待处理' },
-    { label: '已入库', value: '已入库' },
-    { label: '校验失败', value: '校验失败' },
-    { label: '已忽略', value: '已忽略' },
-  ]},
-  { name: 'carrier', label: '运营商', type: 'select', options: [
-    { label: '全部', value: '' },
-    { label: '移动', value: '移动' },
-    { label: '联通', value: '联通' },
-    { label: '电信', value: '电信' },
-  ]},
-  { name: 'enterprise_name', label: '企业名称', type: 'text' },
-]
+export function ApiAccessPage() {
+  const [selectedConfig, setSelectedConfig] = useState<ApiAccessConfig | undefined>()
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [configToDelete, setConfigToDelete] = useState<ApiAccessConfig | undefined>()
+  const [dataConfigId, setDataConfigId] = useState<string | null>(null)
+  const queryClient = useQueryClient()
 
-interface ApiDataRow {
-  id: string
-  import_time: string
-  api_name: string
-  data_type: string
-  enterprise_name: string
-  main_port: string
-  sub_port: string
-  carrier: string
-  status: string
-  error_reason: string | null
-  raw_data: object
-}
+  const { data, isLoading } = useQuery({
+    queryKey: ['api-access'],
+    queryFn: () => getApiAccessConfigs(),
+  })
 
-export function ApiDataListPage() {
-  const [filters, setFilters] = useState<Record<string, string>>({})
-  const [page, setPage] = useState(1)
-  const [rawDialog, setRawDialog] = useState<{ open: boolean; item?: ApiDataRow }>({ open: false })
-  const pageSize = 10
-
-  const { data, total } = getApiData(filters, page, pageSize)
-  const rows = data as unknown as ApiDataRow[]
-
-  const columns: ColumnDef<ApiDataRow>[] = useMemo(() => [
-    { accessorKey: 'import_time', header: '导入时间' },
-    { accessorKey: 'api_name', header: 'API名称' },
-    { accessorKey: 'data_type', header: '数据类型' },
-    { accessorKey: 'enterprise_name', header: '企业名称' },
-    { accessorKey: 'main_port', header: '主端口' },
-    { accessorKey: 'sub_port', header: '子端口' },
-    { accessorKey: 'carrier', header: '运营商' },
-    {
-      accessorKey: 'status',
-      header: '状态',
-      cell: ({ getValue }) => <StatusTag status={getValue() as string} />,
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteApiAccessConfig(id),
+    onSuccess: () => {
+      toast.success('配置删除成功')
+      queryClient.invalidateQueries({ queryKey: ['api-access'] })
+      setDeleteDialogOpen(false)
+      setConfigToDelete(undefined)
     },
-    {
-      accessorKey: 'error_reason',
-      header: '错误原因',
-      cell: ({ getValue }) => {
-        const val = getValue() as string | null
-        return val ? <span className="text-destructive text-xs">{val}</span> : '-'
-      },
-    },
-    {
-      id: 'actions',
-      header: '操作',
-      cell: ({ row }) => (
-        <Button variant="ghost" size="sm" onClick={() => setRawDialog({ open: true, item: row.original })}>
-          <Eye className="mr-1 h-4 w-4" />原始数据
-        </Button>
-      ),
-    },
-  ], [])
+    onError: () => toast.error('配置删除失败'),
+  })
+
+  const configs = data?.data ?? []
 
   return (
-    <div className="space-y-4 p-6">
-      <h1 className="text-2xl font-bold">API数据展示</h1>
-      <SearchForm fields={searchFields} onSearch={(f) => { setFilters(f); setPage(1) }} onReset={() => { setFilters({}); setPage(1) }} />
-      <DataTable
-        columns={columns}
-        data={rows}
-        page={page}
-        pageSize={pageSize}
-        total={total}
-        onPageChange={setPage}
+    <>
+      <Header fixed>
+        <Search />
+        <div className='ml-auto flex items-center space-x-4'>
+          <ThemeSwitch />
+          <ProfileDropdown />
+        </div>
+      </Header>
+
+      <Main>
+        <div className='mb-2 flex flex-wrap items-center justify-between space-y-2'>
+          <div>
+            <h2 className='text-2xl font-bold tracking-tight'>API 接入配置</h2>
+            <p className='text-muted-foreground'>
+              管理第三方 API 数据接入配置与数据展示
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['api-access'] })}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              刷新
+            </Button>
+            <Button onClick={() => { setSelectedConfig(undefined); setDialogOpen(true) }}>
+              <Plus className="mr-2 h-4 w-4" />
+              新建配置
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {configs.map((config) => (
+            <Card key={config.id}>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">{config.name}</CardTitle>
+                  <div className="flex space-x-1">
+                    <Button variant="ghost" size="sm" onClick={() => { setSelectedConfig(config); setDialogOpen(true) }}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setConfigToDelete(config); setDeleteDialogOpen(true) }}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <CardDescription>
+                  {config.endpoint || '未配置端点'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">类型:</span>
+                    <span>{config.source_type || '-'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">状态:</span>
+                    <Badge variant={config.is_active ? 'default' : 'secondary'}>
+                      {config.is_active ? '启用' : '停用'}
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-2"
+                    onClick={() => setDataConfigId(dataConfigId === config.id ? null : config.id)}
+                  >
+                    {dataConfigId === config.id ? <EyeOff className="mr-1 h-3 w-3" /> : <Eye className="mr-1 h-3 w-3" />}
+                    {dataConfigId === config.id ? '隐藏数据' : '查看数据'}
+                  </Button>
+                  {dataConfigId === config.id && (
+                    <ApiAccessDataView configId={config.id} />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {configs.length === 0 && !isLoading && (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">暂无 API 接入配置</p>
+          </div>
+        )}
+      </Main>
+
+      <ApiAccessDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        config={selectedConfig}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['api-access'] })}
       />
-      <Dialog open={rawDialog.open} onOpenChange={(open) => setRawDialog({ open })}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>原始数据</DialogTitle>
-          </DialogHeader>
-          <pre className="max-h-96 overflow-auto rounded-md bg-muted p-4 text-xs">
-            {JSON.stringify(rawDialog.item?.raw_data, null, 2)}
-          </pre>
-        </DialogContent>
-      </Dialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除配置 "{configToDelete?.name}" 吗？此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => configToDelete && deleteMutation.mutate(configToDelete.id)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
+}
+
+function ApiAccessDataView({ configId }: { configId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['api-access', configId, 'data'],
+    queryFn: () => getApiAccessData(configId),
+  })
+
+  if (isLoading) {
+    return <div className="text-sm text-muted-foreground py-2">加载中...</div>
+  }
+
+  const records = data?.data ?? []
+
+  if (records.length === 0) {
+    return <div className="text-sm text-muted-foreground py-2">暂无数据</div>
+  }
+
+  const columns = Object.keys(records[0] || {}).slice(0, 5)
+
+  return (
+    <div className="mt-2 overflow-auto rounded border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {columns.map((col) => (
+              <TableHead key={col} className="text-xs">{col}</TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {records.slice(0, 10).map((row, i) => (
+            <TableRow key={i}>
+              {columns.map((col) => (
+                <TableCell key={col} className="text-xs">
+                  {String(row[col] ?? '-')}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   )
 }
+
+export default ApiAccessPage

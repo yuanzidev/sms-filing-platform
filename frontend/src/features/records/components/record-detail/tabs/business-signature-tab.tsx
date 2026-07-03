@@ -1,4 +1,4 @@
-import type { FilingRecord } from '@/lib/mock/data/records'
+import type { FilingRecord } from '@/lib/api/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface Props { record: FilingRecord }
@@ -18,31 +18,24 @@ export function BusinessSignatureTab({ record }: Props) {
       <Card>
         <CardHeader><CardTitle>业务信息</CardTitle></CardHeader>
         <CardContent>
-          <Row label="业务属性" value={record.business_attribute} />
-          <Row label="业务类型" value={record.business_type} />
-          <Row label="业务子类型" value={record.business_subtype} />
-          <Row label="运营商原始业务类型" value={record.carrier_original_biz_type} />
-          <Row label="具体用途" value={record.specific_usage} />
-          <Row label="绿色通道" value={record.is_green_channel} />
-          <Row label="黑名单类型" value={record.blacklist_type} />
+          <Row label="业务属性" value={record.port_info?.business_attribute} />
+          <Row label="业务类型" value={record.port_info?.business_type} />
+          <Row label="业务子类型" value={record.port_info?.business_subtype} />
+          <Row label="具体用途" value={record.port_info?.specific_usage} />
         </CardContent>
       </Card>
       <Card>
         <CardHeader><CardTitle>签名信息</CardTitle></CardHeader>
         <CardContent>
-          <Row label="短信签名" value={record.sms_signature} />
-          <Row label="签名类型" value={record.signature_type} />
-          <Row label="签名已验证" value={record.signature_verified} />
-          <Row label="网关签名" value={record.is_gateway_signature} />
-          <Row label="签名附件" value={record.signature_attachment} />
+          <Row label="短信签名" value={record.port_info?.sms_signature} />
+          <Row label="网关签名" value={record.port_info?.is_gateway_signature} />
         </CardContent>
       </Card>
       <Card>
         <CardHeader><CardTitle>机房信息</CardTitle></CardHeader>
         <CardContent>
-          <Row label="运营商机房" value={record.carrier_room} />
-          <Row label="企业机房" value={record.enterprise_room} />
-          <Row label="其他机房" value={record.other_room} />
+          <Row label="运营商机房" value={record.port_info?.carrier_room} />
+          <Row label="企业机房" value={record.port_info?.enterprise_room} />
         </CardContent>
       </Card>
     </div>

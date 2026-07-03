@@ -1,0 +1,271 @@
+/** Backend-aligned type definitions. Replaces mock data types. */
+
+// ─── Shared enums / unions ────────────────────────────────
+
+export type Carrier = '移动' | '联通' | '电信'
+export type RecordStatus = '草稿' | '已报备' | '变更中' | '停用'
+export type PortStatus = '空闲' | '使用中' | '停用' | '异常'
+export type SubPortStatus = '空闲' | '已分配' | '已报备' | '停用'
+export type ApiDataStatus = '待处理' | '已入库' | '校验失败' | '已忽略'
+
+// ─── QualificationInfo ─────────────────────────────────────
+
+export interface QualificationInfo {
+  id: string
+  submit_unit: string | null
+  carrier_enterprise_id: string | null
+  enterprise_name: string
+  cert_type: string | null
+  cert_number: string | null
+  app_platform_name: string | null
+  group_code: string | null
+  responsible_name: string | null
+  responsible_cert_type: string | null
+  responsible_cert_number: string | null
+  responsible_phone: string | null
+  handler_name: string | null
+  handler_cert_type: string | null
+  handler_cert_number: string | null
+  handler_phone: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface QualificationListResponse {
+  data: QualificationInfo[]
+  total: number
+  page: number
+  page_size: number
+}
+
+// ─── PortInfo ──────────────────────────────────────────────
+
+export interface PortInfo {
+  id: string
+  carrier: string
+  operation_type: string | null
+  main_port_number: string | null
+  sub_port_number: string | null
+  port_range: string | null
+  province: string | null
+  city: string | null
+  port_type: string | null
+  port_activation_date: string | null
+  allow_self_extension: boolean | null
+  business_attribute: string | null
+  business_type: string | null
+  business_subtype: string | null
+  specific_usage: string | null
+  sms_signature: string | null
+  is_gateway_signature: boolean | null
+  carrier_room: string | null
+  enterprise_room: string | null
+  has_authorization: boolean | null
+  auth_start_date: string | null
+  auth_end_date: string | null
+  sms_template_content: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PortInfoListResponse {
+  data: PortInfo[]
+  total: number
+  page: number
+  page_size: number
+}
+
+// ─── FilingRecord (nested, matching backend) ──────────────
+
+export interface FilingRecord {
+  id: string
+  record_number: string
+  status: string
+  source_file: string | null
+  import_batch: string | null
+  port_info_id: string
+  qualification_info_id: string
+  operator_id: string | null
+  created_at: string
+  updated_at: string
+  port_info: PortInfo | null
+  qualification_info: QualificationInfo | null
+}
+
+export interface FilingRecordListResponse {
+  data: FilingRecord[]
+  total: number
+  page: number
+  page_size: number
+}
+
+// ─── Dashboard ─────────────────────────────────────────────
+
+export interface DashboardStats {
+  total_records: number
+  new_this_month: number
+  updated_this_month: number
+  incomplete: number
+  expiring_soon: number
+  main_port_count: number
+  sub_port_count: number
+}
+
+export interface TrendDataPoint {
+  date: string
+  count: number
+}
+
+export interface CarrierDistribution {
+  carrier: string
+  count: number
+}
+
+export interface StatusDistribution {
+  status: string
+  count: number
+}
+
+// ─── Users ─────────────────────────────────────────────────
+
+export interface User {
+  id: string
+  email: string
+  is_active: boolean
+  is_superuser: boolean
+  full_name: string | null
+  role_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface UserListResponse {
+  data: User[]
+  count: number
+}
+
+// ─── Roles ─────────────────────────────────────────────────
+
+export interface Role {
+  id: string
+  name: string
+  description: string | null
+  permissions: string[]
+  created_at: string
+  updated_at: string
+}
+
+export interface RoleListResponse {
+  data: Role[]
+  count: number
+}
+
+// ─── Login Logs ────────────────────────────────────────────
+
+export interface LoginLog {
+  id: string
+  user_id: string
+  user_email: string
+  ip_address: string | null
+  user_agent: string | null
+  login_time: string
+  success: boolean
+}
+
+export interface LoginLogListResponse {
+  data: LoginLog[]
+  count: number
+}
+
+// ─── Operation Logs ────────────────────────────────────────
+
+export interface OperationLog {
+  id: string
+  user_id: string | null
+  user_email: string | null
+  action: string
+  module: string | null
+  detail: string | null
+  result: string
+  created_at: string
+}
+
+export interface OperationLogListResponse {
+  data: OperationLog[]
+  count: number
+}
+
+// ─── Ports (Main/Sub) ──────────────────────────────────────
+
+export interface MainPort {
+  id: string
+  port_number: string
+  carrier: string
+  port_range: string | null
+  province: string | null
+  city: string | null
+  port_type: string | null
+  status: string
+  sub_port_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface SubPort {
+  id: string
+  port_number: string
+  main_port_id: string
+  main_port_number: string
+  carrier: string
+  status: string
+  filing_record_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface MainPortListResponse {
+  data: MainPort[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface SubPortListResponse {
+  data: SubPort[]
+  total: number
+  page: number
+  page_size: number
+}
+
+// ─── API Access ────────────────────────────────────────────
+
+export interface ApiAccessConfig {
+  id: string
+  name: string
+  source_type: string | null
+  endpoint: string | null
+  auth_config: Record<string, unknown> | null
+  field_mapping: Record<string, unknown> | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ApiAccessConfigListResponse {
+  data: ApiAccessConfig[]
+  count: number
+}
+
+export interface ApiAccessDataResponse {
+  data: Record<string, unknown>[]
+  total: number
+  page: number
+  page_size: number
+  config: ApiAccessConfig
+}
+
+// ─── Generic ───────────────────────────────────────────────
+
+export interface MessageResponse {
+  message: string
+}

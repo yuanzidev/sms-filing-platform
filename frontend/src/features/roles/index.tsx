@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
@@ -9,8 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Plus, RefreshCw, Edit, Trash2, Users } from 'lucide-react'
 import { toast } from 'sonner'
-import { getRoles, deleteRole } from '@/lib/mock/store'
-import type { Role } from '@/lib/api/roles'
+import { getRoles, deleteRole, type Role } from '@/lib/api/roles'
 import { RoleDialog } from './components/role-dialog'
 import {
     AlertDialog,
@@ -23,74 +23,30 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
-/**
- * 角色管理主页面
- * 提供角色列表展示、创建、编辑、删除等功能
- */
 export function RolesPage() {
-    const [roles, setRoles] = useState<Role[]>([])
-    const [loading, setLoading] = useState(true)
     const [selectedRole, setSelectedRole] = useState<Role | undefined>()
     const [dialogOpen, setDialogOpen] = useState(false)
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [roleToDelete, setRoleToDelete] = useState<Role | undefined>()
+    const queryClient = useQueryClient()
 
-    /**
-     * 加载角色列表
-     */
-    const loadRoles = () => {
-        setLoading(true)
-        const response = getRoles()
-        setRoles(response.data)
-        setLoading(false)
-    }
+    const { data, isLoading } = useQuery({
+        queryKey: ['roles'],
+        queryFn: () => getRoles(),
+    })
 
-    /**
-     * 删除角色
-     */
-    const handleDeleteRole = (role: Role) => {
-        deleteRole(role.id)
-        toast.success('角色删除成功')
-        loadRoles()
-        setDeleteDialogOpen(false)
-        setRoleToDelete(undefined)
-    }
+    const deleteMutation = useMutation({
+        mutationFn: (id: string) => deleteRole(id),
+        onSuccess: () => {
+            toast.success('角色删除成功')
+            queryClient.invalidateQueries({ queryKey: ['roles'] })
+            setDeleteDialogOpen(false)
+            setRoleToDelete(undefined)
+        },
+        onError: () => toast.error('角色删除失败'),
+    })
 
-    /**
-     * 打开创建角色对话框
-     */
-    const handleCreateRole = () => {
-        setSelectedRole(undefined)
-        setDialogOpen(true)
-    }
-
-    /**
-     * 打开编辑角色对话框
-     */
-    const handleEditRole = (role: Role) => {
-        setSelectedRole(role)
-        setDialogOpen(true)
-    }
-
-    /**
-     * 打开删除角色确认对话框
-     */
-    const handleOpenDeleteRole = (role: Role) => {
-        setRoleToDelete(role)
-        setDeleteDialogOpen(true)
-    }
-
-    /**
-     * 对话框成功回调
-     */
-    const handleDialogSuccess = () => {
-        loadRoles()
-    }
-
-    // 初始加载
-    useEffect(() => {
-        loadRoles()
-    }, [])
+    const roles = data?.data ?? []
 
     return (
         <>
@@ -111,11 +67,15 @@ export function RolesPage() {
                         </p>
                     </div>
                     <div className="flex space-x-2">
-                        <Button variant="outline" onClick={loadRoles} disabled={loading}>
-                            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                        <Button
+                            variant="outline"
+                            onClick={() => queryClient.invalidateQueries({ queryKey: ['roles'] })}
+                            disabled={isLoading}
+                        >
+                            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                             刷新
                         </Button>
-                        <Button onClick={handleCreateRole}>
+                        <Button onClick={() => { setSelectedRole(undefined); setDialogOpen(true) }}>
                             <Plus className="mr-2 h-4 w-4" />
                             新建角色
                         </Button>
@@ -129,18 +89,10 @@ export function RolesPage() {
                                 <div className="flex items-center justify-between">
                                     <CardTitle className="text-lg">{role.name}</CardTitle>
                                     <div className="flex space-x-1">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleEditRole(role)}
-                                        >
+                                        <Button variant="ghost" size="sm" onClick={() => { setSelectedRole(role); setDialogOpen(true) }}>
                                             <Edit className="h-4 w-4" />
                                         </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleOpenDeleteRole(role)}
-                                        >
+                                        <Button variant="ghost" size="sm" onClick={() => { setRoleToDelete(role); setDeleteDialogOpen(true) }}>
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
                                     </div>
@@ -152,31 +104,15 @@ export function RolesPage() {
                                     <div className="flex items-center space-x-2">
                                         <Users className="h-4 w-4 text-muted-foreground" />
                                         <span className="text-sm text-muted-foreground">
-                                            关联用户: 0人
+                                            关联用户: {role.user_count ?? 0}人
                                         </span>
                                     </div>
                                     <div className="space-y-1">
                                         <div className="text-sm font-medium">功能权限:</div>
                                         <div className="flex flex-wrap gap-1">
                                             {role.permissions && role.permissions.length > 0 ? (
-                                                role.permissions.map((permission) => (
-                                                    <Badge key={permission} variant="secondary" className="text-xs">
-                                                        {permission}
-                                                    </Badge>
-                                                ))
-                                            ) : (
-                                                <span className="text-xs text-muted-foreground">无权限</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <div className="text-sm font-medium">主机权限:</div>
-                                        <div className="flex flex-wrap gap-1">
-                                            {role.host_permissions && role.host_permissions.length > 0 ? (
-                                                role.host_permissions.map((permission) => (
-                                                    <Badge key={permission} variant="outline" className="text-xs">
-                                                        {permission}
-                                                    </Badge>
+                                                role.permissions.map((p) => (
+                                                    <Badge key={p} variant="secondary" className="text-xs">{p}</Badge>
                                                 ))
                                             ) : (
                                                 <span className="text-xs text-muted-foreground">无权限</span>
@@ -189,22 +125,20 @@ export function RolesPage() {
                     ))}
                 </div>
 
-                {roles.length === 0 && !loading && (
+                {roles.length === 0 && !isLoading && (
                     <div className="text-center py-8">
                         <p className="text-muted-foreground">暂无角色数据</p>
                     </div>
                 )}
             </Main>
 
-            {/* 角色创建/编辑对话框 */}
             <RoleDialog
                 open={dialogOpen}
                 onOpenChange={setDialogOpen}
                 role={selectedRole}
-                onSuccess={handleDialogSuccess}
+                onSuccess={() => queryClient.invalidateQueries({ queryKey: ['roles'] })}
             />
 
-            {/* 删除确认对话框 */}
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -216,7 +150,7 @@ export function RolesPage() {
                     <AlertDialogFooter>
                         <AlertDialogCancel>取消</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={() => roleToDelete && handleDeleteRole(roleToDelete)}
+                            onClick={() => roleToDelete && deleteMutation.mutate(roleToDelete.id)}
                             className="bg-red-600 hover:bg-red-700"
                         >
                             删除
@@ -228,4 +162,4 @@ export function RolesPage() {
     )
 }
 
-export default RolesPage 
+export default RolesPage

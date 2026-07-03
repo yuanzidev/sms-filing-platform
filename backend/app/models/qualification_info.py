@@ -62,4 +62,6 @@ class QualificationInfoPublic(QualificationInfoBase):
 
 class QualificationInfosPublic(SQLModel):
     data: list[QualificationInfoPublic]
-    count: int
+    total: int
+    page: int
+    page_size: int

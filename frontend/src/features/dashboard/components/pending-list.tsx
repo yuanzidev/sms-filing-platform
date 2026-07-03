@@ -1,9 +1,18 @@
-import { dashboardStats } from '@/lib/mock/data/dashboard'
+import { useQuery } from '@tanstack/react-query'
+import { getDashboardStats } from '@/lib/api/dashboard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AlertTriangle, Clock } from 'lucide-react'
 
 export function PendingList() {
-  const allZero = dashboardStats.incomplete === 0 && dashboardStats.expiring_soon === 0
+  const { data } = useQuery({
+    queryKey: ['dashboard', 'stats'],
+    queryFn: getDashboardStats,
+  })
+
+  const incomplete = data?.incomplete ?? 0
+  const expiringSoon = data?.expiring_soon ?? 0
+  const allZero = incomplete === 0 && expiringSoon === 0
+
   if (allZero) {
     return (
       <Card>
@@ -24,22 +33,22 @@ export function PendingList() {
       </CardHeader>
       <CardContent>
         <ul className="space-y-3">
-          {dashboardStats.incomplete > 0 && (
+          {incomplete > 0 && (
             <li>
               <div className="flex items-center gap-3 rounded-md p-2 text-sm">
                 <AlertTriangle className="h-5 w-5 text-amber-500" />
                 <span>
-                  <span className="font-medium">{dashboardStats.incomplete}</span> 条报备资料不全，请及时补全
+                  <span className="font-medium">{incomplete}</span> 条报备资料不全，请及时补全
                 </span>
               </div>
             </li>
           )}
-          {dashboardStats.expiring_soon > 0 && (
+          {expiringSoon > 0 && (
             <li>
               <div className="flex items-center gap-3 rounded-md p-2 text-sm">
                 <Clock className="h-5 w-5 text-orange-500" />
                 <span>
-                  <span className="font-medium">{dashboardStats.expiring_soon}</span> 条授权即将到期，请及时处理
+                  <span className="font-medium">{expiringSoon}</span> 条授权即将到期，请及时处理
                 </span>
               </div>
             </li>

@@ -1,4 +1,4 @@
-import type { MainPort } from '@/lib/mock/data/ports'
+import type { MainPort } from '@/lib/api/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusTag } from '@/components/shared/status-tag'
 

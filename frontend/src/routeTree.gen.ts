@@ -25,6 +25,8 @@ import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authen
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedRecordsIndexRouteImport } from './routes/_authenticated/records/index'
+import { Route as AuthenticatedQualificationsIndexRouteImport } from './routes/_authenticated/qualifications/index'
+import { Route as AuthenticatedPortInfoIndexRouteImport } from './routes/_authenticated/port-info/index'
 import { Route as AuthenticatedApiDataIndexRouteImport } from './routes/_authenticated/api-data/index'
 import { Route as AuthenticatedUsersRolesRouteImport } from './routes/_authenticated/users/roles'
 import { Route as AuthenticatedUsersLogsRouteImport } from './routes/_authenticated/users/logs'
@@ -120,6 +122,18 @@ const AuthenticatedRecordsIndexRoute =
   AuthenticatedRecordsIndexRouteImport.update({
     id: '/records/',
     path: '/records/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedQualificationsIndexRoute =
+  AuthenticatedQualificationsIndexRouteImport.update({
+    id: '/qualifications/',
+    path: '/qualifications/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPortInfoIndexRoute =
+  AuthenticatedPortInfoIndexRouteImport.update({
+    id: '/port-info/',
+    path: '/port-info/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedApiDataIndexRoute =
@@ -226,6 +240,8 @@ export interface FileRoutesByFullPath {
   '/users/logs': typeof AuthenticatedUsersLogsRoute
   '/users/roles': typeof AuthenticatedUsersRolesRoute
   '/api-data': typeof AuthenticatedApiDataIndexRoute
+  '/port-info': typeof AuthenticatedPortInfoIndexRoute
+  '/qualifications': typeof AuthenticatedQualificationsIndexRoute
   '/records': typeof AuthenticatedRecordsIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
@@ -256,6 +272,8 @@ export interface FileRoutesByTo {
   '/users/logs': typeof AuthenticatedUsersLogsRoute
   '/users/roles': typeof AuthenticatedUsersRolesRoute
   '/api-data': typeof AuthenticatedApiDataIndexRoute
+  '/port-info': typeof AuthenticatedPortInfoIndexRoute
+  '/qualifications': typeof AuthenticatedQualificationsIndexRoute
   '/records': typeof AuthenticatedRecordsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
@@ -289,6 +307,8 @@ export interface FileRoutesById {
   '/_authenticated/users/logs': typeof AuthenticatedUsersLogsRoute
   '/_authenticated/users/roles': typeof AuthenticatedUsersRolesRoute
   '/_authenticated/api-data/': typeof AuthenticatedApiDataIndexRoute
+  '/_authenticated/port-info/': typeof AuthenticatedPortInfoIndexRoute
+  '/_authenticated/qualifications/': typeof AuthenticatedQualificationsIndexRoute
   '/_authenticated/records/': typeof AuthenticatedRecordsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
@@ -322,6 +342,8 @@ export interface FileRouteTypes {
     | '/users/logs'
     | '/users/roles'
     | '/api-data'
+    | '/port-info'
+    | '/qualifications'
     | '/records'
     | '/settings/'
     | '/users'
@@ -352,6 +374,8 @@ export interface FileRouteTypes {
     | '/users/logs'
     | '/users/roles'
     | '/api-data'
+    | '/port-info'
+    | '/qualifications'
     | '/records'
     | '/settings'
     | '/users'
@@ -384,6 +408,8 @@ export interface FileRouteTypes {
     | '/_authenticated/users/logs'
     | '/_authenticated/users/roles'
     | '/_authenticated/api-data/'
+    | '/_authenticated/port-info/'
+    | '/_authenticated/qualifications/'
     | '/_authenticated/records/'
     | '/_authenticated/settings/'
     | '/_authenticated/users/'
@@ -523,6 +549,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRecordsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/qualifications/': {
+      id: '/_authenticated/qualifications/'
+      path: '/qualifications'
+      fullPath: '/qualifications'
+      preLoaderRoute: typeof AuthenticatedQualificationsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/port-info/': {
+      id: '/_authenticated/port-info/'
+      path: '/port-info'
+      fullPath: '/port-info'
+      preLoaderRoute: typeof AuthenticatedPortInfoIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/api-data/': {
       id: '/_authenticated/api-data/'
       path: '/api-data'
@@ -654,6 +694,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedUsersLogsRoute: typeof AuthenticatedUsersLogsRoute
   AuthenticatedUsersRolesRoute: typeof AuthenticatedUsersRolesRoute
   AuthenticatedApiDataIndexRoute: typeof AuthenticatedApiDataIndexRoute
+  AuthenticatedPortInfoIndexRoute: typeof AuthenticatedPortInfoIndexRoute
+  AuthenticatedQualificationsIndexRoute: typeof AuthenticatedQualificationsIndexRoute
   AuthenticatedRecordsIndexRoute: typeof AuthenticatedRecordsIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
   AuthenticatedRecordsRecordIdDetailRoute: typeof AuthenticatedRecordsRecordIdDetailRoute
@@ -671,6 +713,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedUsersLogsRoute: AuthenticatedUsersLogsRoute,
   AuthenticatedUsersRolesRoute: AuthenticatedUsersRolesRoute,
   AuthenticatedApiDataIndexRoute: AuthenticatedApiDataIndexRoute,
+  AuthenticatedPortInfoIndexRoute: AuthenticatedPortInfoIndexRoute,
+  AuthenticatedQualificationsIndexRoute: AuthenticatedQualificationsIndexRoute,
   AuthenticatedRecordsIndexRoute: AuthenticatedRecordsIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
   AuthenticatedRecordsRecordIdDetailRoute:

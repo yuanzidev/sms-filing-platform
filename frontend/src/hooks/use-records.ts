@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as recordsApi from '@/lib/api/records'
 import type { RecordFilters } from '@/lib/api/records'
-import type { FilingRecord } from '@/lib/mock/data/records'
+import type { FilingRecord } from '@/lib/api/types'
 
 export function useRecords(filters: RecordFilters = {}) {
   return useQuery({

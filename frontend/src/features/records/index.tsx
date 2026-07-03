@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { getRecords, deleteRecord } from '@/lib/mock/store'
+import { getRecords, deleteRecord, type RecordFilters } from '@/lib/api/records'
 import { RecordSearchForm } from '@/features/records/components/record-search-form'
 import { RecordsTable } from '@/features/records/components/records-table'
 import {
@@ -14,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import type { FilingRecord } from '@/lib/mock/data/records'
+import { toast } from 'sonner'
 
 const PAGE_SIZE = 10
 
@@ -22,8 +23,22 @@ export function RecordListPage() {
   const [page, setPage] = useState(1)
   const [filters, setFilters] = useState<Record<string, string>>({})
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const queryClient = useQueryClient()
 
-  const { data, total } = getRecords(filters, page, PAGE_SIZE)
+  const { data, isLoading } = useQuery({
+    queryKey: ['records', { ...filters, page, page_size: PAGE_SIZE }],
+    queryFn: () => getRecords({ ...filters, page, page_size: PAGE_SIZE } as RecordFilters),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteRecord(id),
+    onSuccess: () => {
+      toast.success('删除成功')
+      queryClient.invalidateQueries({ queryKey: ['records'] })
+      setDeleteId(null)
+    },
+    onError: () => toast.error('删除失败'),
+  })
 
   const handleSearch = (values: Record<string, string>) => {
     setFilters(values)
@@ -33,12 +48,6 @@ export function RecordListPage() {
   const handleReset = () => {
     setFilters({})
     setPage(1)
-  }
-
-  const handleDeleteConfirm = () => {
-    if (!deleteId) return
-    deleteRecord(deleteId)
-    setDeleteId(null)
   }
 
   return (
@@ -55,12 +64,13 @@ export function RecordListPage() {
       </div>
 
       <RecordsTable
-        data={data as FilingRecord[]}
+        data={data?.data ?? []}
         page={page}
         pageSize={PAGE_SIZE}
-        total={total}
+        total={data?.total ?? 0}
         onPageChange={setPage}
         onDelete={(id) => setDeleteId(id)}
+        isLoading={isLoading}
       />
 
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
@@ -73,7 +83,7 @@ export function RecordListPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm}>
+            <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>
               删除
             </AlertDialogAction>
           </AlertDialogFooter>

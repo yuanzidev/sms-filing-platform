@@ -1,4 +1,4 @@
-import type { FilingRecord } from '@/lib/mock/data/records'
+import type { FilingRecord } from '@/lib/api/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface Props { record: FilingRecord }

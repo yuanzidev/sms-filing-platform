@@ -1,5 +1,5 @@
 import api from '../api'
-import type { MainPort, SubPort } from '../mock/data/ports'
+import type { MainPort, SubPort, MainPortListResponse, SubPortListResponse } from './types'
 
 /**
  * 主端口列表查询参数
@@ -49,7 +49,7 @@ export interface SubPortsResponse {
  * @param params 查询参数
  * @returns 主端口列表和总数
  */
-export const getMainPorts = async (params?: MainPortFilters): Promise<MainPortsResponse> => {
+export const getMainPorts = async (params?: MainPortFilters): Promise<MainPortListResponse> => {
   const response = await api.get('/api/v1/ports/main', { params })
   return response.data
 }
@@ -69,7 +69,7 @@ export const getMainPort = async (id: string): Promise<MainPort> => {
  * @param params 查询参数
  * @returns 子端口列表和总数
  */
-export const getSubPorts = async (params?: SubPortFilters): Promise<SubPortsResponse> => {
+export const getSubPorts = async (params?: SubPortFilters): Promise<SubPortListResponse> => {
   const response = await api.get('/api/v1/ports/sub', { params })
   return response.data
 }

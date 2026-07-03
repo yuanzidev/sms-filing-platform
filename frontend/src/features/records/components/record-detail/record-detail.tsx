@@ -1,4 +1,4 @@
-import type { FilingRecord } from '@/lib/mock/data/records'
+import type { FilingRecord } from '@/lib/api/types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BasicInfoTab } from './tabs/basic-info-tab'
 import { PortEnterpriseTab } from './tabs/port-enterprise-tab'

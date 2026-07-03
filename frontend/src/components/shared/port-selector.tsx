@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Check, ChevronsUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,7 +12,7 @@ import {
 } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
-import { getMainPorts } from '@/lib/mock/store'
+import { getMainPorts } from '@/lib/api/ports'
 
 interface PortSelectorProps {
   value: string
@@ -29,12 +30,12 @@ export function PortSelector({
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
 
-  const ports = useMemo(() => {
-    const filters: Record<string, string> = {}
-    if (carrier) filters.carrier = carrier
-    const { data } = getMainPorts(filters, 1, 100)
-    return data
-  }, [carrier])
+  const { data } = useQuery({
+    queryKey: ['main-ports', { carrier, page_size: 100 }],
+    queryFn: () => getMainPorts({ carrier, page_size: 100 }),
+  })
+  const ports = data?.data ?? []
+
   const filtered = search
     ? ports.filter((p) => p.port_number.includes(search))
     : ports

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
@@ -9,8 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { RefreshCw, Trash2, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { getLoginLogs, deleteLoginLog, clearLoginLogs } from '@/lib/mock/store'
-import type { LoginLog } from '@/lib/api/login-logs'
+import { getLoginLogs, deleteLoginLog, clearLoginLogs, type LoginLog } from '@/lib/api/login-logs'
 import { formatCN } from '@/lib/time'
 import {
     AlertDialog,
@@ -23,47 +23,32 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
-/**
- * 登录日志主页面
- * 提供登录日志列表展示、筛选、清理等功能
- */
 export function LoginLogsPage() {
-    const [logs, setLogs] = useState<LoginLog[]>([])
-    const [loading, setLoading] = useState(true)
     const [clearDialogOpen, setClearDialogOpen] = useState(false)
+    const queryClient = useQueryClient()
 
-    /**
-     * 加载登录日志列表
-     */
-    const loadLogs = () => {
-        setLoading(true)
-        const response = getLoginLogs()
-        setLogs(response.data)
-        setLoading(false)
-    }
+    const { data, isLoading } = useQuery({
+        queryKey: ['login-logs'],
+        queryFn: () => getLoginLogs(),
+    })
 
-    /**
-     * 删除单条日志
-     */
-    const handleDeleteLog = (logId: string) => {
-        deleteLoginLog(logId)
-        toast.success('日志删除成功')
-        loadLogs()
-    }
+    const deleteMutation = useMutation({
+        mutationFn: (id: string) => deleteLoginLog(id),
+        onSuccess: () => {
+            toast.success('日志删除成功')
+            queryClient.invalidateQueries({ queryKey: ['login-logs'] })
+        },
+    })
 
-    /**
-     * 清理所有日志
-     */
-    const handleClearLogs = () => {
-        clearLoginLogs()
-        toast.success('日志清理成功')
-        loadLogs()
-        setClearDialogOpen(false)
-    }
+    const clearMutation = useMutation({
+        mutationFn: () => clearLoginLogs(),
+        onSuccess: () => {
+            toast.success('日志清理成功')
+            setClearDialogOpen(false)
+            queryClient.invalidateQueries({ queryKey: ['login-logs'] })
+        },
+    })
 
-    /**
-     * 获取状态图标
-     */
     const getStatusIcon = (status: string) => {
         switch (status) {
             case 'success':
@@ -75,9 +60,6 @@ export function LoginLogsPage() {
         }
     }
 
-    /**
-     * 获取状态徽章
-     */
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'success':
@@ -89,10 +71,7 @@ export function LoginLogsPage() {
         }
     }
 
-    // 初始加载
-    useEffect(() => {
-        loadLogs()
-    }, [])
+    const logs = data?.data ?? []
 
     return (
         <>
@@ -113,8 +92,12 @@ export function LoginLogsPage() {
                         </p>
                     </div>
                     <div className="flex space-x-2">
-                        <Button variant="outline" onClick={loadLogs} disabled={loading}>
-                            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                        <Button
+                            variant="outline"
+                            onClick={() => queryClient.invalidateQueries({ queryKey: ['login-logs'] })}
+                            disabled={isLoading}
+                        >
+                            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                             刷新
                         </Button>
                         <Button
@@ -138,11 +121,7 @@ export function LoginLogsPage() {
                                         <CardTitle className="text-lg">{log.username}</CardTitle>
                                         {getStatusBadge(log.status)}
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleDeleteLog(log.id)}
-                                    >
+                                    <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(log.id)}>
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </div>
@@ -166,14 +145,13 @@ export function LoginLogsPage() {
                     ))}
                 </div>
 
-                {logs.length === 0 && !loading && (
+                {logs.length === 0 && !isLoading && (
                     <div className="text-center py-8">
                         <p className="text-muted-foreground">暂无登录日志</p>
                     </div>
                 )}
             </Main>
 
-            {/* 清理日志确认对话框 */}
             <AlertDialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -184,10 +162,7 @@ export function LoginLogsPage() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>取消</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleClearLogs}
-                            className="bg-red-600 hover:bg-red-700"
-                        >
+                        <AlertDialogAction onClick={() => clearMutation.mutate()} className="bg-red-600 hover:bg-red-700">
                             清理
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -197,4 +172,4 @@ export function LoginLogsPage() {
     )
 }
 
-export default LoginLogsPage 
+export default LoginLogsPage

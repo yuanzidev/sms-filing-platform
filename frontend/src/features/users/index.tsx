@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
@@ -7,110 +8,64 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { getUsers, deleteUser, enableUser, disableUser, resetUserPassword } from '@/lib/mock/store'
-import type { User } from '@/lib/api/users'
+import {
+  getUsers,
+  deleteUser,
+  enableUser,
+  disableUser,
+  resetUserPassword,
+  type User,
+} from '@/lib/api/users'
 import { UserDialog } from './components/user-dialog'
 import { columns } from './components/users-columns'
 import { UsersTable } from './components/users-table'
 
-/**
- * 用户管理主页面
- * 提供用户列表展示、搜索、筛选、增删改查等功能
- */
 export function UsersPage() {
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
   const [selectedUser, setSelectedUser] = useState<User | undefined>()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
   const [newPassword, setNewPassword] = useState('')
+  const queryClient = useQueryClient()
 
-  /**
-   * 加载用户列表
-   */
-  const loadUsers = () => {
-    setLoading(true)
-    const response = getUsers()
-    setUsers(response.data)
-    setLoading(false)
-  }
+  const { data, isLoading } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => getUsers(),
+  })
 
-  /**
-   * 删除用户
-   */
-  const handleDeleteUser = (userId: string) => {
-    deleteUser(userId)
-    toast.success('用户删除成功')
-    loadUsers()
-  }
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteUser(id),
+    onSuccess: () => {
+      toast.success('用户删除成功')
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+    },
+  })
 
-  /**
-   * 启用用户
-   */
-  const handleEnableUser = (userId: string) => {
-    enableUser(userId)
-    toast.success('用户已启用')
-    loadUsers()
-  }
+  const enableMutation = useMutation({
+    mutationFn: (id: string) => enableUser(id),
+    onSuccess: () => {
+      toast.success('用户已启用')
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+    },
+  })
 
-  /**
-   * 禁用用户
-   */
-  const handleDisableUser = (userId: string) => {
-    disableUser(userId)
-    toast.success('用户已禁用')
-    loadUsers()
-  }
+  const disableMutation = useMutation({
+    mutationFn: (id: string) => disableUser(id),
+    onSuccess: () => {
+      toast.success('用户已禁用')
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+    },
+  })
 
-  /**
-   * 重置用户密码
-   */
-  const handleResetPassword = (userId: string) => {
-    if (!newPassword) {
-      toast.error('请输入新密码')
-      return
-    }
-    resetUserPassword(userId, newPassword)
-    toast.success('密码重置成功')
-    setPasswordDialogOpen(false)
-    setNewPassword('')
-  }
-
-  /**
-   * 打开创建用户对话框
-   */
-  const handleCreateUser = () => {
-    setSelectedUser(undefined)
-    setDialogOpen(true)
-  }
-
-  /**
-   * 打开编辑用户对话框
-   */
-  const handleEditUser = (user: User) => {
-    setSelectedUser(user)
-    setDialogOpen(true)
-  }
-
-  /**
-   * 打开重置密码对话框
-   */
-  const handleOpenResetPassword = (user: User) => {
-    setSelectedUser(user)
-    setPasswordDialogOpen(true)
-  }
-
-  /**
-   * 对话框成功回调
-   */
-  const handleDialogSuccess = () => {
-    loadUsers()
-  }
-
-  // 初始加载
-  useEffect(() => {
-    loadUsers()
-  }, [])
+  const resetMutation = useMutation({
+    mutationFn: ({ id, password }: { id: string; password: string }) =>
+      resetUserPassword(id, password),
+    onSuccess: () => {
+      toast.success('密码重置成功')
+      setPasswordDialogOpen(false)
+      setNewPassword('')
+    },
+    onError: () => toast.error('密码重置失败'),
+  })
 
   return (
     <>
@@ -131,11 +86,15 @@ export function UsersPage() {
             </p>
           </div>
           <div className="flex space-x-2">
-            <Button variant="outline" onClick={loadUsers} disabled={loading}>
-              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <Button
+              variant="outline"
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               刷新
             </Button>
-            <Button onClick={handleCreateUser}>
+            <Button onClick={() => { setSelectedUser(undefined); setDialogOpen(true) }}>
               <Plus className="mr-2 h-4 w-4" />
               新建用户
             </Button>
@@ -144,27 +103,25 @@ export function UsersPage() {
 
         <div className='-mx-4 flex-1 overflow-auto px-4 py-1 lg:flex-row lg:space-y-0 lg:space-x-12'>
           <UsersTable
-            data={users}
+            data={data?.data ?? []}
             columns={columns({
-              onEdit: handleEditUser,
-              onDelete: handleDeleteUser,
-              onEnable: handleEnableUser,
-              onDisable: handleDisableUser,
-              onResetPassword: handleOpenResetPassword,
+              onEdit: (user) => { setSelectedUser(user); setDialogOpen(true) },
+              onDelete: (id) => deleteMutation.mutate(id),
+              onEnable: (id) => enableMutation.mutate(id),
+              onDisable: (id) => disableMutation.mutate(id),
+              onResetPassword: (user) => { setSelectedUser(user); setPasswordDialogOpen(true) },
             })}
           />
         </div>
       </Main>
 
-      {/* 用户创建/编辑对话框 */}
       <UserDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         user={selectedUser}
-        onSuccess={handleDialogSuccess}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
       />
 
-      {/* 重置密码对话框 */}
       {passwordDialogOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-background p-6 rounded-lg shadow-lg w-96">
@@ -182,14 +139,11 @@ export function UsersPage() {
             <div className="flex justify-end space-x-2">
               <Button
                 variant="outline"
-                onClick={() => {
-                  setPasswordDialogOpen(false)
-                  setNewPassword('')
-                }}
+                onClick={() => { setPasswordDialogOpen(false); setNewPassword('') }}
               >
                 取消
               </Button>
-              <Button onClick={() => handleResetPassword(selectedUser.id)}>
+              <Button onClick={() => resetMutation.mutate({ id: selectedUser.id, password: newPassword })}>
                 确认重置
               </Button>
             </div>

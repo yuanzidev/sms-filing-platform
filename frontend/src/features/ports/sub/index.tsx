@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { getSubPorts } from '@/lib/mock/store'
-import type { SubPort } from '@/lib/mock/data/ports'
+import { useQuery } from '@tanstack/react-query'
+import { getSubPorts, type SubPortFilters } from '@/lib/api/ports'
+import type { SubPort } from '@/lib/api/types'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { SearchForm, type SearchField } from '@/components/shared/search-form'
 import { StatusTag } from '@/components/shared/status-tag'
@@ -23,21 +24,18 @@ const searchFields: SearchField[] = [
     { label: '已报备', value: '已报备' },
     { label: '停用', value: '停用' },
   ]},
-  { name: 'enterprise_name', label: '企业名称', type: 'text' },
 ]
 
 const columns: ColumnDef<SubPort>[] = [
   { accessorKey: 'port_number', header: '端口号' },
   { accessorKey: 'carrier', header: '运营商' },
   { accessorKey: 'main_port_number', header: '所属主端口' },
-  { accessorKey: 'enterprise_name', header: '企业名称' },
-  { accessorKey: 'sms_signature', header: '短信签名' },
-  { accessorKey: 'business_type', header: '业务类型' },
   {
     accessorKey: 'status',
     header: '状态',
     cell: ({ getValue }) => <StatusTag status={getValue() as string} />,
   },
+  { accessorKey: 'created_at', header: '创建时间' },
   {
     id: 'actions',
     header: '操作',
@@ -57,7 +55,10 @@ export function SubPortListPage() {
   const [page, setPage] = useState(1)
   const pageSize = 10
 
-  const { data, total } = getSubPorts(filters, page, pageSize)
+  const { data, isLoading } = useQuery({
+    queryKey: ['ports', 'sub', { ...filters, page, page_size: pageSize }],
+    queryFn: () => getSubPorts({ ...filters, page, page_size: pageSize } as SubPortFilters),
+  })
 
   return (
     <div className="space-y-4 p-6">
@@ -65,11 +66,12 @@ export function SubPortListPage() {
       <SearchForm fields={searchFields} onSearch={(f) => { setFilters(f); setPage(1) }} onReset={() => { setFilters({}); setPage(1) }} />
       <DataTable
         columns={columns}
-        data={data as SubPort[]}
+        data={data?.data ?? []}
         page={page}
         pageSize={pageSize}
-        total={total}
+        total={data?.total ?? 0}
         onPageChange={setPage}
+        isLoading={isLoading}
       />
     </div>
   )

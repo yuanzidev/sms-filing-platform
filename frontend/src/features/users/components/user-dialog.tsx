@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -29,10 +29,9 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { createUser, updateUser } from '@/lib/mock/store'
-import { getRoles } from '@/lib/mock/store'
+import { createUser, updateUser } from '@/lib/api/users'
+import { getRoles } from '@/lib/api/roles'
 import type { User } from '@/lib/api/users'
-import type { Role } from '@/lib/api/roles'
 
 /**
  * 用户表单验证模式
@@ -60,8 +59,49 @@ interface UserDialogProps {
  * 提供用户信息的创建和编辑功能
  */
 export function UserDialog({ open, onOpenChange, user, onSuccess }: UserDialogProps) {
-    const [loading, setLoading] = useState(false)
-    const [roles, setRoles] = useState<Role[]>([])
+    const queryClient = useQueryClient()
+
+    const { data: rolesData } = useQuery({
+        queryKey: ['roles'],
+        queryFn: () => getRoles({ limit: 100 }),
+        enabled: open,
+    })
+    const roles = rolesData?.data ?? []
+
+    const createMutation = useMutation({
+        mutationFn: (data: UserFormData) => createUser({
+            email: data.email,
+            username: data.username,
+            password: data.password!,
+            full_name: data.full_name,
+            role_id: data.role_id || undefined,
+        }),
+        onSuccess: () => {
+            toast.success('用户创建成功')
+            queryClient.invalidateQueries({ queryKey: ['users'] })
+            onSuccess()
+            onOpenChange(false)
+        },
+        onError: () => toast.error('用户创建失败'),
+    })
+
+    const updateMutation = useMutation({
+        mutationFn: ({ id, data }: { id: string; data: UserFormData }) => updateUser(id, {
+            email: data.email,
+            username: data.username,
+            password: data.password || undefined,
+            full_name: data.full_name,
+            role_id: data.role_id || undefined,
+            status: data.status,
+        }),
+        onSuccess: () => {
+            toast.success('用户更新成功')
+            queryClient.invalidateQueries({ queryKey: ['users'] })
+            onSuccess()
+            onOpenChange(false)
+        },
+        onError: () => toast.error('用户更新失败'),
+    })
 
     const form = useForm<UserFormData>({
         resolver: zodResolver(userFormSchema),
@@ -82,69 +122,44 @@ export function UserDialog({ open, onOpenChange, user, onSuccess }: UserDialogPr
         },
     })
 
-    const loadRoles = () => {
-        const response = getRoles()
-        setRoles(response.data)
-    }
-
     const onSubmit = (data: UserFormData) => {
-        setLoading(true)
-
-        const submitData = {
-            ...data,
-            role_id: data.role_id || undefined,
-        }
-
         if (user) {
-            updateUser(user.id, submitData)
-            toast.success('用户更新成功')
+            updateMutation.mutate({ id: user.id, data })
         } else {
             if (!data.password) {
                 toast.error('创建用户时必须设置密码')
-                setLoading(false)
                 return
             }
-            createUser(submitData as Record<string, unknown>)
-            toast.success('用户创建成功')
+            createMutation.mutate(data)
         }
-        onSuccess()
-        onOpenChange(false)
-        form.reset()
-        setLoading(false)
     }
-
-    useEffect(() => {
-        if (!open) return
-        loadRoles()
-        if (user) {
-            form.reset({
-                email: user.email,
-                username: user.username,
-                password: '',
-                full_name: user.full_name || '',
-                role_id: user.role?.id || '',
-                status: user.status,
-            })
-        } else {
-            form.reset({
-                email: '',
-                username: '',
-                password: '',
-                full_name: '',
-                role_id: '',
-                status: 'active',
-            })
-        }
-    }, [open, user, form])
 
     const handleOpenChange = (newOpen: boolean) => {
-        /**
-         * 目的: 同步对话框开关状态
-         * :param newOpen 对话框是否打开
-         * :return void
-         */
+        if (newOpen) {
+            if (user) {
+                form.reset({
+                    email: user.email,
+                    username: user.username,
+                    password: '',
+                    full_name: user.full_name || '',
+                    role_id: user.role?.id || '',
+                    status: user.status,
+                })
+            } else {
+                form.reset({
+                    email: '',
+                    username: '',
+                    password: '',
+                    full_name: '',
+                    role_id: '',
+                    status: 'active',
+                })
+            }
+        }
         onOpenChange(newOpen)
     }
+
+    const isPending = createMutation.isPending || updateMutation.isPending
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -275,12 +290,12 @@ export function UserDialog({ open, onOpenChange, user, onSuccess }: UserDialogPr
                                 type="button"
                                 variant="outline"
                                 onClick={() => handleOpenChange(false)}
-                                disabled={loading}
+                                disabled={isPending}
                             >
                                 取消
                             </Button>
-                            <Button type="submit" disabled={loading}>
-                                {loading ? '处理中...' : (user ? '更新' : '创建')}
+                            <Button type="submit" disabled={isPending}>
+                                {isPending ? '处理中...' : (user ? '更新' : '创建')}
                             </Button>
                         </DialogFooter>
                     </form>
@@ -288,4 +303,4 @@ export function UserDialog({ open, onOpenChange, user, onSuccess }: UserDialogPr
             </DialogContent>
         </Dialog>
     )
-} 
+}

@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { getMainPorts } from '@/lib/mock/store'
-import type { MainPort } from '@/lib/mock/data/ports'
+import { useQuery } from '@tanstack/react-query'
+import { getMainPorts, type MainPortFilters } from '@/lib/api/ports'
+import type { MainPort } from '@/lib/api/types'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { SearchForm, type SearchField } from '@/components/shared/search-form'
 import { StatusTag } from '@/components/shared/status-tag'
@@ -31,7 +32,10 @@ export function MainPortListPage() {
   const [page, setPage] = useState(1)
   const pageSize = 10
 
-  const { data, total } = getMainPorts(filters, page, pageSize)
+  const { data, isLoading } = useQuery({
+    queryKey: ['ports', 'main', { ...filters, page, page_size: pageSize }],
+    queryFn: () => getMainPorts({ ...filters, page, page_size: pageSize } as MainPortFilters),
+  })
 
   const columns: ColumnDef<MainPort>[] = useMemo(() => [
     { accessorKey: 'port_number', header: '端口号' },
@@ -67,11 +71,12 @@ export function MainPortListPage() {
       <SearchForm fields={searchFields} onSearch={(f) => { setFilters(f); setPage(1) }} onReset={() => { setFilters({}); setPage(1) }} />
       <DataTable
         columns={columns}
-        data={data}
+        data={data?.data ?? []}
         page={page}
         pageSize={pageSize}
-        total={total}
+        total={data?.total ?? 0}
         onPageChange={setPage}
+        isLoading={isLoading}
       />
     </div>
   )
