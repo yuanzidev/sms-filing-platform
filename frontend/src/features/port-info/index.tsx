@@ -8,10 +8,11 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, RefreshCw } from 'lucide-react'
+import { Download, Plus, RefreshCw, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable } from '@/components/shared/data-table/data-table'
-import { getPortInfos, deletePortInfo } from '@/lib/api/port-info'
+import { getPortInfos, deletePortInfo, downloadPortInfoTemplate, importPortInfos } from '@/lib/api/port-info'
+import { ImportDialog } from '@/components/shared/import-dialog'
 import type { PortInfo } from '@/lib/api/types'
 import { PortInfoDialog } from './components/port-info-dialog'
 import {
@@ -33,6 +34,7 @@ export function PortInfoPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [toDelete, setToDelete] = useState<PortInfo | undefined>()
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
@@ -106,6 +108,18 @@ export function PortInfoPage() {
             </p>
           </div>
           <div className="flex space-x-2">
+            <Button onClick={() => { setSelected(undefined); setDialogOpen(true) }}>
+              <Plus className="mr-2 h-4 w-4" />
+              新建端口信息
+            </Button>
+            <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              导入数据
+            </Button>
+            <Button variant="outline" onClick={() => downloadPortInfoTemplate()}>
+              <Download className="mr-2 h-4 w-4" />
+              下载模板
+            </Button>
             <Button
               variant="outline"
               onClick={() => queryClient.invalidateQueries({ queryKey: ['port-info'] })}
@@ -113,10 +127,6 @@ export function PortInfoPage() {
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               刷新
-            </Button>
-            <Button onClick={() => { setSelected(undefined); setDialogOpen(true) }}>
-              <Plus className="mr-2 h-4 w-4" />
-              新建端口信息
             </Button>
           </div>
         </div>
@@ -135,6 +145,15 @@ export function PortInfoPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         portInfo={selected}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['port-info'] })}
+      />
+
+      <ImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        title="端口信息"
+        onDownloadTemplate={downloadPortInfoTemplate}
+        onImport={importPortInfos}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ['port-info'] })}
       />
 
