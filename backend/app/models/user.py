@@ -38,6 +38,7 @@ class UserBase(SQLModel):
 
 class UserCreate(UserBase):
     """创建用户模型"""
+    username: str = Field(default="", max_length=100)
     password: str = Field(min_length=8, max_length=40)
     role_id: uuid.UUID | None = Field(default=None)
 

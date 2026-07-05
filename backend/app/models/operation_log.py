@@ -6,9 +6,10 @@ Description: 操作日志模型
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import List
 
 from sqlmodel import Field, SQLModel
+
+from app.core.timezone import utcnow
 
 
 class OperationResult(str, Enum):
@@ -32,7 +33,7 @@ class OperationLog(OperationLogBase, table=True):
     __tablename__ = "operation_logs"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow, description="创建时间")
+    created_at: datetime = Field(default_factory=utcnow, description="创建时间")
 
 
 class OperationLogPublic(OperationLogBase):
@@ -41,6 +42,6 @@ class OperationLogPublic(OperationLogBase):
 
 
 class OperationLogsPublic(SQLModel):
-    data: List[OperationLogPublic]
+    data: list[OperationLogPublic]
     count: int
 

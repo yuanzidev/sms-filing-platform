@@ -1,9 +1,23 @@
+from .api_access import (
+    create_api_access_config,
+    delete_api_access_config,
+    get_api_access_config,
+    list_api_access_configs,
+    update_api_access_config,
+)
 from .dashboard import (
     get_carrier_distribution,
     get_recent_changes,
     get_stats,
     get_status_distribution,
     get_trends,
+)
+from .export_group import (
+    create_export_group,
+    delete_export_group,
+    get_export_group,
+    list_export_groups,
+    update_export_group,
 )
 from .file_attachment import (
     create_file_attachment,
@@ -28,6 +42,20 @@ from .port import (
     list_sub_ports,
     update_main_port,
     update_sub_port,
+)
+from .port_info import (
+    create_port_info,
+    delete_port_info,
+    get_port_info,
+    list_port_infos,
+    update_port_info,
+)
+from .qualification import (
+    create_qualification,
+    delete_qualification,
+    get_qualification,
+    list_qualifications,
+    update_qualification,
 )
 from .role import (
     create_role,
@@ -73,6 +101,26 @@ __all__ = [
     "list_sub_ports",
     "update_sub_port",
     "delete_sub_port",
+    "create_port_info",
+    "get_port_info",
+    "list_port_infos",
+    "update_port_info",
+    "delete_port_info",
+    "create_qualification",
+    "get_qualification",
+    "list_qualifications",
+    "update_qualification",
+    "delete_qualification",
+    "create_export_group",
+    "get_export_group",
+    "list_export_groups",
+    "update_export_group",
+    "delete_export_group",
+    "create_api_access_config",
+    "get_api_access_config",
+    "list_api_access_configs",
+    "update_api_access_config",
+    "delete_api_access_config",
     "create_filing_task",
     "get_filing_task",
     "list_filing_tasks",

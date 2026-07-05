@@ -6,6 +6,15 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -122,34 +131,40 @@ export function UsersPage() {
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
       />
 
-      {passwordDialogOpen && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-background p-6 rounded-lg shadow-lg w-96">
-            <h3 className="text-lg font-semibold mb-4">重置密码</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              为用户 <strong>{selectedUser.username}</strong> 设置新密码
-            </p>
-            <input
+      <Dialog open={passwordDialogOpen && !!selectedUser} onOpenChange={(open) => {
+        if (!open) { setPasswordDialogOpen(false); setNewPassword('') }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>重置密码</DialogTitle>
+            <DialogDescription>
+              为用户 <strong>{selectedUser?.username}</strong> 设置新密码
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <Input
               type="password"
               placeholder="输入新密码"
-              className="w-full p-2 border rounded mb-4"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
             />
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => { setPasswordDialogOpen(false); setNewPassword('') }}
-              >
-                取消
-              </Button>
-              <Button onClick={() => resetMutation.mutate({ id: selectedUser.id, password: newPassword })}>
-                确认重置
-              </Button>
-            </div>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setPasswordDialogOpen(false); setNewPassword('') }}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={() => selectedUser && resetMutation.mutate({ id: selectedUser.id, password: newPassword })}
+              disabled={!newPassword || resetMutation.isPending}
+            >
+              确认重置
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

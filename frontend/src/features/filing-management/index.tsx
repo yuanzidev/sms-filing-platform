@@ -9,7 +9,15 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, RefreshCw } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
+import { Plus, RefreshCw, Eye, Download } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { getFilingTasks, deleteFilingTask, getFilingTaskDownloadUrl } from '@/lib/api/filing-tasks'
 import type { FilingTask } from '@/lib/api/types'
@@ -47,6 +55,7 @@ export function FilingManagementPage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [detailId, setDetailId] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
   const filters = {
@@ -70,6 +79,12 @@ export function FilingManagementPage() {
       setDeleteId(null)
     },
     onError: () => toast.error('删除失败'),
+  })
+
+  const { data: taskDetail, isLoading: detailLoading } = useQuery({
+    queryKey: ['filing-task-detail', detailId],
+    queryFn: () => import('@/lib/api/filing-tasks').then((m) => m.getFilingTask(detailId!)),
+    enabled: !!detailId,
   })
 
   const handleDownload = async (id: string) => {
@@ -126,6 +141,9 @@ export function FilingManagementPage() {
       header: '操作',
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={() => setDetailId(row.original.id)}>
+            <Eye className="mr-1 h-3 w-3" />查看
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => handleDownload(row.original.id)}>
             下载
           </Button>
@@ -220,6 +238,52 @@ export function FilingManagementPage() {
           total={total}
           onPageChange={setPage}
         />
+
+        <Dialog open={!!detailId} onOpenChange={(open) => !open && setDetailId(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>任务详情</DialogTitle>
+            </DialogHeader>
+            {detailLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-5 w-1/2" />
+                <Skeleton className="h-5 w-full" />
+              </div>
+            ) : taskDetail ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><span className="text-muted-foreground">任务名称：</span>{taskDetail.task_name}</div>
+                  <div><span className="text-muted-foreground">操作人：</span>{taskDetail.operator_name}</div>
+                  <div><span className="text-muted-foreground">字段组：</span>{taskDetail.export_group_name}</div>
+                  <div><span className="text-muted-foreground">排序字段：</span>{taskDetail.group_by_field || '-'}</div>
+                  <div><span className="text-muted-foreground">资质数量：</span>{taskDetail.qualification_count}</div>
+                  <div><span className="text-muted-foreground">端口数量：</span>{taskDetail.port_count}</div>
+                  <div><span className="text-muted-foreground">文件大小：</span>{formatFileSize(taskDetail.file_size)}</div>
+                  <div><span className="text-muted-foreground">生成时间：</span>{formatDate(taskDetail.created_at)}</div>
+                </div>
+                <Separator />
+                <div className="text-sm">
+                  <span className="text-muted-foreground">资质ID列表：</span>
+                  <pre className="mt-1 max-h-24 overflow-auto rounded bg-muted p-2 text-xs">
+                    {JSON.stringify(taskDetail.qualification_ids ?? [], null, 2)}
+                  </pre>
+                </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">端口ID列表：</span>
+                  <pre className="mt-1 max-h-24 overflow-auto rounded bg-muted p-2 text-xs">
+                    {JSON.stringify(taskDetail.port_ids ?? [], null, 2)}
+                  </pre>
+                </div>
+                {taskDetail.download_url && (
+                  <Button className="w-full" onClick={() => window.open(taskDetail.download_url!, '_blank')}>
+                    <Download className="mr-2 h-4 w-4" />下载 Excel 文件
+                  </Button>
+                )}
+              </div>
+            ) : null}
+          </DialogContent>
+        </Dialog>
 
         <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
           <AlertDialogContent>

@@ -27,7 +27,8 @@ def user_authentication_headers(
 def create_random_user(db: Session) -> User:
     email = random_email()
     password = random_lower_string()
-    user_in = UserCreate(email=email, password=password)
+    username = f"test_{random_lower_string()[:20]}"
+    user_in = UserCreate(email=email, username=username, password=password)
     user = crud.create_user(session=db, user_create=user_in)
     return user
 
@@ -43,7 +44,7 @@ def authentication_token_from_email(
     password = random_lower_string()
     user = crud.get_user_by_email(session=db, email=email)
     if not user:
-        user_in_create = UserCreate(email=email, password=password)
+        user_in_create = UserCreate(email=email, username=f"test_{random_lower_string()[:20]}", password=password)
         user = crud.create_user(session=db, user_create=user_in_create)
     else:
         user_in_update = UserUpdate(password=password)

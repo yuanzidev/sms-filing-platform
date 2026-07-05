@@ -4,11 +4,11 @@ import uuid
 from typing import Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 
-from app.api.deps import SessionDep, get_current_active_superuser
+from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
 from app.crud.qualification import (
     create_qualification,
     delete_qualification,
@@ -24,6 +24,7 @@ from app.models import (
     QualificationInfosPublic,
     QualificationInfoUpdate,
 )
+from app.services.operation_log import log_operation
 
 router = APIRouter(
     prefix="/qualifications",
@@ -175,8 +176,10 @@ def read_qualifications(
 
 @router.post("", response_model=QualificationInfoPublic)
 @router.post("/", include_in_schema=False, response_model=QualificationInfoPublic)
-def create_qualification_endpoint(*, session: SessionDep, create: QualificationInfoCreate) -> Any:
-    return create_qualification(session=session, create=create)
+def create_qualification_endpoint(*, session: SessionDep, create: QualificationInfoCreate, current_user: CurrentUser, request: Request) -> Any:
+    result = create_qualification(session=session, create=create)
+    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="qualifications", action="create", target=result.enterprise_name or str(result.id))
+    return result
 
 
 @router.get("/{id}", response_model=QualificationInfoPublic)
@@ -189,18 +192,22 @@ def read_qualification(*, session: SessionDep, id: uuid.UUID) -> Any:
 
 @router.patch("/{id}", response_model=QualificationInfoPublic)
 def update_qualification_endpoint(
-    *, session: SessionDep, id: uuid.UUID, update: QualificationInfoUpdate
+    *, session: SessionDep, id: uuid.UUID, update: QualificationInfoUpdate, current_user: CurrentUser, request: Request
 ) -> Any:
     db_obj = get_qualification(session=session, id=id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="资质信息不存在")
-    return update_qualification(session=session, db_obj=db_obj, update=update)
+    result = update_qualification(session=session, db_obj=db_obj, update=update)
+    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="qualifications", action="update", target=result.enterprise_name or str(id))
+    return result
 
 
 @router.delete("/{id}")
-def delete_qualification_endpoint(*, session: SessionDep, id: uuid.UUID) -> Message:
+def delete_qualification_endpoint(*, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request) -> Message:
     db_obj = get_qualification(session=session, id=id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="资质信息不存在")
+    target = db_obj.enterprise_name or str(id)
     delete_qualification(session=session, db_obj=db_obj)
+    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="qualifications", action="delete", target=target)
     return Message(message="资质信息删除成功")

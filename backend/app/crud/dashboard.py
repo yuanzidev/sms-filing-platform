@@ -4,7 +4,7 @@ from typing import Any
 
 from sqlmodel import Session, func, select
 
-from app.models import MainPort, SubPort
+from app.models import MainPort, PortInfo, SubPort
 from app.models.filing_task import FilingTask
 
 
@@ -21,7 +21,14 @@ def get_stats(session: Session) -> dict[str, Any]:
         )
     ).one()
 
-    expiring_soon = 0  # No longer tied to filing records
+    today = date.today()
+    thirty_days = today + timedelta(days=30)
+    expiring_soon = session.exec(
+        select(func.count()).select_from(PortInfo).where(
+            PortInfo.auth_end_date >= today,
+            PortInfo.auth_end_date <= thirty_days,
+        )
+    ).one()
 
     main_port_count = session.exec(select(func.count()).select_from(MainPort)).one()
     sub_port_count = session.exec(select(func.count()).select_from(SubPort)).one()
@@ -61,15 +68,47 @@ def get_trends(session: Session, days: int = 30) -> list[dict[str, Any]]:
     return filled
 
 
-def get_carrier_distribution(session: Session) -> list[dict[str, Any]]:  # noqa: ARG001
-    """Carrier distribution is not directly available from FilingTask (port_ids are JSON).
-    Return empty list as placeholder."""
-    return []
+def get_carrier_distribution(session: Session) -> list[dict[str, Any]]:
+    """Get port count distribution by carrier from PortInfo."""
+    stmt = (
+        select(PortInfo.carrier, func.count().label("count"))
+        .group_by(PortInfo.carrier)
+        .order_by(func.count().desc())
+    )
+    return [{"carrier": str(r[0]), "count": r[1]} for r in session.exec(stmt).all()]
 
 
 def get_status_distribution(session: Session) -> list[dict[str, Any]]:  # noqa: ARG001
     """FilingTask has no status field. Return empty list as placeholder."""
     return []
+
+
+def get_expiring_authorizations(session: Session, days: int = 30) -> list[dict[str, Any]]:
+    """Get port_info records with auth_end_date expiring within N days."""
+    today = date.today()
+    cutoff = today + timedelta(days=days)
+    stmt = (
+        select(PortInfo)
+        .where(
+            PortInfo.auth_end_date >= today,
+            PortInfo.auth_end_date <= cutoff,
+        )
+        .order_by(PortInfo.auth_end_date.asc())
+        .limit(20)
+    )
+    results = session.exec(stmt).all()
+    return [
+        {
+            "id": str(r.id),
+            "carrier": r.carrier,
+            "main_port_number": r.main_port_number,
+            "sub_port_number": r.sub_port_number,
+            "province": r.province,
+            "enterprise_name": "",
+            "auth_end_date": r.auth_end_date.isoformat() if r.auth_end_date else None,
+        }
+        for r in results
+    ]
 
 
 def get_recent_changes(session: Session, limit: int = 10) -> list[FilingTask]:

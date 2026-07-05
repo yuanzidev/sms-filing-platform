@@ -7,10 +7,12 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
-import { Download, Plus, RefreshCw, Upload } from 'lucide-react'
+import { Download, FileDown, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { getQualifications, deleteQualification, downloadQualificationTemplate, importQualifications } from '@/lib/api/qualifications'
+import { exportToCSV } from '@/lib/utils'
+import type { RowSelectionState } from '@tanstack/react-table'
 import type { QualificationInfo } from '@/lib/api/types'
 import { QualificationDialog } from './components/qualification-dialog'
 import { ImportDialog } from '@/components/shared/import-dialog'
@@ -34,6 +36,7 @@ export function QualificationsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [toDelete, setToDelete] = useState<QualificationInfo | undefined>()
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
@@ -54,6 +57,39 @@ export function QualificationsPage() {
 
   const qualifications = data?.data ?? []
   const total = data?.total ?? 0
+
+  const handleExportCSV = async () => {
+    try {
+      const result = await getQualifications({ page: 1, page_size: Math.max(total, 100) })
+      exportToCSV(result.data, [
+        { key: 'enterprise_name', label: '企业名称' },
+        { key: 'submit_unit', label: '报送单位' },
+        { key: 'cert_number', label: '证件号码' },
+        { key: 'responsible_name', label: '负责人' },
+        { key: 'handler_name', label: '经办人' },
+        { key: 'handler_phone', label: '经办人手机' },
+        { key: 'app_platform_name', label: '平台名称' },
+        { key: 'created_at', label: '创建时间' },
+      ], `资质信息_${new Date().toISOString().slice(0, 10)}.csv`)
+      toast.success('CSV 导出成功')
+    } catch {
+      toast.error('CSV 导出失败')
+    }
+  }
+
+  const selectedIds = Object.keys(rowSelection)
+  const selectedCount = selectedIds.length
+
+  const handleBatchDelete = async () => {
+    try {
+      await Promise.all(selectedIds.map((idx) => deleteQualification(qualifications[Number(idx)]?.id)))
+      toast.success(`已删除 ${selectedCount} 条记录`)
+      setRowSelection({})
+      queryClient.invalidateQueries({ queryKey: ['qualifications'] })
+    } catch {
+      toast.error('批量删除失败')
+    }
+  }
 
   const columns = useMemo<ColumnDef<QualificationInfo>[]>(() => [
     { accessorKey: 'enterprise_name', header: '企业名称' },
@@ -110,6 +146,15 @@ export function QualificationsPage() {
               <Download className="mr-2 h-4 w-4" />
               下载模板
             </Button>
+            <Button variant="outline" onClick={handleExportCSV} disabled={total === 0}>
+              <FileDown className="mr-2 h-4 w-4" />
+              导出CSV
+            </Button>
+            {selectedCount > 0 && (
+              <Button variant="destructive" onClick={handleBatchDelete}>
+                <Trash2 className="mr-2 h-4 w-4" />删除 ({selectedCount})
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => queryClient.invalidateQueries({ queryKey: ['qualifications'] })}
@@ -128,6 +173,8 @@ export function QualificationsPage() {
           pageSize={PAGE_SIZE}
           total={total}
           onPageChange={setPage}
+          enableRowSelection
+          onRowSelectionChange={setRowSelection}
         />
       </Main>
 

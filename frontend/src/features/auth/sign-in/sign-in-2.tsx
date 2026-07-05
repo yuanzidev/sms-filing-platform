@@ -1,4 +1,3 @@
-import ViteLogo from '@/assets/vite.svg'
 import { UserAuthForm } from './components/user-auth-form'
 
 export default function SignIn2() {
@@ -19,23 +18,15 @@ export default function SignIn2() {
           >
             <path d='M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3' />
           </svg>
-          Shadcn Admin
+          SMS 报备管理平台
         </div>
-
-        <img
-          src={ViteLogo}
-          className='relative m-auto'
-          width={301}
-          height={60}
-          alt='Vite'
-        />
 
         <div className='relative z-20 mt-auto'>
           <blockquote className='space-y-2'>
             <p className='text-lg'>
-              &ldquo;这个模板为我节省了无数工作时间，帮助我比以往更快地向客户交付令人惊叹的设计。&rdquo;
+              &ldquo;高效的短信端口报备管理，助力企业合规运营。&rdquo;
             </p>
-            <footer className='text-sm'>张三</footer>
+            <footer className='text-sm'>SMS Filing Platform</footer>
           </blockquote>
         </div>
       </div>
@@ -43,29 +34,11 @@ export default function SignIn2() {
         <div className='mx-auto flex w-full flex-col justify-center space-y-2 sm:w-[350px]'>
           <div className='flex flex-col space-y-2 text-left'>
             <h1 className='text-2xl font-semibold tracking-tight'>登录</h1>
-            {/* <p className='text-muted-foreground text-sm'>
-              请输入您的邮箱和密码 <br />
-              登录您的账户
-            </p> */}
+            <p className='text-muted-foreground text-sm'>
+              请输入您的邮箱和密码登录账户
+            </p>
           </div>
           <UserAuthForm />
-          <p className='text-muted-foreground px-8 text-center text-sm'>
-            点击登录即表示您同意我们的{' '}
-            <a
-              href='/terms'
-              className='hover:text-primary underline underline-offset-4'
-            >
-              服务条款
-            </a>{' '}
-            和{' '}
-            <a
-              href='/privacy'
-              className='hover:text-primary underline underline-offset-4'
-            >
-              隐私政策
-            </a>
-            。
-          </p>
         </div>
       </div>
     </div>

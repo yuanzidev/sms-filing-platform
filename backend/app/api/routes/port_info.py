@@ -4,11 +4,11 @@ import uuid
 from typing import Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 
-from app.api.deps import SessionDep, get_current_active_superuser
+from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
 from app.crud.port_info import (
     create_port_info,
     delete_port_info,
@@ -24,6 +24,7 @@ from app.models import (
     PortInfosPublic,
     PortInfoUpdate,
 )
+from app.services.operation_log import log_operation
 
 router = APIRouter(
     prefix="/port-info",
@@ -229,8 +230,10 @@ def read_port_infos(
 
 @router.post("", response_model=PortInfoPublic)
 @router.post("/", include_in_schema=False, response_model=PortInfoPublic)
-def create_port_info_endpoint(*, session: SessionDep, create: PortInfoCreate) -> Any:
-    return create_port_info(session=session, create=create)
+def create_port_info_endpoint(*, session: SessionDep, create: PortInfoCreate, current_user: CurrentUser, request: Request) -> Any:
+    result = create_port_info(session=session, create=create)
+    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="port_info", action="create", target=f"{result.main_port_number or result.sub_port_number or result.id}")
+    return result
 
 
 @router.get("/{id}", response_model=PortInfoPublic)
@@ -243,18 +246,22 @@ def read_port_info(*, session: SessionDep, id: uuid.UUID) -> Any:
 
 @router.patch("/{id}", response_model=PortInfoPublic)
 def update_port_info_endpoint(
-    *, session: SessionDep, id: uuid.UUID, update: PortInfoUpdate
+    *, session: SessionDep, id: uuid.UUID, update: PortInfoUpdate, current_user: CurrentUser, request: Request
 ) -> Any:
     db_obj = get_port_info(session=session, id=id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="端口信息不存在")
-    return update_port_info(session=session, db_obj=db_obj, update=update)
+    result = update_port_info(session=session, db_obj=db_obj, update=update)
+    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="port_info", action="update", target=f"{result.main_port_number or result.sub_port_number or id}")
+    return result
 
 
 @router.delete("/{id}")
-def delete_port_info_endpoint(*, session: SessionDep, id: uuid.UUID) -> Message:
+def delete_port_info_endpoint(*, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request) -> Message:
     db_obj = get_port_info(session=session, id=id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="端口信息不存在")
+    target = f"{db_obj.main_port_number or db_obj.sub_port_number or id}"
     delete_port_info(session=session, db_obj=db_obj)
+    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="port_info", action="delete", target=target)
     return Message(message="端口信息删除成功")

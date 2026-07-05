@@ -13,6 +13,8 @@ from app.models import User, UserCreate, UserUpdate
 
 
 def create_user(*, session: Session, user_create: UserCreate) -> User:
+    if not user_create.username:
+        user_create.username = user_create.email.split("@")[0]
     db_obj = User.model_validate(
         user_create, update={"hashed_password": get_password_hash(user_create.password)}
     )

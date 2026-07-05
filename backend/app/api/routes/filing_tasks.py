@@ -5,7 +5,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -13,6 +13,7 @@ from sqlmodel import select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.storage import get_storage
+from app.services.operation_log import log_operation
 from app.crud.export_group import get_export_group
 from app.crud.filing_task import (
     create_filing_task as crud_create_filing_task,
@@ -272,7 +273,7 @@ def read_task(*, session: SessionDep, id: uuid.UUID) -> Any:
 
 @router.post("", response_model=FilingTaskDetail)
 @router.post("/", include_in_schema=False, response_model=FilingTaskDetail)
-def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: CurrentUser) -> Any:
+def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: CurrentUser, request: Request) -> Any:
     # 1. Validate export group exists
     export_group = get_export_group(session=session, id=create.export_group_id)
     if not export_group:
@@ -299,7 +300,7 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
 
     shuffled = list(all_ports)
     random.shuffle(shuffled)
-    port_count = create.port_count or len(shuffled)
+    port_count = create.port_count if create.port_count is not None else len(shuffled)
     selected_ports = shuffled[:port_count]
     selected_port_ids = [p.id for p in selected_ports]
 
@@ -342,11 +343,12 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
     session.commit()
     session.refresh(task)
 
+    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="filing_tasks", action="create", target=task.task_name, detail=f"资质:{task.qualification_count} 端口:{task.port_count}")
     return _task_to_detail(session, task)
 
 
 @router.delete("/{id}")
-def delete_task(*, session: SessionDep, id: uuid.UUID) -> Message:
+def delete_task(*, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request) -> Message:
     task = get_filing_task(session=session, id=id)
     if not task:
         raise HTTPException(status_code=404, detail="报备任务不存在")
@@ -359,7 +361,9 @@ def delete_task(*, session: SessionDep, id: uuid.UUID) -> Message:
         except Exception:
             pass  # File may already be gone
 
+    target = task.task_name
     delete_filing_task(session=session, db_obj=task)
+    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="filing_tasks", action="delete", target=target)
     return Message(message="报备任务删除成功")
 
 

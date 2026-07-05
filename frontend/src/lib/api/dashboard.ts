@@ -4,7 +4,7 @@ import type {
   TrendDataPoint,
   CarrierDistribution,
   StatusDistribution,
-  FilingRecord,
+  FilingTask,
 } from './types'
 
 export const getDashboardStats = async (): Promise<DashboardStats> => {
@@ -27,8 +27,23 @@ export const getStatusDistribution = async (): Promise<StatusDistribution[]> => 
   return response.data
 }
 
-export const getRecentChanges = async (limit?: number): Promise<FilingRecord[]> => {
+export const getRecentChanges = async (limit?: number): Promise<FilingTask[]> => {
   const response = await api.get('/api/v1/dashboard/recent-changes', { params: { limit } })
+  return response.data
+}
+
+export interface ExpiringAuth {
+  id: string
+  carrier: string
+  main_port_number: string | null
+  sub_port_number: string | null
+  province: string | null
+  enterprise_name: string
+  auth_end_date: string | null
+}
+
+export const getExpiringAuths = async (days?: number): Promise<ExpiringAuth[]> => {
+  const response = await api.get('/api/v1/dashboard/expiring-auths', { params: { days } })
   return response.data
 }
 

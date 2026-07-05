@@ -7,12 +7,13 @@ from sqlmodel import SQLModel
 from app.api.deps import SessionDep
 from app.crud.dashboard import (
     get_carrier_distribution,
+    get_expiring_authorizations,
     get_recent_changes,
     get_stats,
     get_status_distribution,
     get_trends,
 )
-from app.models.filing_task import FilingTaskPublic
+from app.models import ExportGroup, FilingTaskPublic, User
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -50,17 +51,34 @@ def dashboard_status_dist(session: SessionDep) -> Any:
 @router.get("/recent-changes")
 def dashboard_recent_changes(session: SessionDep, limit: int = Query(10, ge=1, le=50)) -> Any:
     tasks = get_recent_changes(session, limit=limit)
-    return [
-        FilingTaskPublic(
-            id=t.id,
-            task_name=t.task_name,
-            qualification_count=t.qualification_count,
-            port_count=t.port_count,
-            export_group_name="",
-            group_by_field=t.group_by_field,
-            file_size=t.file_size,
-            operator_name="",
-            created_at=t.created_at,
+    result = []
+    for t in tasks:
+        operator_name = ""
+        if t.operator_id:
+            user = session.get(User, t.operator_id)
+            if user:
+                operator_name = user.full_name or user.username
+        export_group_name = ""
+        if t.export_group_id:
+            group = session.get(ExportGroup, t.export_group_id)
+            if group:
+                export_group_name = group.name
+        result.append(
+            FilingTaskPublic(
+                id=t.id,
+                task_name=t.task_name,
+                qualification_count=t.qualification_count,
+                port_count=t.port_count,
+                export_group_name=export_group_name,
+                group_by_field=t.group_by_field,
+                file_size=t.file_size,
+                operator_name=operator_name,
+                created_at=t.created_at,
+            )
         )
-        for t in tasks
-    ]
+    return result
+
+
+@router.get("/expiring-auths")
+def dashboard_expiring_auths(session: SessionDep, days: int = Query(30, ge=1, le=180)) -> Any:
+    return get_expiring_authorizations(session, days=days)

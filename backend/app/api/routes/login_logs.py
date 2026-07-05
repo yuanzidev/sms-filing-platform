@@ -11,7 +11,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import func, select
 
 from app.api.deps import (
-    CurrentUser,
     SessionDep,
     get_current_active_superuser,
 )
@@ -19,6 +18,7 @@ from app.models import (
     LoginLog,
     LoginLogPublic,
     LoginLogsPublic,
+    Message,
 )
 
 router = APIRouter(prefix="/login-logs", tags=["login-logs"])
@@ -27,8 +27,8 @@ router = APIRouter(prefix="/login-logs", tags=["login-logs"])
 @router.get("", dependencies=[Depends(get_current_active_superuser)], response_model=LoginLogsPublic)
 @router.get("/", dependencies=[Depends(get_current_active_superuser)], response_model=LoginLogsPublic, include_in_schema=False)
 def read_login_logs(
-    session: SessionDep, 
-    skip: int = 0, 
+    session: SessionDep,
+    skip: int = 0,
     limit: int = 100,
     username: str | None = None,
     status: str | None = None,
@@ -39,7 +39,7 @@ def read_login_logs(
     获取登录日志列表
     """
     query = select(LoginLog)
-    
+
     # 添加过滤条件
     if username:
         query = query.where(LoginLog.username.contains(username))
@@ -49,10 +49,10 @@ def read_login_logs(
         query = query.where(LoginLog.login_time >= start_date)
     if end_date:
         query = query.where(LoginLog.login_time <= end_date)
-    
+
     # 按时间倒序排列
     query = query.order_by(LoginLog.login_time.desc())
-    
+
     count_statement = select(func.count()).select_from(query.subquery())
     count = session.exec(count_statement).one()
 
@@ -77,7 +77,7 @@ def read_login_log_by_id(log_id: uuid.UUID, session: SessionDep) -> Any:
 
 
 @router.delete("/{log_id}", dependencies=[Depends(get_current_active_superuser)])
-def delete_login_log(session: SessionDep, log_id: uuid.UUID) -> dict:
+def delete_login_log(session: SessionDep, log_id: uuid.UUID) -> Message:
     """
     删除登录日志
     """
@@ -87,7 +87,7 @@ def delete_login_log(session: SessionDep, log_id: uuid.UUID) -> dict:
 
     session.delete(log)
     session.commit()
-    return {"message": "登录日志删除成功"}
+    return Message(message="登录日志删除成功")
 
 
 @router.delete("", dependencies=[Depends(get_current_active_superuser)])
@@ -95,17 +95,17 @@ def delete_login_log(session: SessionDep, log_id: uuid.UUID) -> dict:
 def clear_login_logs(
     session: SessionDep,
     before_date: datetime | None = None,
-) -> dict:
+) -> Message:
     """
     清理登录日志
     """
     query = select(LoginLog)
     if before_date:
         query = query.where(LoginLog.login_time < before_date)
-    
+
     logs_to_delete = session.exec(query).all()
     for log in logs_to_delete:
         session.delete(log)
-    
+
     session.commit()
-    return {"message": f"已删除 {len(logs_to_delete)} 条登录日志"} 
+    return Message(message=f"已删除 {len(logs_to_delete)} 条登录日志")

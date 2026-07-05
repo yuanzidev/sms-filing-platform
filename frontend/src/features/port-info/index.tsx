@@ -8,10 +8,12 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Download, Plus, RefreshCw, Upload } from 'lucide-react'
+import { Download, FileDown, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { getPortInfos, deletePortInfo, downloadPortInfoTemplate, importPortInfos } from '@/lib/api/port-info'
+import { exportToCSV } from '@/lib/utils'
+import type { RowSelectionState } from '@tanstack/react-table'
 import { ImportDialog } from '@/components/shared/import-dialog'
 import type { PortInfo } from '@/lib/api/types'
 import { PortInfoDialog } from './components/port-info-dialog'
@@ -35,6 +37,7 @@ export function PortInfoPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [toDelete, setToDelete] = useState<PortInfo | undefined>()
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
@@ -55,6 +58,40 @@ export function PortInfoPage() {
 
   const portInfos = data?.data ?? []
   const total = data?.total ?? 0
+
+  const handleExportCSV = async () => {
+    try {
+      const result = await getPortInfos({ page: 1, page_size: Math.max(total, 100) })
+      exportToCSV(result.data, [
+        { key: 'main_port_number', label: '主端口号' },
+        { key: 'sub_port_number', label: '子端口号' },
+        { key: 'carrier', label: '运营商' },
+        { key: 'business_type', label: '业务类型' },
+        { key: 'province', label: '省份' },
+        { key: 'city', label: '城市' },
+        { key: 'sms_signature', label: '短信签名' },
+        { key: 'port_type', label: '端口类型' },
+        { key: 'created_at', label: '创建时间' },
+      ], `端口信息_${new Date().toISOString().slice(0, 10)}.csv`)
+      toast.success('CSV 导出成功')
+    } catch {
+      toast.error('CSV 导出失败')
+    }
+  }
+
+  const selectedIds = Object.keys(rowSelection)
+  const selectedCount = selectedIds.length
+
+  const handleBatchDelete = async () => {
+    try {
+      await Promise.all(selectedIds.map((idx) => deletePortInfo(portInfos[Number(idx)]?.id)))
+      toast.success(`已删除 ${selectedCount} 条记录`)
+      setRowSelection({})
+      queryClient.invalidateQueries({ queryKey: ['port-info'] })
+    } catch {
+      toast.error('批量删除失败')
+    }
+  }
 
   const columns = useMemo<ColumnDef<PortInfo>[]>(() => [
     {
@@ -120,6 +157,15 @@ export function PortInfoPage() {
               <Download className="mr-2 h-4 w-4" />
               下载模板
             </Button>
+            <Button variant="outline" onClick={handleExportCSV} disabled={total === 0}>
+              <FileDown className="mr-2 h-4 w-4" />
+              导出CSV
+            </Button>
+            {selectedCount > 0 && (
+              <Button variant="destructive" onClick={handleBatchDelete}>
+                <Trash2 className="mr-2 h-4 w-4" />删除 ({selectedCount})
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => queryClient.invalidateQueries({ queryKey: ['port-info'] })}
@@ -134,10 +180,12 @@ export function PortInfoPage() {
         <DataTable
           columns={columns}
           data={portInfos}
+          total={total}
           page={page}
           pageSize={PAGE_SIZE}
-          total={total}
           onPageChange={setPage}
+          enableRowSelection
+          onRowSelectionChange={setRowSelection}
         />
       </Main>
 
@@ -148,21 +196,12 @@ export function PortInfoPage() {
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ['port-info'] })}
       />
 
-      <ImportDialog
-        open={importDialogOpen}
-        onOpenChange={setImportDialogOpen}
-        title="端口信息"
-        onDownloadTemplate={downloadPortInfoTemplate}
-        onImport={importPortInfos}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['port-info'] })}
-      />
-
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除端口信息 "{toDelete?.main_port_number || toDelete?.sub_port_number || '未指定'}" 吗？此操作不可撤销。
+              确定要删除此端口信息吗？此操作不可撤销。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -176,6 +215,15 @@ export function PortInfoPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        title="导入端口信息"
+        onDownloadTemplate={downloadPortInfoTemplate}
+        onImport={importPortInfos}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['port-info'] })}
+      />
     </>
   )
 }

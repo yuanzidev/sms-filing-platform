@@ -2,7 +2,7 @@ import { Card, CardContent } from '@/components/ui/card'
 
 interface StatCardProps {
   title: string
-  value: number | string
+  value: React.ReactNode
   icon?: React.ReactNode
 }
 

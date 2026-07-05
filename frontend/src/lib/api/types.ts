@@ -219,7 +219,6 @@ export interface SubPort {
   main_port_number: string
   carrier: string
   status: string
-  filing_record_id: string | null
   created_at: string
   updated_at: string
 }

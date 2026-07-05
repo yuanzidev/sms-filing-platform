@@ -31,14 +31,12 @@ export function ForgotPasswordForm({ className, ...props }: ForgotFormProps) {
     defaultValues: { email: '' },
   })
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
+  function onSubmit(_data: z.infer<typeof formSchema>) {
     setIsLoading(true)
-    // eslint-disable-next-line no-console
-    console.log(data)
-
+    // 密码重置功能待后端接口就绪后实现
     setTimeout(() => {
       setIsLoading(false)
-    }, 3000)
+    }, 1000)
   }
 
   return (

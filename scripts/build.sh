@@ -217,6 +217,55 @@ push_all_images() {
     return 0
 }
 
+# 清理旧版本镜像（保留 latest）
+cleanup_old_images() {
+    print_info "清理本地旧版本镜像..."
+
+    local count=0
+    while IFS= read -r img; do
+        [ -z "$img" ] && continue
+        docker rmi "$img" 2>/dev/null && count=$((count + 1))
+    done < <(docker images --format '{{.Repository}}:{{.Tag}}' \
+        | grep "${PRIVATE_REGISTRY}/${DOCKER_IMAGE_BACKEND:-sms-filing-backend}" \
+        | grep -v ':latest' || true)
+
+    while IFS= read -r img; do
+        [ -z "$img" ] && continue
+        docker rmi "$img" 2>/dev/null && count=$((count + 1))
+    done < <(docker images --format '{{.Repository}}:{{.Tag}}' \
+        | grep "${PRIVATE_REGISTRY}/${DOCKER_IMAGE_FRONTEND:-sms-filing-frontend}" \
+        | grep -v ':latest' || true)
+
+    if [ "$count" -gt 0 ]; then
+        print_success "已清理 ${count} 个旧版本镜像"
+    else
+        print_info "没有需要清理的旧版本镜像"
+    fi
+
+    # 每周清理一次构建缓存（通过标记文件判断）
+    local cache_marker="/tmp/.sms-build-cache-clean"
+    local should_clean=false
+    if [ ! -f "$cache_marker" ]; then
+        should_clean=true
+    else
+        local last_clean
+        last_clean=$(stat -f %m "$cache_marker" 2>/dev/null || stat -c %Y "$cache_marker" 2>/dev/null || echo 0)
+        local now
+        now=$(date +%s)
+        local week_secs=604800
+        if [ $((now - last_clean)) -gt $week_secs ]; then
+            should_clean=true
+        fi
+    fi
+
+    if [ "$should_clean" = true ]; then
+        print_info "清理构建缓存（每周一次）..."
+        docker builder prune -f >/dev/null 2>&1 && \
+            touch "$cache_marker" && \
+            print_success "构建缓存已清理"
+    fi
+}
+
 # 显示访问信息
 show_access_info() {
     local tag=${TAG:-latest}
@@ -261,6 +310,9 @@ main() {
 
     # 推送镜像到私有仓库
     push_all_images
+
+    # 清理本地旧版本镜像
+    cleanup_old_images
 
     # 显示结果
     show_access_info

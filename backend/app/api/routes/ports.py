@@ -119,7 +119,6 @@ def _sub_port_to_public(db_obj: SubPort, session) -> SubPortPublic:
         main_port_number=main_port.port_number if main_port else "",
         carrier=db_obj.carrier,
         status=db_obj.status,
-        filing_record_id=db_obj.filing_record_id,
         created_at=db_obj.created_at,
         updated_at=db_obj.updated_at,
     )

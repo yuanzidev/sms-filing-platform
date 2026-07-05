@@ -10,11 +10,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app.crud import user as crud_user
 from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
 from app.core import security
 from app.core.config import settings
 from app.core.security import get_password_hash
+from app.crud import user as crud_user
 from app.models import LoginLog, Message, NewPassword, Token, UserPublic
 from app.utils import (
     generate_password_reset_token,
@@ -28,7 +28,7 @@ router = APIRouter(tags=["login"])
 
 @router.post("/login/access-token")
 def login_access_token(
-    session: SessionDep, 
+    session: SessionDep,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     request: Request,
 ) -> Token:
@@ -38,7 +38,7 @@ def login_access_token(
     user = crud_user.authenticate(
         session=session, email=form_data.username, password=form_data.password
     )
-    
+
     # 记录登录日志
     from datetime import datetime, timezone
     log_data = {
@@ -53,12 +53,12 @@ def login_access_token(
         user.last_login = datetime.now(timezone.utc)
         session.add(user)
         session.commit()
-        
+
         # 记录成功登录日志
         log = LoginLog(**log_data, user_id=user.id)
         session.add(log)
         session.commit()
-        
+
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         return Token(
             access_token=security.create_access_token(
@@ -70,7 +70,7 @@ def login_access_token(
         log = LoginLog(**log_data)
         session.add(log)
         session.commit()
-        
+
         raise HTTPException(status_code=400, detail="用户名/邮箱或密码错误")
 
 
@@ -151,5 +151,5 @@ def recover_password_html_content(email: str, session: SessionDep) -> Any:
     )
 
     return HTMLResponse(
-        content=email_data.html_content, headers={"subject:": email_data.subject}
+        content=email_data.html_content, headers={"subject": email_data.subject}
     )

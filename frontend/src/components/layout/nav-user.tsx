@@ -21,19 +21,15 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar'
-
-const demoUser = {
-  full_name: '管理员',
-  email: 'admin@sms-filing.example.com',
-}
+import useAuth from '@/hooks/use-auth'
 
 export function NavUser() {
   const { isMobile } = useSidebar()
+  const { user, logout } = useAuth()
 
-  const handleLogout = () => {
-    localStorage.removeItem('access_token')
-    window.location.href = '/sign-in'
-  }
+  const displayName = user?.full_name || user?.username || '用户'
+  const email = user?.email || ''
+  const initial = displayName.charAt(0).toUpperCase()
 
   return (
     <SidebarMenu>
@@ -45,13 +41,11 @@ export function NavUser() {
               className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
             >
               <Avatar className='h-8 w-8 rounded-lg'>
-                <AvatarFallback className='rounded-lg'>
-                  {demoUser.full_name.charAt(0).toUpperCase()}
-                </AvatarFallback>
+                <AvatarFallback className='rounded-lg'>{initial}</AvatarFallback>
               </Avatar>
               <div className='grid flex-1 text-left text-sm leading-tight'>
-                <span className='truncate font-semibold'>{demoUser.full_name}</span>
-                <span className='truncate text-xs'>{demoUser.email}</span>
+                <span className='truncate font-semibold'>{displayName}</span>
+                <span className='truncate text-xs'>{email}</span>
               </div>
               <ChevronsUpDown className='ml-auto size-4' />
             </SidebarMenuButton>
@@ -65,18 +59,14 @@ export function NavUser() {
             <DropdownMenuLabel className='p-0 font-normal'>
               <div className='flex items-center gap-2 px-1 py-1.5 text-left text-sm'>
                 <Avatar className='h-8 w-8 rounded-lg'>
-                  <AvatarFallback className='rounded-lg'>
-                    {demoUser.full_name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
+                  <AvatarFallback className='rounded-lg'>{initial}</AvatarFallback>
                 </Avatar>
                 <div className='grid flex-1 text-left text-sm leading-tight'>
-                  <span className='truncate font-semibold'>{demoUser.full_name}</span>
-                  <span className='truncate text-xs'>{demoUser.email}</span>
+                  <span className='truncate font-semibold'>{displayName}</span>
+                  <span className='truncate text-xs'>{email}</span>
                 </div>
               </div>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
@@ -93,7 +83,7 @@ export function NavUser() {
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>
+            <DropdownMenuItem onClick={logout}>
               <LogOut />
               退出登录
             </DropdownMenuItem>
