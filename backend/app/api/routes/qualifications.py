@@ -24,6 +24,11 @@ from app.models import (
     QualificationInfosPublic,
     QualificationInfoUpdate,
 )
+from app.services.excel_image_extractor import (
+    extract_cell_images_from_xlsx,
+    extract_images_from_xlsx,
+    upload_import_images,
+)
 from app.services.operation_log import log_operation
 
 router = APIRouter(
@@ -48,21 +53,68 @@ _QUALIFICATION_HEADERS = [
     "经办人证件类型",
     "经办人证件号码",
     "经办人手机号",
+    "单位证件图片",
+    "责任人身份证正面",
+    "责任人身份证反面",
+    "经办人身份证正面",
+    "经办人身份证反面",
 ]
 
 
 @router.get("/template")
 def download_qualification_template() -> Any:
+    from openpyxl.styles import Font
+    from PIL import Image, ImageDraw
+    from app.services.excel_image_extractor import inject_cell_images
+
     wb = Workbook()
     ws = wb.active
     ws.title = "资质导入模板"
+
     for col_idx, header in enumerate(_QUALIFICATION_HEADERS, 1):
         ws.cell(row=1, column=col_idx, value=header)
+
+    example_data = [
+        "示例企业有限公司", "报送部", "OP10001",
+        "营业执照", "91110108MA01XXXXX",
+        "示例平台", "G001",
+        "张三", "身份证", "110101199001011234", "13800138000",
+        "李四", "身份证", "110101199501011234", "13900139000",
+    ]
+    for col_idx, val in enumerate(example_data, 1):
+        ws.cell(row=2, column=col_idx, value=val)
+
+    instructions = wb.create_sheet("填写说明")
+    instructions.cell(row=1, column=1, value="Excel 导入图片填写说明").font = Font(bold=True, size=14)
+    notes = [
+        "1. 请勿修改表头行（第一行）的列标题",
+        "2. 每条数据填写一行，从第二行开始",
+        "3. 图片列（单位证件图片、身份证正面/反面等）用于存放资质证明图片",
+        "4. 插入方法：右键单元格 ->「插入图片」->「放置在单元格中」-> 选择图片文件",
+        "5. 也可将图片直接拖入到图片列的单元格中",
+        "6. 系统会自动提取每行单元格内嵌的图片，并与对应字段关联",
+        "7. 支持的图片格式：PNG、JPEG、GIF、BMP、WEBP，单张不超过 10MB",
+    ]
+    for i, note in enumerate(notes, 2):
+        instructions.cell(row=i, column=1, value=note)
+
     output = io.BytesIO()
     wb.save(output)
-    output.seek(0)
+    xlsx_bytes = output.getvalue()
+
+    # Inject sample cell images into the template
+    sample_img = Image.new("RGB", (120, 60), color=(220, 230, 241))
+    draw = ImageDraw.Draw(sample_img)
+    draw.text((10, 20), "示例\n请替换", fill=(50, 50, 50))
+    img_buf = io.BytesIO()
+    sample_img.save(img_buf, format="PNG")
+
+    # First image column is column 16 (0-based) = "P2"
+    cell_images = {"P2": img_buf.getvalue()}
+    xlsx_bytes = inject_cell_images(xlsx_bytes, cell_images)
+
     return StreamingResponse(
-        output,
+        io.BytesIO(xlsx_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote('资质导入模板.xlsx')}"},
     )
@@ -75,8 +127,9 @@ def import_qualifications(
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
 
+    content = file.file.read()
     try:
-        wb = load_workbook(io.BytesIO(file.file.read()), read_only=True)
+        wb = load_workbook(io.BytesIO(content))
     except Exception:
         raise HTTPException(status_code=400, detail="无法解析 Excel 文件，请检查文件格式")
 
@@ -153,8 +206,34 @@ def import_qualifications(
         raise HTTPException(status_code=400, detail="文件中没有有效数据")
 
     session.add_all(objects)
+    session.flush()
+
+    warnings: list[str] = []
+    if file.filename.endswith(".xlsx"):
+        all_images: list = []
+        try:
+            all_images.extend(extract_cell_images_from_xlsx(content, headers=header_row))
+        except Exception:
+            pass
+        try:
+            all_images.extend(extract_images_from_xlsx(content))
+        except Exception:
+            pass
+        if all_images:
+            _, img_warnings = upload_import_images(
+                images=all_images,
+                objects=objects,
+                entity_type="qualification_info",
+                session=session,
+            )
+            warnings.extend(img_warnings)
+
     session.commit()
-    return {"count": len(objects), "message": f"成功导入 {len(objects)} 条资质信息"}
+
+    msg = f"成功导入 {len(objects)} 条资质信息"
+    if warnings:
+        msg += "。" + "；".join(warnings)
+    return {"count": len(objects), "message": msg}
 
 
 @router.get("", response_model=QualificationInfosPublic)

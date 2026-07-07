@@ -6,7 +6,6 @@ from datetime import date, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import RedirectResponse
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from sqlmodel import select
@@ -78,6 +77,14 @@ def build_field_map() -> dict[str, str]:
         "handler_cert_type": "经办人证件类型",
         "handler_cert_number": "经办人证件号码",
         "handler_phone": "经办人手机号",
+        # Image fields from qualification
+        "cert_image": "单位证件图片",
+        "responsible_id_front": "责任人身份证正面",
+        "responsible_id_back": "责任人身份证反面",
+        "handler_id_front": "经办人身份证正面",
+        "handler_id_back": "经办人身份证反面",
+        # Image field from port_info
+        "auth_image": "授权书图片",
     }
 
 
@@ -98,7 +105,13 @@ def get_field_value(qualification: QualificationInfo, port: PortInfo, field_name
         "responsible_cert_type", "responsible_cert_number", "responsible_phone",
         "handler_name", "handler_cert_type", "handler_cert_number", "handler_phone",
     }
+    img_fields = {
+        "cert_image", "responsible_id_front", "responsible_id_back",
+        "handler_id_front", "handler_id_back", "auth_image",
+    }
 
+    if field_name in img_fields:
+        return "[图片]"
     if field_name in pi_fields:
         value = getattr(port, field_name, "")
     elif field_name in qi_fields:
@@ -120,9 +133,19 @@ def generate_excel(
     ports: list[PortInfo],
     export_group: ExportGroup,
     group_by_field: str | None = None,
+    qual_images: dict[uuid.UUID, dict[str, bytes]] | None = None,
 ) -> io.BytesIO:
-    """Generate Excel bytes from qualification+port Cartesian product."""
+    """Generate Excel bytes from qualification+port Cartesian product.
+
+    qual_images: {qual_id: {field_name: image_bytes}} for cell-embedded images.
+    field_name is the logical name (e.g. "cert_image").
+    """
+    qual_images = qual_images or {}
     field_map = build_field_map()
+    img_field_names = {
+        "cert_image", "responsible_id_front", "responsible_id_back",
+        "handler_id_front", "handler_id_back", "auth_image",
+    }
     wb = Workbook()
     ws = wb.active
     ws.title = "报备导出"
@@ -138,6 +161,12 @@ def generate_excel(
 
     sorted_fields = sorted(export_group.fields, key=lambda f: f.sort_order)
     col_names = [f.field_name for f in sorted_fields if f.field_name in field_map]
+
+    # Build column index for image fields
+    img_col_map: dict[str, int] = {}
+    for col_idx, field_name in enumerate(col_names, 1):
+        if field_name in img_field_names:
+            img_col_map[field_name] = col_idx
 
     # Write headers
     for col_idx, field_name in enumerate(col_names, 1):
@@ -159,11 +188,12 @@ def generate_excel(
     # Write data rows, inserting blank separator between groups
     row_idx = 2
     prev_group_value: str | None = None
+    cell_images: dict[str, bytes] = {}
+
     for q, p in rows:
         if group_by_field:
             current_value = get_field_value(q, p, group_by_field)
             if prev_group_value is not None and current_value != prev_group_value:
-                # Insert blank separator row
                 for col_idx in range(1, len(col_names) + 1):
                     cell = ws.cell(row=row_idx, column=col_idx, value="")
                     cell.border = thin_border
@@ -174,6 +204,16 @@ def generate_excel(
             value = get_field_value(q, p, field_name)
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
             cell.border = thin_border
+
+        # Collect images for this row from the qualification
+        if img_col_map and q.id in qual_images:
+            qual_imgs = qual_images[q.id]
+            for field_name, col_idx in img_col_map.items():
+                if field_name in qual_imgs:
+                    col_letter = ws.cell(row=row_idx, column=col_idx).column_letter
+                    cell_ref = f"{col_letter}{row_idx}"
+                    cell_images[cell_ref] = qual_imgs[field_name]
+
         row_idx += 1
 
     # Auto-fit column widths
@@ -188,6 +228,14 @@ def generate_excel(
 
     output = io.BytesIO()
     wb.save(output)
+    xlsx_bytes = output.getvalue()
+
+    # Inject cell images if any
+    if cell_images:
+        from app.services.excel_image_extractor import inject_cell_images
+        xlsx_bytes = inject_cell_images(xlsx_bytes, cell_images)
+
+    output = io.BytesIO(xlsx_bytes)
     output.seek(0)
     return output
 
@@ -218,13 +266,7 @@ def _task_to_public(session, task) -> FilingTaskPublic:
 
 def _task_to_detail(session, task) -> FilingTaskDetail:
     public = _task_to_public(session, task)
-    download_url = None
-    if task.file_path:
-        try:
-            storage = get_storage()
-            download_url = storage.get_url(task.file_path)
-        except Exception:
-            download_url = None
+    download_url = f"/api/v1/filing-tasks/{task.id}/download" if task.file_path else None
 
     return FilingTaskDetail(
         id=public.id,
@@ -309,13 +351,46 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
         session=session, create=create, operator_id=current_user.id
     )
 
-    # 5. Generate Excel
+    # 5. Load image attachments for selected qualifications
+    # Map Chinese field_name → logical field name for export
+    _CN_TO_LOGICAL_IMG = {
+        "单位证件图片": "cert_image",
+        "责任人身份证正面": "responsible_id_front",
+        "责任人身份证反面": "responsible_id_back",
+        "经办人身份证正面": "handler_id_front",
+        "经办人身份证反面": "handler_id_back",
+        "授权书图片": "auth_image",
+    }
+    qual_images: dict[uuid.UUID, dict[str, bytes]] = {}
+    try:
+        from app.crud.file_attachment import get_file_attachments_by_entity
+        storage = get_storage()
+        for q in qualifications:
+            attachments = get_file_attachments_by_entity(
+                session=session, entity_type="qualification_info", entity_id=q.id
+            )
+            img_map: dict[str, bytes] = {}
+            for att in attachments:
+                logical = _CN_TO_LOGICAL_IMG.get(att.field_name or "")
+                if logical and att.stored_path:
+                    try:
+                        raw = storage.download(att.stored_path)
+                        img_map[logical] = raw
+                    except Exception:
+                        pass
+            if img_map:
+                qual_images[q.id] = img_map
+    except Exception:
+        pass  # Image loading failure should not block export
+
+    # 6. Generate Excel
     try:
         excel_bytes = generate_excel(
             qualifications=qualifications,
             ports=selected_ports,
             export_group=export_group,
             group_by_field=create.group_by_field,
+            qual_images=qual_images,
         )
     except Exception as e:
         delete_filing_task(session=session, db_obj=task)
@@ -377,7 +452,14 @@ def download_task(*, session: SessionDep, id: uuid.UUID) -> Any:
 
     try:
         storage = get_storage()
-        url = storage.get_url(task.file_path)
-        return RedirectResponse(url=url, status_code=302)
+        content = storage.download(task.file_path)
+        from fastapi.responses import Response
+        return Response(
+            content=content,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{task.task_name}.xlsx",
+            },
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取下载链接失败: {e}")
+        raise HTTPException(status_code=500, detail=f"文件下载失败: {e}")

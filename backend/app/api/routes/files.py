@@ -5,7 +5,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
@@ -23,6 +23,7 @@ def upload_file(
     file: UploadFile,
     entity_type: str = "",
     entity_id: str = "",
+    field_name: str = "",
 ) -> FileAttachmentPublic:
     """Upload a file/image. Returns file metadata."""
     if not file.filename:
@@ -56,9 +57,22 @@ def upload_file(
         md5_hash=md5_hash,
         entity_type=entity_type or "uploads",
         entity_id=entity_uuid,
+        field_name=field_name or None,
     )
     db_obj = create_file_attachment(session=session, create=fa_in, uploader_id=current_user.id)
     return db_obj
+
+
+@router.get("")
+def list_files(
+    *,
+    session: SessionDep,
+    entity_type: str = Query(...),
+    entity_id: uuid.UUID = Query(...),
+) -> Any:
+    """List file attachments for a given entity."""
+    from app.crud.file_attachment import get_file_attachments_by_entity
+    return get_file_attachments_by_entity(session=session, entity_type=entity_type, entity_id=entity_id)
 
 
 @router.get("/{id}")

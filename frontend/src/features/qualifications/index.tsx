@@ -7,15 +7,17 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
-import { Download, FileDown, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Download, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { getQualifications, deleteQualification, downloadQualificationTemplate, importQualifications } from '@/lib/api/qualifications'
-import { exportToCSV } from '@/lib/utils'
 import type { RowSelectionState } from '@tanstack/react-table'
 import type { QualificationInfo } from '@/lib/api/types'
 import { QualificationDialog } from './components/qualification-dialog'
+import { QualificationDetailDialog } from './components/qualification-detail-dialog'
 import { ImportDialog } from '@/components/shared/import-dialog'
+import { formatCN } from '@/lib/time'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,13 +38,30 @@ export function QualificationsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [toDelete, setToDelete] = useState<QualificationInfo | undefined>()
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [detailTarget, setDetailTarget] = useState<QualificationInfo | undefined>()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [searchInputs, setSearchInputs] = useState({ enterprise_name: '', cert_number: '' })
+  const [appliedFilters, setAppliedFilters] = useState<{ enterprise_name?: string; cert_number?: string }>({})
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['qualifications', { page, page_size: PAGE_SIZE }],
-    queryFn: () => getQualifications({ page, page_size: PAGE_SIZE }),
+    queryKey: ['qualifications', { page, page_size: PAGE_SIZE, ...appliedFilters }],
+    queryFn: () => getQualifications({ page, page_size: PAGE_SIZE, ...appliedFilters }),
   })
+
+  const handleSearch = () => {
+    setAppliedFilters({
+      enterprise_name: searchInputs.enterprise_name.trim() || undefined,
+      cert_number: searchInputs.cert_number.trim() || undefined,
+    })
+    setPage(1)
+  }
+
+  const handleReset = () => {
+    setSearchInputs({ enterprise_name: '', cert_number: '' })
+    setAppliedFilters({})
+    setPage(1)
+  }
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteQualification(id),
@@ -57,25 +76,6 @@ export function QualificationsPage() {
 
   const qualifications = data?.data ?? []
   const total = data?.total ?? 0
-
-  const handleExportCSV = async () => {
-    try {
-      const result = await getQualifications({ page: 1, page_size: Math.max(total, 100) })
-      exportToCSV(result.data, [
-        { key: 'enterprise_name', label: '企业名称' },
-        { key: 'submit_unit', label: '报送单位' },
-        { key: 'cert_number', label: '证件号码' },
-        { key: 'responsible_name', label: '负责人' },
-        { key: 'handler_name', label: '经办人' },
-        { key: 'handler_phone', label: '经办人手机' },
-        { key: 'app_platform_name', label: '平台名称' },
-        { key: 'created_at', label: '创建时间' },
-      ], `资质信息_${new Date().toISOString().slice(0, 10)}.csv`)
-      toast.success('CSV 导出成功')
-    } catch {
-      toast.error('CSV 导出失败')
-    }
-  }
 
   const selectedIds = Object.keys(rowSelection)
   const selectedCount = selectedIds.length
@@ -98,12 +98,19 @@ export function QualificationsPage() {
     { accessorKey: 'responsible_name', header: '负责人', cell: ({ getValue }) => getValue() || '-' },
     { accessorKey: 'handler_name', header: '经办人', cell: ({ getValue }) => getValue() || '-' },
     { accessorKey: 'app_platform_name', header: '平台', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'created_at', header: '创建时间' },
+    {
+      accessorKey: 'created_at',
+      header: '创建时间',
+      cell: ({ getValue }) => formatCN(getValue() as string),
+    },
     {
       id: 'actions',
       header: '操作',
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={() => { setDetailTarget(row.original) }}>
+            详情
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => { setSelected(row.original); setDialogOpen(true) }}>
             编辑
           </Button>
@@ -146,10 +153,6 @@ export function QualificationsPage() {
               <Download className="mr-2 h-4 w-4" />
               下载模板
             </Button>
-            <Button variant="outline" onClick={handleExportCSV} disabled={total === 0}>
-              <FileDown className="mr-2 h-4 w-4" />
-              导出CSV
-            </Button>
             {selectedCount > 0 && (
               <Button variant="destructive" onClick={handleBatchDelete}>
                 <Trash2 className="mr-2 h-4 w-4" />删除 ({selectedCount})
@@ -162,6 +165,38 @@ export function QualificationsPage() {
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               刷新
+            </Button>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="mb-4 mt-4 flex flex-wrap items-end gap-3 rounded-lg border p-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-muted-foreground">企业名称</label>
+            <Input
+              placeholder="搜索企业名称"
+              value={searchInputs.enterprise_name}
+              onChange={(e) => setSearchInputs((s) => ({ ...s, enterprise_name: e.target.value }))}
+              className="w-56"
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-muted-foreground">证件号码</label>
+            <Input
+              placeholder="搜索证件号码"
+              value={searchInputs.cert_number}
+              onChange={(e) => setSearchInputs((s) => ({ ...s, cert_number: e.target.value }))}
+              className="w-56"
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleSearch}>
+              搜索
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleReset}>
+              重置
             </Button>
           </div>
         </div>
@@ -193,6 +228,14 @@ export function QualificationsPage() {
         onImport={importQualifications}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ['qualifications'] })}
       />
+
+      {detailTarget && (
+        <QualificationDetailDialog
+          open={!!detailTarget}
+          onOpenChange={(open) => { if (!open) setDetailTarget(undefined) }}
+          qualification={detailTarget}
+        />
+      )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

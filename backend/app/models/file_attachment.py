@@ -15,6 +15,7 @@ class FileAttachmentBase(SQLModel):
     md5_hash: str = Field(max_length=32, index=True)
     entity_type: str = Field(max_length=50, index=True)
     entity_id: uuid.UUID = Field(index=True)
+    field_name: str | None = Field(default=None, max_length=100)
 
 
 class FileAttachment(FileAttachmentBase, table=True):
@@ -32,6 +33,7 @@ class FileAttachmentCreate(SQLModel):
     md5_hash: str
     entity_type: str
     entity_id: uuid.UUID
+    field_name: str | None = None
 
 
 class FileAttachmentPublic(FileAttachmentBase):

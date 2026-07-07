@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Skeleton } from '@/components/ui/skeleton'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import {
   Select,
@@ -83,7 +84,7 @@ export function FilingCreatePage() {
 
   // Step 2 state
   const [exportGroupId, setExportGroupId] = useState<string>('')
-  const [groupByField, setGroupByField] = useState<string>('')
+  const [groupByField, setGroupByField] = useState<string>('__none__')
   const [portCount, setPortCount] = useState('')
 
   // Fetch qualifications
@@ -93,7 +94,7 @@ export function FilingCreatePage() {
   })
 
   // Fetch export groups
-  const { data: exportGroupsData } = useQuery({
+  const { data: exportGroupsData, isLoading: exportGroupsLoading, isError: exportGroupsError } = useQuery({
     queryKey: ['export-groups'],
     queryFn: () => getExportGroups(),
   })
@@ -158,7 +159,7 @@ export function FilingCreatePage() {
         qualification_ids: selectedIds,
         port_count: portCount ? Number(portCount) : undefined,
         export_group_id: exportGroupId,
-        group_by_field: groupByField || undefined,
+        group_by_field: groupByField === '__none__' ? undefined : (groupByField || undefined),
       },
       {
         onSuccess: (task) => {
@@ -274,18 +275,24 @@ export function FilingCreatePage() {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <label className="text-sm font-medium">导出字段组 *</label>
-              <Select value={exportGroupId} onValueChange={(v) => { setExportGroupId(v); setGroupByField('') }}>
-                <SelectTrigger className="w-full max-w-sm">
-                  <SelectValue placeholder="选择导出字段组" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(exportGroupsData?.data ?? []).map((g: ExportGroup) => (
-                    <SelectItem key={g.id} value={g.id}>
-                      {g.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {exportGroupsLoading ? (
+                <Skeleton className="h-10 w-full max-w-sm" />
+              ) : exportGroupsError ? (
+                <p className="text-sm text-destructive">加载导出字段组失败，请刷新重试</p>
+              ) : (
+                <Select value={exportGroupId} onValueChange={(v) => { setExportGroupId(v); setGroupByField('__none__') }}>
+                  <SelectTrigger className="w-full max-w-sm">
+                    <SelectValue placeholder="选择导出字段组" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(exportGroupsData?.data ?? []).map((g: ExportGroup) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -295,7 +302,7 @@ export function FilingCreatePage() {
                   <SelectValue placeholder="不分组" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">不分组</SelectItem>
+                  <SelectItem value="__none__">不分组</SelectItem>
                   {groupByFieldOptions.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
@@ -351,7 +358,7 @@ export function FilingCreatePage() {
               </div>
               <div>
                 <span className="text-sm text-muted-foreground">分组字段</span>
-                <p className="text-lg font-medium">{groupByField ? getFieldLabel(groupByField) : '无'}</p>
+                <p className="text-lg font-medium">{groupByField && groupByField !== '__none__' ? getFieldLabel(groupByField) : '无'}</p>
               </div>
               <div className="col-span-2">
                 <span className="text-sm text-muted-foreground">预计行数（资质 × 端口）</span>

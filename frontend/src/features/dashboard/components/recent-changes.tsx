@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getRecentChanges } from '@/lib/api/dashboard'
+import { formatCN } from '@/lib/time'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -50,7 +51,7 @@ export function RecentChanges() {
               ) : (
                 data.map((item) => (
                   <TableRow key={item.id}>
-                    <TableCell className="text-muted-foreground">{item.created_at}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatCN(item.created_at)}</TableCell>
                     <TableCell>{item.task_name}</TableCell>
                     <TableCell>{item.port_count}</TableCell>
                   </TableRow>

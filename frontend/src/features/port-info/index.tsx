@@ -7,14 +7,23 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Download, FileDown, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Download, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { getPortInfos, deletePortInfo, downloadPortInfoTemplate, importPortInfos } from '@/lib/api/port-info'
-import { exportToCSV } from '@/lib/utils'
 import type { RowSelectionState } from '@tanstack/react-table'
 import { ImportDialog } from '@/components/shared/import-dialog'
+import { PROVINCES } from '@/components/shared/province-city-fields'
+import { formatCN } from '@/lib/time'
 import type { PortInfo } from '@/lib/api/types'
 import { PortInfoDialog } from './components/port-info-dialog'
 import {
@@ -29,6 +38,7 @@ import {
 } from '@/components/ui/alert-dialog'
 
 const PAGE_SIZE = 10
+const CARRIERS = ['中国移动', '中国联通', '中国电信', '中国广电']
 
 export function PortInfoPage() {
   const [page, setPage] = useState(1)
@@ -38,12 +48,29 @@ export function PortInfoPage() {
   const [toDelete, setToDelete] = useState<PortInfo | undefined>()
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [searchInputs, setSearchInputs] = useState({ carrier: '', province: '', business_type: '' })
+  const [appliedFilters, setAppliedFilters] = useState<{ carrier?: string; province?: string; business_type?: string }>({})
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['port-info', { page, page_size: PAGE_SIZE }],
-    queryFn: () => getPortInfos({ page, page_size: PAGE_SIZE }),
+    queryKey: ['port-info', { page, page_size: PAGE_SIZE, ...appliedFilters }],
+    queryFn: () => getPortInfos({ page, page_size: PAGE_SIZE, ...appliedFilters }),
   })
+
+  const handleSearch = () => {
+    setAppliedFilters({
+      carrier: searchInputs.carrier || undefined,
+      province: searchInputs.province || undefined,
+      business_type: searchInputs.business_type.trim() || undefined,
+    })
+    setPage(1)
+  }
+
+  const handleReset = () => {
+    setSearchInputs({ carrier: '', province: '', business_type: '' })
+    setAppliedFilters({})
+    setPage(1)
+  }
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deletePortInfo(id),
@@ -58,26 +85,6 @@ export function PortInfoPage() {
 
   const portInfos = data?.data ?? []
   const total = data?.total ?? 0
-
-  const handleExportCSV = async () => {
-    try {
-      const result = await getPortInfos({ page: 1, page_size: Math.max(total, 100) })
-      exportToCSV(result.data, [
-        { key: 'main_port_number', label: '主端口号' },
-        { key: 'sub_port_number', label: '子端口号' },
-        { key: 'carrier', label: '运营商' },
-        { key: 'business_type', label: '业务类型' },
-        { key: 'province', label: '省份' },
-        { key: 'city', label: '城市' },
-        { key: 'sms_signature', label: '短信签名' },
-        { key: 'port_type', label: '端口类型' },
-        { key: 'created_at', label: '创建时间' },
-      ], `端口信息_${new Date().toISOString().slice(0, 10)}.csv`)
-      toast.success('CSV 导出成功')
-    } catch {
-      toast.error('CSV 导出失败')
-    }
-  }
 
   const selectedIds = Object.keys(rowSelection)
   const selectedCount = selectedIds.length
@@ -109,7 +116,11 @@ export function PortInfoPage() {
     { accessorKey: 'city', header: '城市', cell: ({ getValue }) => getValue() || '-' },
     { accessorKey: 'sms_signature', header: '短信签名', cell: ({ getValue }) => getValue() || '-' },
     { accessorKey: 'port_type', header: '端口类型', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'created_at', header: '创建时间' },
+    {
+      accessorKey: 'created_at',
+      header: '创建时间',
+      cell: ({ getValue }) => formatCN(getValue() as string),
+    },
     {
       id: 'actions',
       header: '操作',
@@ -157,10 +168,6 @@ export function PortInfoPage() {
               <Download className="mr-2 h-4 w-4" />
               下载模板
             </Button>
-            <Button variant="outline" onClick={handleExportCSV} disabled={total === 0}>
-              <FileDown className="mr-2 h-4 w-4" />
-              导出CSV
-            </Button>
             {selectedCount > 0 && (
               <Button variant="destructive" onClick={handleBatchDelete}>
                 <Trash2 className="mr-2 h-4 w-4" />删除 ({selectedCount})
@@ -173,6 +180,62 @@ export function PortInfoPage() {
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               刷新
+            </Button>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="mb-4 mt-4 flex flex-wrap items-end gap-3 rounded-lg border p-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-muted-foreground">运营商</label>
+            <Select
+              value={searchInputs.carrier}
+              onValueChange={(v) => setSearchInputs((s) => ({ ...s, carrier: v === '__all__' ? '' : v }))}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="全部" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">全部</SelectItem>
+                {CARRIERS.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-muted-foreground">接入省</label>
+            <Select
+              value={searchInputs.province}
+              onValueChange={(v) => setSearchInputs((s) => ({ ...s, province: v === '__all__' ? '' : v }))}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="全部" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">全部</SelectItem>
+                {PROVINCES.map((p) => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-muted-foreground">业务类型</label>
+            <Input
+              placeholder="如 验证码"
+              value={searchInputs.business_type}
+              onChange={(e) => setSearchInputs((s) => ({ ...s, business_type: e.target.value }))}
+              className="w-40"
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleSearch}>
+              搜索
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleReset}>
+              重置
             </Button>
           </div>
         </div>

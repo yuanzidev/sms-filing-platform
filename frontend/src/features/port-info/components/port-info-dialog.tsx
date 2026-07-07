@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { createPortInfo, updatePortInfo } from '@/lib/api/port-info'
+import { ProvinceCityFields } from '@/components/shared/province-city-fields'
 import type { PortInfo } from '@/lib/api/types'
 
 const formSchema = z.object({
@@ -226,32 +227,9 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="province"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>省份</FormLabel>
-                    <FormControl>
-                      <Input placeholder="省份" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="city"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>城市</FormLabel>
-                    <FormControl>
-                      <Input placeholder="城市" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <ProvinceCityFields form={form} />
+              </div>
               <FormField
                 control={form.control}
                 name="port_activation_date"

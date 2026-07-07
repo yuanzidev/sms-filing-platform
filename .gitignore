@@ -53,3 +53,10 @@ logs/
 
 # Copier
 .copier/
+
+# Runtime storage (uploads / exports)
+storage/
+backend/storage/
+
+# Claude Code local
+.claude/

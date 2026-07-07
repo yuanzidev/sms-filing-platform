@@ -19,7 +19,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import { Plus, RefreshCw, Eye, Download } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table/data-table'
-import { getFilingTasks, deleteFilingTask, getFilingTaskDownloadUrl } from '@/lib/api/filing-tasks'
+import { getFilingTasks, deleteFilingTask, downloadFilingTaskFile } from '@/lib/api/filing-tasks'
+import { formatCN } from '@/lib/time'
 import type { FilingTask } from '@/lib/api/types'
 import {
   AlertDialog,
@@ -40,13 +41,6 @@ function formatFileSize(bytes: number | null): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function formatDate(iso: string): string {
-  if (!iso) return '-'
-  const d = new Date(iso)
-  const pad = (n: number) => n.toString().padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 export function FilingManagementPage() {
@@ -89,10 +83,10 @@ export function FilingManagementPage() {
 
   const handleDownload = async (id: string) => {
     try {
-      const url = await getFilingTaskDownloadUrl(id)
-      window.open(url, '_blank')
+      const task = tasks.find((t: { id: string }) => t.id === id)
+      await downloadFilingTaskFile(id, `${task?.task_name || 'export'}.xlsx`)
     } catch {
-      toast.error('获取下载链接失败')
+      toast.error('文件下载失败')
     }
   }
 
@@ -117,7 +111,7 @@ export function FilingManagementPage() {
     {
       accessorKey: 'created_at',
       header: '生成时间',
-      cell: ({ getValue }) => formatDate(getValue() as string),
+      cell: ({ getValue }) => formatCN(getValue() as string),
     },
     { accessorKey: 'operator_name', header: '操作人' },
     { accessorKey: 'qualification_count', header: '资质数' },
@@ -260,7 +254,7 @@ export function FilingManagementPage() {
                   <div><span className="text-muted-foreground">资质数量：</span>{taskDetail.qualification_count}</div>
                   <div><span className="text-muted-foreground">端口数量：</span>{taskDetail.port_count}</div>
                   <div><span className="text-muted-foreground">文件大小：</span>{formatFileSize(taskDetail.file_size)}</div>
-                  <div><span className="text-muted-foreground">生成时间：</span>{formatDate(taskDetail.created_at)}</div>
+                  <div><span className="text-muted-foreground">生成时间：</span>{formatCN(taskDetail.created_at)}</div>
                 </div>
                 <Separator />
                 <div className="text-sm">

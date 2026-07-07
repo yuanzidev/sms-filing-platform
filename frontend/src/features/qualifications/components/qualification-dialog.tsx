@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -21,8 +22,17 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { createQualification, updateQualification } from '@/lib/api/qualifications'
+import { Upload, X } from 'lucide-react'
+import { createQualification, updateQualification, uploadQualificationImage } from '@/lib/api/qualifications'
 import type { QualificationInfo } from '@/lib/api/types'
+
+const IMAGE_FIELDS = [
+  { name: 'cert_image', label: '单位证件图片' },
+  { name: 'responsible_id_front', label: '责任人身份证正面' },
+  { name: 'responsible_id_back', label: '责任人身份证反面' },
+  { name: 'handler_id_front', label: '经办人身份证正面' },
+  { name: 'handler_id_back', label: '经办人身份证反面' },
+]
 
 const formSchema = z.object({
   enterprise_name: z.string().min(1, '企业名称不能为空'),
@@ -53,28 +63,92 @@ interface Props {
 
 export function QualificationDialog({ open, onOpenChange, qualification, onSuccess }: Props) {
   const queryClient = useQueryClient()
+  const [uploading, setUploading] = useState(false)
+
+  // Image file state: { fieldKey: File }
+  const [imageFiles, setImageFiles] = useState<Record<string, File>>({})
+  const [imagePreviews, setImagePreviews] = useState<Record<string, string>>({})
+  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const createMutation = useMutation({
     mutationFn: (data: FormData) => createQualification(data),
-    onSuccess: () => {
+    onSuccess: async (result) => {
       toast.success('资质创建成功')
+      // Upload images after record is created
+      const id = result.id
+      if (Object.keys(imageFiles).length > 0) {
+        setUploading(true)
+        for (const [fieldKey, file] of Object.entries(imageFiles)) {
+          const fieldDef = IMAGE_FIELDS.find(f => f.name === fieldKey)
+          try {
+            await uploadQualificationImage(id, file, fieldDef?.label || fieldKey)
+          } catch {
+            toast.error(`${fieldDef?.label || fieldKey} 上传失败`)
+          }
+        }
+        setUploading(false)
+      }
       queryClient.invalidateQueries({ queryKey: ['qualifications'] })
+      queryClient.invalidateQueries({ queryKey: ['qualification-attachments'] })
       onSuccess()
       onOpenChange(false)
+      setImageFiles({})
+      setImagePreviews({})
     },
     onError: () => toast.error('资质创建失败'),
   })
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: FormData }) => updateQualification(id, data),
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
       toast.success('资质更新成功')
+      if (Object.keys(imageFiles).length > 0) {
+        setUploading(true)
+        for (const [fieldKey, file] of Object.entries(imageFiles)) {
+          const fieldDef = IMAGE_FIELDS.find(f => f.name === fieldKey)
+          try {
+            await uploadQualificationImage(variables.id, file, fieldDef?.label || fieldKey)
+          } catch {
+            toast.error(`${fieldDef?.label || fieldKey} 上传失败`)
+          }
+        }
+        setUploading(false)
+      }
       queryClient.invalidateQueries({ queryKey: ['qualifications'] })
+      queryClient.invalidateQueries({ queryKey: ['qualification-attachments'] })
       onSuccess()
       onOpenChange(false)
+      setImageFiles({})
+      setImagePreviews({})
     },
     onError: () => toast.error('资质更新失败'),
   })
+
+  const handleImageSelect = (fieldKey: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImageFiles(prev => ({ ...prev, [fieldKey]: file }))
+    const url = URL.createObjectURL(file)
+    setImagePreviews(prev => {
+      const old = prev[fieldKey]
+      if (old) URL.revokeObjectURL(old)
+      return { ...prev, [fieldKey]: url }
+    })
+  }
+
+  const handleRemoveImage = (fieldKey: string) => () => {
+    setImageFiles(prev => {
+      const next = { ...prev }
+      delete next[fieldKey]
+      return next
+    })
+    setImagePreviews(prev => {
+      const next = { ...prev }
+      if (next[fieldKey]) URL.revokeObjectURL(next[fieldKey])
+      delete next[fieldKey]
+      return next
+    })
+  }
 
   const defaultValues = qualification
     ? {
@@ -132,7 +206,7 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
     onOpenChange(newOpen)
   }
 
-  const isPending = createMutation.isPending || updateMutation.isPending
+  const isPending = createMutation.isPending || updateMutation.isPending || uploading
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -362,6 +436,46 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
                     </FormItem>
                   )}
                 />
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold mb-3">证件图片</h3>
+              <div className="grid grid-cols-2 gap-4">
+                {IMAGE_FIELDS.map((field) => (
+                  <div key={field.name}>
+                    <FormLabel className="mb-1 block">{field.label}</FormLabel>
+                    {imagePreviews[field.name] ? (
+                      <div className="relative rounded border overflow-hidden">
+                        <img src={imagePreviews[field.name]} alt={field.label} className="h-32 w-full object-contain bg-muted" />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-1 right-1 h-6 w-6 bg-background/80 hover:bg-background"
+                          onClick={handleRemoveImage(field.name)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div
+                        className="flex h-32 cursor-pointer flex-col items-center justify-center rounded border-2 border-dashed border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50"
+                        onClick={() => fileRefs.current[field.name]?.click()}
+                      >
+                        <Upload className="h-5 w-5 mb-1" />
+                        <span className="text-xs">上传图片</span>
+                      </div>
+                    )}
+                    <input
+                      ref={(el) => { fileRefs.current[field.name] = el }}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect(field.name)}
+                      className="hidden"
+                    />
+                  </div>
+                ))}
               </div>
             </div>
 

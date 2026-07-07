@@ -45,13 +45,18 @@ export const deleteFilingTask = async (id: string): Promise<{ message: string }>
 }
 
 /**
- * 获取报备任务下载地址
- * 后端返回 302 重定向到 MinIO 预签名 URL
+ * 下载报备任务文件（blob，后端代理 MinIO）
  */
-export const getFilingTaskDownloadUrl = async (id: string): Promise<string> => {
+export const downloadFilingTaskFile = async (id: string, filename: string): Promise<void> => {
   const response = await api.get(`/api/v1/filing-tasks/${id}/download`, {
-    maxRedirects: 0,
-    validateStatus: (status) => status === 302,
+    responseType: 'blob',
   })
-  return response.headers.location
+  const url = window.URL.createObjectURL(new Blob([response.data]))
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', filename)
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(url)
 }

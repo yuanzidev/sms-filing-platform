@@ -1,5 +1,5 @@
 import api from '../api'
-import type { QualificationInfo, QualificationListResponse } from './types'
+import type { QualificationInfo, QualificationListResponse, FileAttachmentPublic } from './types'
 
 export const getQualifications = async (params?: {
   page?: number
@@ -13,6 +13,25 @@ export const getQualifications = async (params?: {
 
 export const getQualification = async (id: string): Promise<QualificationInfo> => {
   const response = await api.get(`/api/v1/qualifications/${id}`)
+  return response.data
+}
+
+export const getQualificationAttachments = async (id: string): Promise<FileAttachmentPublic[]> => {
+  const response = await api.get('/api/v1/files', { params: { entity_type: 'qualification_info', entity_id: id } })
+  return response.data
+}
+
+export const uploadQualificationImage = async (
+  entityId: string,
+  file: File,
+  fieldName: string,
+): Promise<FileAttachmentPublic> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('entity_type', 'qualification_info')
+  formData.append('entity_id', entityId)
+  formData.append('field_name', fieldName)
+  const response = await api.post('/api/v1/files/upload', formData)
   return response.data
 }
 

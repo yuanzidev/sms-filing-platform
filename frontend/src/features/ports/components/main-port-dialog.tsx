@@ -25,6 +25,7 @@ import {
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { ProvinceCityFields } from '@/components/shared/province-city-fields'
 import type { MainPort } from '@/lib/api/types'
 
 const CARRIERS = ['移动', '联通', '电信']
@@ -104,28 +105,7 @@ export function MainPortDialog({ open, onOpenChange, port, onSubmit }: Props) {
               )}
             />
             <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="province"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>省份</FormLabel>
-                    <FormControl><Input placeholder="如 广东" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="city"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>城市</FormLabel>
-                    <FormControl><Input placeholder="如 深圳" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <ProvinceCityFields form={form} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <FormField
