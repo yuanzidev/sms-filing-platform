@@ -16,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
+import { Inbox } from 'lucide-react'
 import { useState } from 'react'
 
 interface DataTableProps<TData, TValue> {
@@ -95,8 +96,12 @@ export function DataTable<TData, TValue>({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  暂无数据
+                <TableCell colSpan={columns.length} className="h-32 text-center">
+                  <div className="flex flex-col items-center gap-2 py-4">
+                    <Inbox className="h-10 w-10 text-muted-foreground/40" />
+                    <p className="text-sm font-medium">暂无数据</p>
+                    <p className="text-xs text-muted-foreground">尝试调整筛选条件或新建记录</p>
+                  </div>
                 </TableCell>
               </TableRow>
             )}
