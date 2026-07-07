@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Download, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
+import { Download, Pencil, Plus, RefreshCw, Search as SearchIcon, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { getPortInfos, deletePortInfo, downloadPortInfoTemplate, importPortInfos } from '@/lib/api/port-info'
@@ -109,7 +109,14 @@ export function PortInfoPage() {
     {
       accessorKey: 'carrier',
       header: '运营商',
-      cell: ({ getValue }) => <Badge variant="outline">{getValue() as string}</Badge>,
+      cell: ({ getValue }) => {
+        const carrier = getValue() as string
+        let cls = ''
+        if (carrier === '中国移动') cls = 'text-blue-600 border-blue-200'
+        else if (carrier === '中国联通') cls = 'text-red-600 border-red-200'
+        else if (carrier === '中国电信') cls = 'text-green-600 border-green-200'
+        return <Badge variant="outline" className={cls}>{carrier}</Badge>
+      },
     },
     { accessorKey: 'business_type', header: '业务类型', cell: ({ getValue }) => getValue() || '-' },
     { accessorKey: 'province', header: '省份', cell: ({ getValue }) => getValue() || '-' },
@@ -126,11 +133,25 @@ export function PortInfoPage() {
       header: '操作',
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={() => { setSelected(row.original); setDialogOpen(true) }}>
-            编辑
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+            onClick={() => { setSelected(row.original); setDialogOpen(true) }}
+          >
+            <span className="flex items-center gap-1.5">
+              <Pencil className="h-4 w-4" />编辑
+            </span>
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => { setToDelete(row.original); setDeleteDialogOpen(true) }}>
-            删除
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+            onClick={() => { setToDelete(row.original); setDeleteDialogOpen(true) }}
+          >
+            <span className="flex items-center gap-1.5">
+              <Trash2 className="h-4 w-4" />删除
+            </span>
           </Button>
         </div>
       ),
@@ -222,13 +243,16 @@ export function PortInfoPage() {
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-sm text-muted-foreground">业务类型</label>
-            <Input
-              placeholder="如 验证码"
-              value={searchInputs.business_type}
-              onChange={(e) => setSearchInputs((s) => ({ ...s, business_type: e.target.value }))}
-              className="w-40"
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
-            />
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="如 验证码"
+                value={searchInputs.business_type}
+                onChange={(e) => setSearchInputs((s) => ({ ...s, business_type: e.target.value }))}
+                className="w-40 pl-8"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
+              />
+            </div>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleSearch}>
