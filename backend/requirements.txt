@@ -23,7 +23,7 @@ httpx>=0.25.1,<1.0.0
 
 # 工具库
 tenacity>=8.2.3,<9.0.0
-emails>=0.6,<1.0
+emails>=1.1.2,<2.0
 
 # 监控
 sentry-sdk[fastapi]>=1.40.6,<2.0.0
