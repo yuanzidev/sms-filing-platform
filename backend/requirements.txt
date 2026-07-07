@@ -1,6 +1,6 @@
 # FastAPI 核心依赖
 fastapi[standard]>=0.114.2,<1.0.0
-uvicorn[standard]>=0.30.0
+uvicorn[standard]>=0.49.0
 python-multipart>=0.0.7,<1.0.0
 
 # 数据验证
