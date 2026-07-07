@@ -8,7 +8,7 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Download, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
+import { Download, Eye, Pencil, Plus, RefreshCw, Search as SearchIcon, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { getQualifications, deleteQualification, downloadQualificationTemplate, importQualifications } from '@/lib/api/qualifications'
@@ -108,14 +108,35 @@ export function QualificationsPage() {
       header: '操作',
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={() => { setDetailTarget(row.original) }}>
-            详情
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => { setDetailTarget(row.original) }}
+          >
+            <span className="flex items-center gap-1.5">
+              <Eye className="h-4 w-4" />详情
+            </span>
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => { setSelected(row.original); setDialogOpen(true) }}>
-            编辑
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+            onClick={() => { setSelected(row.original); setDialogOpen(true) }}
+          >
+            <span className="flex items-center gap-1.5">
+              <Pencil className="h-4 w-4" />编辑
+            </span>
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => { setToDelete(row.original); setDeleteDialogOpen(true) }}>
-            删除
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+            onClick={() => { setToDelete(row.original); setDeleteDialogOpen(true) }}
+          >
+            <span className="flex items-center gap-1.5">
+              <Trash2 className="h-4 w-4" />删除
+            </span>
           </Button>
         </div>
       ),
@@ -173,23 +194,29 @@ export function QualificationsPage() {
         <div className="mb-4 mt-4 flex flex-wrap items-end gap-3 rounded-lg border p-4">
           <div className="flex flex-col gap-1">
             <label className="text-sm text-muted-foreground">企业名称</label>
-            <Input
-              placeholder="搜索企业名称"
-              value={searchInputs.enterprise_name}
-              onChange={(e) => setSearchInputs((s) => ({ ...s, enterprise_name: e.target.value }))}
-              className="w-56"
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
-            />
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="搜索企业名称"
+                value={searchInputs.enterprise_name}
+                onChange={(e) => setSearchInputs((s) => ({ ...s, enterprise_name: e.target.value }))}
+                className="w-56 pl-8"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
+              />
+            </div>
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-sm text-muted-foreground">证件号码</label>
-            <Input
-              placeholder="搜索证件号码"
-              value={searchInputs.cert_number}
-              onChange={(e) => setSearchInputs((s) => ({ ...s, cert_number: e.target.value }))}
-              className="w-56"
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
-            />
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="搜索证件号码"
+                value={searchInputs.cert_number}
+                onChange={(e) => setSearchInputs((s) => ({ ...s, cert_number: e.target.value }))}
+                className="w-56 pl-8"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
+              />
+            </div>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleSearch}>
