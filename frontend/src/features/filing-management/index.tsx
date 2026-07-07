@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
-import { Plus, RefreshCw, Eye, Download } from 'lucide-react'
+import { Plus, RefreshCw, Eye, Download, Trash2, Search as SearchIcon } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { getFilingTasks, deleteFilingTask, downloadFilingTaskFile } from '@/lib/api/filing-tasks'
 import { formatCN } from '@/lib/time'
@@ -135,14 +135,34 @@ export function FilingManagementPage() {
       header: '操作',
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={() => setDetailId(row.original.id)}>
-            <Eye className="mr-1 h-3 w-3" />查看
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => setDetailId(row.original.id)}
+          >
+            <span className="flex items-center gap-1.5">
+              <Eye className="h-4 w-4" />查看
+            </span>
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => handleDownload(row.original.id)}>
-            下载
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDownload(row.original.id)}
+          >
+            <span className="flex items-center gap-1.5">
+              <Download className="h-4 w-4" />下载
+            </span>
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setDeleteId(row.original.id)}>
-            删除
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+            onClick={() => setDeleteId(row.original.id)}
+          >
+            <span className="flex items-center gap-1.5">
+              <Trash2 className="h-4 w-4" />删除
+            </span>
           </Button>
         </div>
       ),
@@ -206,13 +226,16 @@ export function FilingManagementPage() {
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-sm text-muted-foreground">关键词</label>
-            <Input
-              type="text"
-              placeholder="搜索任务名称"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              className="w-48"
-            />
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="搜索任务名称"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                className="w-48 pl-8"
+              />
+            </div>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleSearch}>
