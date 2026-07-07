@@ -58,5 +58,9 @@ logs/
 storage/
 backend/storage/
 
-# Claude Code local
-.claude/
+# Claude Code local (keep skills/ and commands/ for team sharing)
+.claude/settings.local.json
+.claude/todos/
+.claude/plans/
+.claude/memory/
+.claude/worktrees/
