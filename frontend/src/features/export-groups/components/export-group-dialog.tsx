@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { ChevronUp, ChevronDown, X } from 'lucide-react'
 import type { ExportGroup } from '@/lib/api/types'
 
 const AVAILABLE_FIELDS = [
@@ -80,9 +81,7 @@ interface Props {
 }
 
 export function ExportGroupDialog({ open, onOpenChange, group, onSubmit }: Props) {
-  const [selectedFields, setSelectedFields] = useState<Set<string>>(() =>
-    new Set(group?.fields?.map((f) => f.field_name) ?? [])
-  )
+  const [selectedFields, setSelectedFields] = useState<string[]>([])
 
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -92,24 +91,62 @@ export function ExportGroupDialog({ open, onOpenChange, group, onSubmit }: Props
     },
   })
 
+  useEffect(() => {
+    if (!open) return
+    if (group?.fields?.length) {
+      setSelectedFields(
+        [...group.fields]
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((f) => f.field_name)
+      )
+    } else {
+      setSelectedFields([])
+    }
+    form.reset({
+      name: group?.name ?? '',
+      description: group?.description ?? '',
+    })
+  }, [open])
+
   const toggleField = (key: string) => {
     setSelectedFields((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
+      const idx = prev.indexOf(key)
+      if (idx >= 0) return prev.filter((k) => k !== key)
+      return [...prev, key]
+    })
+  }
+
+  const moveUp = (idx: number) => {
+    if (idx <= 0) return
+    setSelectedFields((prev) => {
+      const next = [...prev]
+      ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
       return next
     })
   }
 
+  const moveDown = (idx: number) => {
+    setSelectedFields((prev) => {
+      if (idx >= prev.length - 1) return prev
+      const next = [...prev]
+      ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
+      return next
+    })
+  }
+
+  const removeField = (key: string) => {
+    setSelectedFields((prev) => prev.filter((k) => k !== key))
+  }
+
   const handleSubmit = async (data: z.infer<typeof formSchema>) => {
-    const fields = Array.from(selectedFields).map((key, idx) => {
+    const fields = selectedFields.map((key, idx) => {
       const fieldDef = AVAILABLE_FIELDS.find((f) => f.key === key)!
       return { field_name: key, field_label: fieldDef.label, sort_order: idx }
     })
     await onSubmit({ name: data.name, description: data.description ?? '', fields })
     onOpenChange(false)
     form.reset()
-    setSelectedFields(new Set())
+    setSelectedFields([])
   }
 
   return (
@@ -143,20 +180,79 @@ export function ExportGroupDialog({ open, onOpenChange, group, onSubmit }: Props
               )}
             />
             <div>
-              <FormLabel className="mb-2 block">选择字段（已选 {selectedFields.size} 项）</FormLabel>
-              <ScrollArea className="h-[300px] rounded-md border p-4">
-                <div className="grid grid-cols-2 gap-2">
-                  {AVAILABLE_FIELDS.map((f) => (
-                    <label key={f.key} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-2 py-1">
-                      <Checkbox
-                        checked={selectedFields.has(f.key)}
-                        onCheckedChange={() => toggleField(f.key)}
-                      />
-                      {f.label}
-                    </label>
-                  ))}
-                </div>
-              </ScrollArea>
+              <FormLabel className="mb-2 block">选择字段（已选 {selectedFields.length} 项）</FormLabel>
+              <div className="grid grid-cols-2 gap-3">
+                {/* 左栏：可选字段 */}
+                <ScrollArea className="h-[300px] rounded-md border p-2">
+                  <div className="space-y-0.5">
+                    {AVAILABLE_FIELDS.map((f) => (
+                      <label
+                        key={f.key}
+                        className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-2 py-1.5"
+                      >
+                        <Checkbox
+                          checked={selectedFields.includes(f.key)}
+                          onCheckedChange={() => toggleField(f.key)}
+                        />
+                        {f.label}
+                      </label>
+                    ))}
+                  </div>
+                </ScrollArea>
+
+                {/* 右栏：已选字段排序 */}
+                <ScrollArea className="h-[300px] rounded-md border p-2">
+                  {selectedFields.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      请在左侧勾选字段
+                    </p>
+                  ) : (
+                    <div className="space-y-0.5">
+                      {selectedFields.map((key, idx) => {
+                        const fieldDef = AVAILABLE_FIELDS.find((f) => f.key === key)!
+                        return (
+                          <div
+                            key={key}
+                            className="flex items-center gap-1 text-sm rounded px-2 py-1.5 hover:bg-muted/50"
+                          >
+                            <span className="text-muted-foreground w-5 text-xs">{idx + 1}.</span>
+                            <span className="flex-1 truncate">{fieldDef.label}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              disabled={idx === 0}
+                              onClick={() => moveUp(idx)}
+                            >
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              disabled={idx === selectedFields.length - 1}
+                              onClick={() => moveDown(idx)}
+                            >
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              onClick={() => removeField(key)}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
