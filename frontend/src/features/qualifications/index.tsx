@@ -40,8 +40,8 @@ export function QualificationsPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [detailTarget, setDetailTarget] = useState<QualificationInfo | undefined>()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const [searchInputs, setSearchInputs] = useState({ enterprise_name: '', cert_number: '' })
-  const [appliedFilters, setAppliedFilters] = useState<{ enterprise_name?: string; cert_number?: string }>({})
+  const [searchInputs, setSearchInputs] = useState({ enterprise_name: '', cert_number: '', signature: '' })
+  const [appliedFilters, setAppliedFilters] = useState<{ enterprise_name?: string; cert_number?: string; signature?: string }>({})
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
@@ -53,12 +53,13 @@ export function QualificationsPage() {
     setAppliedFilters({
       enterprise_name: searchInputs.enterprise_name.trim() || undefined,
       cert_number: searchInputs.cert_number.trim() || undefined,
+      signature: searchInputs.signature.trim() || undefined,
     })
     setPage(1)
   }
 
   const handleReset = () => {
-    setSearchInputs({ enterprise_name: '', cert_number: '' })
+    setSearchInputs({ enterprise_name: '', cert_number: '', signature: '' })
     setAppliedFilters({})
     setPage(1)
   }
@@ -97,6 +98,7 @@ export function QualificationsPage() {
     { accessorKey: 'cert_number', header: '证件号码', cell: ({ getValue }) => getValue() || '-' },
     { accessorKey: 'responsible_name', header: '负责人', cell: ({ getValue }) => getValue() || '-' },
     { accessorKey: 'handler_name', header: '经办人', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'signature', header: '签名', cell: ({ getValue }) => getValue() || '-' },
     { accessorKey: 'app_platform_name', header: '平台', cell: ({ getValue }) => getValue() || '-' },
     {
       accessorKey: 'created_at',
@@ -213,6 +215,19 @@ export function QualificationsPage() {
                 placeholder="搜索证件号码"
                 value={searchInputs.cert_number}
                 onChange={(e) => setSearchInputs((s) => ({ ...s, cert_number: e.target.value }))}
+                className="w-56 pl-8"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-muted-foreground">签名</label>
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="搜索签名"
+                value={searchInputs.signature}
+                onChange={(e) => setSearchInputs((s) => ({ ...s, signature: e.target.value }))}
                 className="w-56 pl-8"
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
               />
