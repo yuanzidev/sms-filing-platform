@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { pc } from 'china-division'
+import pcData from 'china-division/dist/pc.json'
 import type { FieldPath, FieldValues, UseFormReturn } from 'react-hook-form'
 import {
   FormField,
@@ -16,7 +16,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-export const PROVINCES = Object.keys(pc as Record<string, string[]>)
+const pc = pcData as Record<string, string[]>
+export const PROVINCES = Object.keys(pc)
 
 interface Props<T extends FieldValues> {
   form: UseFormReturn<T>
@@ -33,7 +34,7 @@ export function ProvinceCityFields<T extends FieldValues>({
 
   const cityOptions = useMemo<string[]>(() => {
     if (!provinceValue) return []
-    const list = (pc as Record<string, string[]>)[provinceValue]
+    const list = pc[provinceValue]
     return Array.isArray(list) ? list : []
   }, [provinceValue])
 
