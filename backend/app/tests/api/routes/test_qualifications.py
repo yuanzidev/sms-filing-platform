@@ -24,3 +24,21 @@ def test_list_qualifications_filter_by_signature(
     body = r.json()
     assert body["total"] >= 1
     assert all("张三" in item["signature"] for item in body["data"])
+
+
+def test_template_has_signature_header(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    from io import BytesIO
+    from openpyxl import load_workbook
+
+    r = client.get(
+        f"{settings.API_V1_STR}/qualifications/template", headers=superuser_token_headers
+    )
+    assert r.status_code == 200
+    wb = load_workbook(BytesIO(r.content))
+    ws = wb.active
+    headers = [c.value for c in ws[1]]
+    # 第 16 列（1-based）应为 "签名"，第 17 列应为 "单位证件图片"
+    assert headers[15] == "签名"
+    assert headers[16] == "单位证件图片"

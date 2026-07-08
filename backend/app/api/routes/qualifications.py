@@ -53,6 +53,7 @@ _QUALIFICATION_HEADERS = [
     "经办人证件类型",
     "经办人证件号码",
     "经办人手机号",
+    "签名",
     "单位证件图片",
     "责任人身份证正面",
     "责任人身份证反面",
@@ -80,6 +81,7 @@ def download_qualification_template() -> Any:
         "示例平台", "G001",
         "张三", "身份证", "110101199001011234", "13800138000",
         "李四", "身份证", "110101199501011234", "13900139000",
+        "张三 经办",
     ]
     for col_idx, val in enumerate(example_data, 1):
         ws.cell(row=2, column=col_idx, value=val)
@@ -109,8 +111,8 @@ def download_qualification_template() -> Any:
     img_buf = io.BytesIO()
     sample_img.save(img_buf, format="PNG")
 
-    # First image column is column 16 (0-based) = "P2"
-    cell_images = {"P2": img_buf.getvalue()}
+    # First image column is column 17 (1-based) = "Q2"
+    cell_images = {"Q2": img_buf.getvalue()}
     xlsx_bytes = inject_cell_images(xlsx_bytes, cell_images)
 
     return StreamingResponse(
