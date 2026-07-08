@@ -157,6 +157,7 @@ def import_qualifications(
         "经办人证件类型": "handler_cert_type",
         "经办人证件号码": "handler_cert_number",
         "经办人手机号": "handler_phone",
+        "签名": "signature",
     }
 
     header_row = [str(c) if c else "" for c in rows[0]]
@@ -186,6 +187,10 @@ def import_qualifications(
         if not enterprise_name:
             raise HTTPException(status_code=400, detail=f"第{row_idx}行: 企业名称不能为空")
 
+        signature = cell("signature")
+        if not signature:
+            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 签名不能为空")
+
         objects.append(QualificationInfo(
             enterprise_name=enterprise_name,
             submit_unit=cell("submit_unit"),
@@ -202,6 +207,7 @@ def import_qualifications(
             handler_cert_type=cell("handler_cert_type"),
             handler_cert_number=cell("handler_cert_number"),
             handler_phone=cell("handler_phone"),
+            signature=signature,
         ))
 
     if not objects:

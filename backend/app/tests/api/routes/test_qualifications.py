@@ -42,3 +42,52 @@ def test_template_has_signature_header(
     # 第 16 列（1-based）应为 "签名"，第 17 列应为 "单位证件图片"
     assert headers[15] == "签名"
     assert headers[16] == "单位证件图片"
+
+
+def _build_xlsx(headers: list[str], rows: list[list]) -> bytes:
+    """构造一个最小 xlsx：第一行为表头，后续为数据行。"""
+    from io import BytesIO
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(headers)
+    for r in rows:
+        ws.append(r)
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_import_rejects_missing_signature(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    headers = ["企业名称", "签名"]
+    rows = [["测试企业A", ""]]  # 签名为空
+    data = _build_xlsx(headers, rows)
+
+    files = {"file": ("test.xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/import",
+        headers=superuser_token_headers,
+        files=files,
+    )
+    assert r.status_code == 400
+    assert "签名" in r.json()["detail"]
+
+
+def test_import_success_with_signature(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    headers = ["企业名称", "签名"]
+    rows = [["测试企业B", "王五 法人"]]
+    data = _build_xlsx(headers, rows)
+
+    files = {"file": ("test.xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/import",
+        headers=superuser_token_headers,
+        files=files,
+    )
+    assert r.status_code == 200
+    assert r.json()["count"] == 1
