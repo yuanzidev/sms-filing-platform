@@ -23,6 +23,7 @@ class QualificationInfoBase(SQLModel):
     handler_cert_type: str | None = Field(default=None, max_length=50)
     handler_cert_number: str | None = Field(default=None, max_length=100)
     handler_phone: str | None = Field(default=None, max_length=20)
+    signature: str = Field(max_length=200, index=True)
 
 
 class QualificationInfo(QualificationInfoBase, table=True):
@@ -52,6 +53,7 @@ class QualificationInfoUpdate(SQLModel):
     handler_cert_type: str | None = None
     handler_cert_number: str | None = None
     handler_phone: str | None = None
+    signature: str | None = None
 
 
 class QualificationInfoPublic(QualificationInfoBase):
