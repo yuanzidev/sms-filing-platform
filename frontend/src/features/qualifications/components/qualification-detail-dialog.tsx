@@ -94,6 +94,7 @@ export function QualificationDetailDialog({ open, onOpenChange, qualification }:
               <FieldRow label="证件类型" value={d.handler_cert_type} />
               <FieldRow label="证件号码" value={d.handler_cert_number} />
               <FieldRow label="手机号" value={d.handler_phone} />
+              <FieldRow label="签名" value={d.signature} />
             </div>
 
             {/* 图片附件 */}

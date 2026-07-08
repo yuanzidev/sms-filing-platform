@@ -27,6 +27,7 @@ export interface QualificationInfo {
   handler_cert_type: string | null
   handler_cert_number: string | null
   handler_phone: string | null
+  signature: string
   created_at: string
   updated_at: string
 }
@@ -338,6 +339,7 @@ export interface FileAttachmentPublic {
   md5_hash: string
   entity_type: string
   entity_id: string
+  field_name: string | null
   uploader_id: string | null
   created_at: string
 }

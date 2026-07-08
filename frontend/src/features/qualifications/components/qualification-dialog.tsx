@@ -50,6 +50,7 @@ const formSchema = z.object({
   handler_cert_type: z.string().optional(),
   handler_cert_number: z.string().optional(),
   handler_phone: z.string().optional(),
+  signature: z.string().min(1, '签名不能为空'),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -167,6 +168,7 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
         handler_cert_type: qualification.handler_cert_type || '',
         handler_cert_number: qualification.handler_cert_number || '',
         handler_phone: qualification.handler_phone || '',
+        signature: qualification.signature || '',
       }
     : {
         enterprise_name: '',
@@ -184,6 +186,7 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
         handler_cert_type: '',
         handler_cert_number: '',
         handler_phone: '',
+        signature: '',
       }
 
   const form = useForm<FormData>({
@@ -399,6 +402,25 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
                       <FormLabel>联系电话</FormLabel>
                       <FormControl>
                         <Input placeholder="手机号码" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold mb-3">签名</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="signature"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>签名 *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="如：张三 经办" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
