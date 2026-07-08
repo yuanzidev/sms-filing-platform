@@ -244,11 +244,12 @@ def read_qualifications(
     page_size: int = Query(20, ge=1, le=100),
     enterprise_name: str | None = None,
     cert_number: str | None = None,
+    signature: str | None = None,
 ) -> Any:
     skip = (page - 1) * page_size
     items, total = list_qualifications(
         session=session, skip=skip, limit=page_size,
-        enterprise_name=enterprise_name, cert_number=cert_number,
+        enterprise_name=enterprise_name, cert_number=cert_number, signature=signature,
     )
     return QualificationInfosPublic(data=items, total=total, page=page, page_size=page_size)
 

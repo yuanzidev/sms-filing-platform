@@ -21,6 +21,7 @@ def list_qualifications(
     limit: int = 20,
     enterprise_name: str | None = None,
     cert_number: str | None = None,
+    signature: str | None = None,
 ) -> tuple[list[QualificationInfo], int]:
     query = select(QualificationInfo)
 
@@ -28,6 +29,8 @@ def list_qualifications(
         query = query.where(QualificationInfo.enterprise_name.contains(enterprise_name))
     if cert_number:
         query = query.where(QualificationInfo.cert_number.contains(cert_number))
+    if signature:
+        query = query.where(QualificationInfo.signature.contains(signature))
 
     count = session.exec(select(func.count()).select_from(query.subquery())).one()
     results = session.exec(
