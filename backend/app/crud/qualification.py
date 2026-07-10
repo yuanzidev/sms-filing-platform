@@ -61,3 +61,15 @@ def update_qualification(
 def delete_qualification(*, session: Session, db_obj: QualificationInfo) -> None:
     session.delete(db_obj)
     session.commit()
+
+
+def get_qualifications_by_signatures(
+    *, session: Session, signatures: list[str]
+) -> tuple[list[QualificationInfo], list[str]]:
+    unique_sigs = list(dict.fromkeys(signatures))  # 去重保序
+    results = session.exec(
+        select(QualificationInfo).where(QualificationInfo.signature.in_(unique_sigs))
+    ).all()
+    matched_sigs = {r.signature for r in results}
+    unmatched = [s for s in unique_sigs if s not in matched_sigs]
+    return list(results), unmatched

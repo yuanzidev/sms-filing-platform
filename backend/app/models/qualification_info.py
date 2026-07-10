@@ -67,3 +67,12 @@ class QualificationInfosPublic(SQLModel):
     total: int
     page: int
     page_size: int
+
+
+class BatchSignatureRequest(SQLModel):
+    signatures: list[str]
+
+
+class BatchSignatureResponse(SQLModel):
+    matched_qualifications: list[QualificationInfoPublic]
+    unmatched_signatures: list[str]

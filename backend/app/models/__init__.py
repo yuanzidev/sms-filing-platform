@@ -67,6 +67,8 @@ from .port_info import (
     PortInfoUpdate,
 )
 from .qualification_info import (
+    BatchSignatureRequest,
+    BatchSignatureResponse,
     QualificationInfo,
     QualificationInfoCreate,
     QualificationInfoPublic,
@@ -145,6 +147,8 @@ __all__ = [
     "QualificationInfoPublic",
     "QualificationInfosPublic",
     "QualificationInfoUpdate",
+    "BatchSignatureRequest",
+    "BatchSignatureResponse",
     "FilingTask",
     "FilingTaskCreate",
     "FilingTaskDetail",
