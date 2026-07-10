@@ -195,6 +195,19 @@ export function QualificationsPage() {
         {/* Filters */}
         <div className="mb-4 mt-4 flex flex-wrap items-end gap-3 rounded-lg border p-4">
           <div className="flex flex-col gap-1">
+            <label className="text-sm text-muted-foreground">签名</label>
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="搜索签名"
+                value={searchInputs.signature}
+                onChange={(e) => setSearchInputs((s) => ({ ...s, signature: e.target.value }))}
+                className="w-56 pl-8"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
             <label className="text-sm text-muted-foreground">企业名称</label>
             <div className="relative">
               <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -215,19 +228,6 @@ export function QualificationsPage() {
                 placeholder="搜索证件号码"
                 value={searchInputs.cert_number}
                 onChange={(e) => setSearchInputs((s) => ({ ...s, cert_number: e.target.value }))}
-                className="w-56 pl-8"
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
-              />
-            </div>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-muted-foreground">签名</label>
-            <div className="relative">
-              <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="搜索签名"
-                value={searchInputs.signature}
-                onChange={(e) => setSearchInputs((s) => ({ ...s, signature: e.target.value }))}
                 className="w-56 pl-8"
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
               />
