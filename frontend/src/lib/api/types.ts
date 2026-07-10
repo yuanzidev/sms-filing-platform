@@ -39,6 +39,15 @@ export interface QualificationListResponse {
   page_size: number
 }
 
+export interface BatchSignatureRequest {
+  signatures: string[]
+}
+
+export interface BatchSignatureResponse {
+  matched_qualifications: QualificationInfo[]
+  unmatched_signatures: string[]
+}
+
 // ─── PortInfo ──────────────────────────────────────────────
 
 export interface PortInfo {
