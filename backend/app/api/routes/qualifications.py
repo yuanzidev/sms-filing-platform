@@ -13,10 +13,13 @@ from app.crud.qualification import (
     create_qualification,
     delete_qualification,
     get_qualification,
+    get_qualifications_by_signatures,
     list_qualifications,
     update_qualification,
 )
 from app.models import (
+    BatchSignatureRequest,
+    BatchSignatureResponse,
     Message,
     QualificationInfo,
     QualificationInfoCreate,
@@ -242,6 +245,19 @@ def import_qualifications(
     if warnings:
         msg += "。" + "；".join(warnings)
     return {"count": len(objects), "message": msg}
+
+
+@router.post("/batch-by-signatures", response_model=BatchSignatureResponse)
+def batch_by_signatures(
+    *, session: SessionDep, body: BatchSignatureRequest
+) -> Any:
+    qualified, unmatched = get_qualifications_by_signatures(
+        session=session, signatures=body.signatures
+    )
+    return BatchSignatureResponse(
+        matched_qualifications=qualified,
+        unmatched_signatures=unmatched,
+    )
 
 
 @router.get("", response_model=QualificationInfosPublic)
