@@ -1,5 +1,5 @@
 import api from '../api'
-import type { QualificationInfo, QualificationListResponse, FileAttachmentPublic } from './types'
+import type { BatchSignatureResponse, QualificationInfo, QualificationListResponse, FileAttachmentPublic } from './types'
 
 export const getQualifications = async (params?: {
   page?: number
@@ -69,5 +69,12 @@ export const importQualifications = async (file: File): Promise<{ count: number;
   const formData = new FormData()
   formData.append('file', file)
   const response = await api.post('/api/v1/qualifications/import', formData)
+  return response.data
+}
+
+export const getQualificationsBySignatures = async (
+  signatures: string[],
+): Promise<BatchSignatureResponse> => {
+  const response = await api.post('/api/v1/qualifications/batch-by-signatures', { signatures })
   return response.data
 }
