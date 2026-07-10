@@ -25,7 +25,8 @@ import { getExportGroups } from '@/lib/api/export-groups'
 import { useCreateFilingTask } from '@/hooks/use-filing-tasks'
 import type { QualificationInfo, ExportGroup } from '@/lib/api/types'
 import { toast } from 'sonner'
-import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Loader2, Upload } from 'lucide-react'
+import { SignatureImportDialog } from './components/signature-import-dialog'
 
 type Step = 1 | 2 | 3
 
@@ -110,6 +111,8 @@ export function FilingCreatePage() {
       .filter(Boolean) as string[]
   }, [selectedRows, qualifications])
 
+  const [signatureImportOpen, setSignatureImportOpen] = useState(false)
+
   const selectedExportGroup = exportGroupsData?.data?.find((g: ExportGroup) => g.id === exportGroupId)
 
   // Field options for group_by_field from the selected export group's fields
@@ -148,6 +151,19 @@ export function FilingCreatePage() {
   ], [])
 
   const estimatedRows = selectedIds.length * (portCount ? Number(portCount) : 0)
+
+  const handleSignatureImport = (matchedIds: string[]) => {
+    setSelectedRows((prev) => {
+      const next = { ...prev }
+      matchedIds.forEach((id) => {
+        const idx = qualifications.findIndex((q) => q.id === id)
+        if (idx !== -1) {
+          next[idx] = true
+        }
+      })
+      return next
+    })
+  }
 
   const handleCreate = () => {
     if (!exportGroupId) {
@@ -244,6 +260,14 @@ export function FilingCreatePage() {
               <span className="text-sm text-muted-foreground">
                 已选 {selectedIds.length} 个资质
               </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSignatureImportOpen(true)}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                批量导入签名
+              </Button>
             </div>
             <DataTable
               columns={qualificationColumns}
@@ -379,6 +403,11 @@ export function FilingCreatePage() {
         </Card>
       )}
         </div>
+        <SignatureImportDialog
+          open={signatureImportOpen}
+          onOpenChange={setSignatureImportOpen}
+          onConfirm={handleSignatureImport}
+        />
       </Main>
     </>
   )
