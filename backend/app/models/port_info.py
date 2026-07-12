@@ -9,7 +9,6 @@ from app.core.timezone import utcnow
 
 class PortInfoBase(SQLModel):
     carrier: str = Field(max_length=10, index=True)
-    operation_type: str | None = Field(default=None, max_length=50)
     main_port_number: str | None = Field(default=None, max_length=100, index=True)
     sub_port_number: str | None = Field(default=None, max_length=100)
     port_range: str | None = Field(default=None, max_length=100)
@@ -18,18 +17,19 @@ class PortInfoBase(SQLModel):
     port_type: str | None = Field(default=None, max_length=50)
     port_activation_date: date | None = Field(default=None)
     allow_self_extension: bool | None = Field(default=None)
-    business_attribute: str | None = Field(default=None, max_length=50)
-    business_type: str | None = Field(default=None, max_length=50, index=True)
-    business_subtype: str | None = Field(default=None, max_length=50)
-    specific_usage: str | None = Field(default=None)
-    sms_signature: str | None = Field(default=None, max_length=200)
-    is_gateway_signature: bool | None = Field(default=None)
     carrier_room: str | None = Field(default=None)
     enterprise_room: str | None = Field(default=None)
     has_authorization: bool | None = Field(default=None)
     auth_start_date: date | None = Field(default=None)
     auth_end_date: date | None = Field(default=None)
-    sms_template_content: str | None = Field(default=None)
+    # 新增/迁移字段
+    group_code: str | None = Field(default=None, max_length=100)
+    region: str | None = Field(default=None, max_length=200)
+    other_room_description: str | None = Field(default=None)
+    is_green_channel: bool | None = Field(default=None)
+    blacklist_whitelist_type: str | None = Field(default=None, max_length=50)
+    audit_form: str | None = Field(default=None, max_length=500)
+    customer_type: str | None = Field(default=None, max_length=50)
 
 
 class PortInfo(PortInfoBase, table=True):
@@ -45,7 +45,6 @@ class PortInfoCreate(PortInfoBase):
 
 class PortInfoUpdate(SQLModel):
     carrier: str | None = None
-    operation_type: str | None = None
     main_port_number: str | None = None
     sub_port_number: str | None = None
     port_range: str | None = None
@@ -54,18 +53,18 @@ class PortInfoUpdate(SQLModel):
     port_type: str | None = None
     port_activation_date: date | None = None
     allow_self_extension: bool | None = None
-    business_attribute: str | None = None
-    business_type: str | None = None
-    business_subtype: str | None = None
-    specific_usage: str | None = None
-    sms_signature: str | None = None
-    is_gateway_signature: bool | None = None
     carrier_room: str | None = None
     enterprise_room: str | None = None
     has_authorization: bool | None = None
     auth_start_date: date | None = None
     auth_end_date: date | None = None
-    sms_template_content: str | None = None
+    group_code: str | None = None
+    region: str | None = None
+    other_room_description: str | None = None
+    is_green_channel: bool | None = None
+    blacklist_whitelist_type: str | None = None
+    audit_form: str | None = None
+    customer_type: str | None = None
 
 
 class PortInfoPublic(PortInfoBase):
