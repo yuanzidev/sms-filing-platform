@@ -40,6 +40,7 @@ import { ImportDialog } from '@/components/shared/import-dialog'
 import { PROVINCES } from '@/components/shared/province-city-fields'
 import { StatusTag } from '@/components/shared/status-tag'
 import { ThemeSwitch } from '@/components/theme-switch'
+import { PortInfoDetailDialog } from './components/port-info-detail-dialog'
 import { PortInfoDialog } from './components/port-info-dialog'
 
 const PAGE_SIZE = 10
@@ -52,6 +53,7 @@ export function PortInfoPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [toDelete, setToDelete] = useState<PortInfo | undefined>()
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [detailTarget, setDetailTarget] = useState<PortInfo | undefined>()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [searchInputs, setSearchInputs] = useState({
     carrier: '',
@@ -160,6 +162,14 @@ export function PortInfoPage() {
         header: '操作',
         cell: ({ row }) => (
           <div className='flex items-center gap-1'>
+            <ActionIconButton
+              label='详情'
+              icon='view'
+              tone='view'
+              onClick={() => {
+                setDetailTarget(row.original)
+              }}
+            />
             <ActionIconButton
               label='编辑'
               icon='edit'
@@ -325,6 +335,16 @@ export function PortInfoPage() {
           queryClient.invalidateQueries({ queryKey: ['port-info'] })
         }
       />
+
+      {detailTarget && (
+        <PortInfoDetailDialog
+          open={!!detailTarget}
+          onOpenChange={(open) => {
+            if (!open) setDetailTarget(undefined)
+          }}
+          portInfo={detailTarget}
+        />
+      )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

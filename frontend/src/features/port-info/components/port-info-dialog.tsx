@@ -137,8 +137,8 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[800px]">
+        <DialogHeader className="shrink-0 border-b px-6 py-4 pr-12">
           <DialogTitle>{portInfo ? '编辑端口信息' : '新建端口信息'}</DialogTitle>
           <DialogDescription>
             {portInfo ? '修改端口详细信息' : '创建新的端口详细信息'}
@@ -146,8 +146,9 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+              <div className="grid grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="carrier"
@@ -398,9 +399,10 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                   </FormItem>
                 )}
               />
+              </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="shrink-0 px-6 py-4">
               <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isPending}>
                 取消
               </Button>

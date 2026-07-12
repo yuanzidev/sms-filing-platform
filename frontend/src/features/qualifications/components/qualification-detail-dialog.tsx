@@ -7,11 +7,13 @@ import type { QualificationInfo } from '@/lib/api/types'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { XIcon } from 'lucide-react'
 
 interface Props {
   open: boolean
@@ -67,19 +69,36 @@ export function QualificationDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-h-[85vh] w-[calc(100vw-2rem)] max-w-5xl overflow-y-auto'>
-        <DialogHeader>
-          <DialogTitle>资质详情 — {d.enterprise_name}</DialogTitle>
+      <DialogContent
+        showCloseButton={false}
+        className='flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0'
+      >
+        <DialogHeader className='shrink-0 border-b px-6 py-4'>
+          <div className='flex items-start justify-between gap-4'>
+            <DialogTitle>资质详情 — {d.enterprise_name}</DialogTitle>
+            <DialogClose asChild>
+              <Button
+                type='button'
+                variant='ghost'
+                size='icon'
+                className='-mt-2 -mr-2 size-8 shrink-0'
+                aria-label='关闭'
+              >
+                <XIcon className='h-4 w-4' />
+              </Button>
+            </DialogClose>
+          </div>
         </DialogHeader>
 
-        {isLoading ? (
-          <div className='space-y-3'>
-            <Skeleton className='h-4 w-full' />
-            <Skeleton className='h-4 w-3/4' />
-            <Skeleton className='h-4 w-1/2' />
-          </div>
-        ) : (
-          <div className='space-y-6'>
+        <div className='min-h-0 flex-1 overflow-y-auto px-6 py-4'>
+          {isLoading ? (
+            <div className='space-y-3'>
+              <Skeleton className='h-4 w-full' />
+              <Skeleton className='h-4 w-3/4' />
+              <Skeleton className='h-4 w-1/2' />
+            </div>
+          ) : (
+            <div className='space-y-6'>
             {/* 企业信息 */}
             <div>
               <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>
@@ -205,10 +224,11 @@ export function QualificationDetailDialog({
                 })}
               </div>
             </div>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
 
-        <div className='flex justify-end'>
+        <div className='flex shrink-0 justify-end border-t px-6 py-4'>
           <Button variant='outline' onClick={() => onOpenChange(false)}>
             关闭
           </Button>

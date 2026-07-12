@@ -394,8 +394,8 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[700px]">
+        <DialogHeader className="shrink-0 border-b px-6 py-4 pr-12">
           <DialogTitle>{qualification ? '编辑资质' : '新建资质'}</DialogTitle>
           <DialogDescription>
             {qualification ? '修改企业资质信息' : '创建新的企业资质信息'}
@@ -403,7 +403,8 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-1">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-6 py-4">
 
             {/* ── 企业信息 ──────────────────────────────────── */}
             <Panel panelKey="enterprise" title="企业信息">
@@ -957,7 +958,9 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
               </div>
             </Panel>
 
-            <DialogFooter className="pt-6">
+            </div>
+
+            <DialogFooter className="shrink-0 px-6 py-4">
               <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isPending}>
                 取消
               </Button>
