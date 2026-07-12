@@ -82,6 +82,7 @@ const AVAILABLE_FIELDS = [
   { key: 'diversion_content', label: '引流内容' },
   { key: 'link_address', label: '链接地址' },
   { key: 'link_type', label: '链接类型' },
+  { key: 'signature', label: '签名' },
 ]
 
 const formSchema = z.object({

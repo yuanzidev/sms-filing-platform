@@ -49,9 +49,9 @@ export function QualificationDetailDialog({ open, onOpenChange, qualification }:
     { name: '责任人身份证反面', match: '责任人身份证反面' },
     { name: '经办人身份证正面', match: '经办人身份证正面' },
     { name: '经办人身份证反面', match: '经办人身份证反面' },
-    { name: '签名承诺函', match: 'signature_proof_image' },
-    { name: '经办人照片', match: 'handler_photo' },
-    { name: '引流证明材料', match: 'diversion_proof_image' },
+    { name: '签名举证附件', match: '签名举证附件' },
+    { name: '经办人现场照片', match: '经办人现场照片' },
+    { name: '引流举证附件', match: '引流举证附件' },
   ]
 
   return (
@@ -107,6 +107,7 @@ export function QualificationDetailDialog({ open, onOpenChange, qualification }:
             {/* 签名与模板 */}
             <div>
               <h4 className="mb-2 text-sm font-semibold border-b pb-1">签名与模板</h4>
+              <FieldRow label="签名" value={d.signature} />
               <FieldRow label="短信签名" value={d.sms_signature} />
               <FieldRow label="签名类型" value={d.signature_type} />
               <FieldRow label="签名是否已认证" value={d.signature_verified} />
