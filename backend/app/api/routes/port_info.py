@@ -37,9 +37,8 @@ router = APIRouter(
     dependencies=[Depends(get_current_active_superuser)],
 )
 
-_PORT_INFO_HEADERS = [
+_PORT_HEADERS = [
     "运营商",
-    "操作类型",
     "主端口号",
     "子端口号",
     "码号使用范围",
@@ -48,18 +47,18 @@ _PORT_INFO_HEADERS = [
     "端口类型",
     "端口入网时间",
     "是否允许自行扩展",
-    "业务属性",
-    "业务类型",
-    "业务细类",
-    "具体用途",
-    "短信签名",
-    "是否网关签名",
     "运营商接入机房及设备",
     "企业接入机房及设备",
     "是否具有授权书",
     "授权开始日期",
     "授权结束日期",
-    "短信模板内容",
+    "集团编码",
+    "所属地区",
+    "其他接入机房说明",
+    "是否绿色通道",
+    "黑白名单类型",
+    "端口审核表",
+    "客户类型",
     "授权书图片",
 ]
 
@@ -74,18 +73,28 @@ def download_port_info_template() -> Any:
     ws = wb.active
     ws.title = "端口信息导入模板"
 
-    for col_idx, header in enumerate(_PORT_INFO_HEADERS, 1):
+    for col_idx, header in enumerate(_PORT_HEADERS, 1):
         ws.cell(row=1, column=col_idx, value=header)
 
     example_data = [
-        "中国移动", "新增", "10690001", "0001",
-        "全国", "广东", "深圳",
-        "短信", "2024-01-15", "是",
-        "营销类", "验证码", "登录验证",
-        "用户登录验证短信", "【示例平台】", "否",
-        "运营商XX机房-XX设备", "企业XX机房-XX设备",
-        "是", "2024-01-01", "2025-12-31",
-        "您的验证码是{code}，请在5分钟内完成验证",
+        "中国移动",
+        "10690001", "0001",
+        "全国",
+        "广东", "深圳",
+        "短信",
+        "2024-01-15",
+        "是",
+        "运营商XX机房-XX设备",
+        "企业XX机房-XX设备",
+        "是",
+        "2024-01-01", "2025-12-31",
+        "G001",
+        "华南地区",
+        "备用机房A",
+        "否",
+        "黑名单",
+        "已审核",
+        "企业客户",
     ]
     for col_idx, val in enumerate(example_data, 1):
         ws.cell(row=2, column=col_idx, value=val)
@@ -114,8 +123,8 @@ def download_port_info_template() -> Any:
     img_buf = io.BytesIO()
     sample_img.save(img_buf, format="PNG")
 
-    # Authorization image column = column 23 (0-based) = "W2"
-    cell_images = {"W2": img_buf.getvalue()}
+    # Authorization image column = column 22 (1-based) = "V2"
+    cell_images = {"V2": img_buf.getvalue()}
     xlsx_bytes = inject_cell_images(xlsx_bytes, cell_images)
 
     return StreamingResponse(
@@ -145,7 +154,6 @@ def import_port_infos(
 
     header_to_field = {
         "运营商": "carrier",
-        "操作类型": "operation_type",
         "主端口号": "main_port_number",
         "子端口号": "sub_port_number",
         "码号使用范围": "port_range",
@@ -154,18 +162,18 @@ def import_port_infos(
         "端口类型": "port_type",
         "端口入网时间": "port_activation_date",
         "是否允许自行扩展": "allow_self_extension",
-        "业务属性": "business_attribute",
-        "业务类型": "business_type",
-        "业务细类": "business_subtype",
-        "具体用途": "specific_usage",
-        "短信签名": "sms_signature",
-        "是否网关签名": "is_gateway_signature",
         "运营商接入机房及设备": "carrier_room",
         "企业接入机房及设备": "enterprise_room",
         "是否具有授权书": "has_authorization",
         "授权开始日期": "auth_start_date",
         "授权结束日期": "auth_end_date",
-        "短信模板内容": "sms_template_content",
+        "集团编码": "group_code",
+        "所属地区": "region",
+        "其他接入机房说明": "other_room_description",
+        "是否绿色通道": "is_green_channel",
+        "黑白名单类型": "blacklist_whitelist_type",
+        "端口审核表": "audit_form",
+        "客户类型": "customer_type",
     }
 
     header_row = [str(c) if c else "" for c in rows[0]]
@@ -227,7 +235,6 @@ def import_port_infos(
 
         objects.append(PortInfo(
             carrier=carrier,
-            operation_type=cell("operation_type"),
             main_port_number=cell("main_port_number"),
             sub_port_number=cell("sub_port_number"),
             port_range=cell("port_range"),
@@ -236,18 +243,18 @@ def import_port_infos(
             port_type=cell("port_type"),
             port_activation_date=parse_date("port_activation_date"),
             allow_self_extension=parse_bool("allow_self_extension"),
-            business_attribute=cell("business_attribute"),
-            business_type=cell("business_type"),
-            business_subtype=cell("business_subtype"),
-            specific_usage=cell("specific_usage"),
-            sms_signature=cell("sms_signature"),
-            is_gateway_signature=parse_bool("is_gateway_signature"),
             carrier_room=cell("carrier_room"),
             enterprise_room=cell("enterprise_room"),
             has_authorization=parse_bool("has_authorization"),
             auth_start_date=parse_date("auth_start_date"),
             auth_end_date=parse_date("auth_end_date"),
-            sms_template_content=cell("sms_template_content"),
+            group_code=cell("group_code"),
+            region=cell("region"),
+            other_room_description=cell("other_room_description"),
+            is_green_channel=parse_bool("is_green_channel"),
+            blacklist_whitelist_type=cell("blacklist_whitelist_type"),
+            audit_form=cell("audit_form"),
+            customer_type=cell("customer_type"),
         ))
 
     if not objects:

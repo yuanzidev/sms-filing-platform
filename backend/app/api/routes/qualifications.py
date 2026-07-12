@@ -42,26 +42,47 @@ router = APIRouter(
 
 _QUALIFICATION_HEADERS = [
     "企业名称",
-    "提交单位",
-    "运营商企业ID",
     "单位证件类型",
     "单位证件号码",
     "APP/平台名称",
-    "集团编码",
+    "法人姓名",
     "责任人姓名",
     "责任人证件类型",
     "责任人证件号码",
+    "责任人证件地址",
     "责任人手机号",
     "经办人姓名",
     "经办人证件类型",
     "经办人证件号码",
+    "经办人证件地址",
     "经办人手机号",
+    "短信签名",
+    "签名类型/来源",
+    "是否签名校验",
+    "是否网关签名",
+    "短信模板内容",
+    "模板是否包含变量",
+    "模板参数类型",
+    "模板参数长度",
+    "业务属性",
+    "业务类型",
+    "业务细类",
+    "具体用途",
+    "引流号码",
+    "引流号码类型",
+    "引流号码用途",
+    "引流内容",
+    "链接地址",
+    "链接类型",
     "签名",
     "单位证件图片",
     "责任人身份证正面",
     "责任人身份证反面",
     "经办人身份证正面",
     "经办人身份证反面",
+    "签名举证附件",
+    "经办人现场照片",
+    "引流举证附件",
 ]
 
 
@@ -79,12 +100,18 @@ def download_qualification_template() -> Any:
         ws.cell(row=1, column=col_idx, value=header)
 
     example_data = [
-        "示例企业有限公司", "报送部", "OP10001",
+        "示例企业有限公司",
         "营业执照", "91110108MA01XXXXX",
-        "示例平台", "G001",
-        "张三", "身份证", "110101199001011234", "13800138000",
-        "李四", "身份证", "110101199501011234", "13900139000",
-        "张三 经办",
+        "示例平台",
+        "张三",  # 法人
+        "李四", "身份证", "110101199001011234", "北京市朝阳区XX路1号", "13800138000",
+        "王五", "身份证", "110101199501011234", "北京市海淀区XX路2号", "13900139000",
+        "【示例平台】", "自营签名", "是", "否",
+        "您的验证码是{code}，请在5分钟内完成验证", "是", "数字", "6",
+        "营销类", "验证码", "登录验证", "用户登录验证",
+        "13800000000", "手机号", "业务联系", "欢迎使用我们的服务",
+        "https://example.com", "H5",
+        "示例签名",
     ]
     for col_idx, val in enumerate(example_data, 1):
         ws.cell(row=2, column=col_idx, value=val)
@@ -114,8 +141,8 @@ def download_qualification_template() -> Any:
     img_buf = io.BytesIO()
     sample_img.save(img_buf, format="PNG")
 
-    # First image column is column 17 (1-based) = "Q2"
-    cell_images = {"Q2": img_buf.getvalue()}
+    # First image column is column 35 (1-based) = "AI2"
+    cell_images = {"AI2": img_buf.getvalue()}
     xlsx_bytes = inject_cell_images(xlsx_bytes, cell_images)
 
     return StreamingResponse(
@@ -146,20 +173,38 @@ def import_qualifications(
     # Map model field names to column index by matching Chinese headers
     header_to_field = {
         "企业名称": "enterprise_name",
-        "提交单位": "submit_unit",
-        "运营商企业ID": "carrier_enterprise_id",
         "单位证件类型": "cert_type",
         "单位证件号码": "cert_number",
         "APP/平台名称": "app_platform_name",
-        "集团编码": "group_code",
+        "法人姓名": "legal_representative_name",
         "责任人姓名": "responsible_name",
         "责任人证件类型": "responsible_cert_type",
         "责任人证件号码": "responsible_cert_number",
+        "责任人证件地址": "responsible_address",
         "责任人手机号": "responsible_phone",
         "经办人姓名": "handler_name",
         "经办人证件类型": "handler_cert_type",
         "经办人证件号码": "handler_cert_number",
+        "经办人证件地址": "handler_address",
         "经办人手机号": "handler_phone",
+        "短信签名": "sms_signature",
+        "签名类型/来源": "signature_type",
+        "是否签名校验": "signature_verified",
+        "是否网关签名": "is_gateway_signature",
+        "短信模板内容": "sms_template_content",
+        "模板是否包含变量": "template_has_variable",
+        "模板参数类型": "template_param_type",
+        "模板参数长度": "template_param_length",
+        "业务属性": "business_attribute",
+        "业务类型": "business_type",
+        "业务细类": "business_subtype",
+        "具体用途": "specific_usage",
+        "引流号码": "diversion_number",
+        "引流号码类型": "diversion_number_type",
+        "引流号码用途": "diversion_number_usage",
+        "引流内容": "diversion_content",
+        "链接地址": "link_address",
+        "链接类型": "link_type",
         "签名": "signature",
     }
 
@@ -186,6 +231,12 @@ def import_qualifications(
                 return None
             return str(v).strip()
 
+        def parse_bool(col_name: str) -> bool | None:
+            v = cell(col_name)
+            if v is None:
+                return None
+            return v in ("是", "true", "True", "1", "TRUE")
+
         enterprise_name = cell("enterprise_name")
         if not enterprise_name:
             raise HTTPException(status_code=400, detail=f"第{row_idx}行: 企业名称不能为空")
@@ -196,20 +247,38 @@ def import_qualifications(
 
         objects.append(QualificationInfo(
             enterprise_name=enterprise_name,
-            submit_unit=cell("submit_unit"),
-            carrier_enterprise_id=cell("carrier_enterprise_id"),
             cert_type=cell("cert_type"),
             cert_number=cell("cert_number"),
             app_platform_name=cell("app_platform_name"),
-            group_code=cell("group_code"),
+            legal_representative_name=cell("legal_representative_name"),
             responsible_name=cell("responsible_name"),
             responsible_cert_type=cell("responsible_cert_type"),
             responsible_cert_number=cell("responsible_cert_number"),
+            responsible_address=cell("responsible_address"),
             responsible_phone=cell("responsible_phone"),
             handler_name=cell("handler_name"),
             handler_cert_type=cell("handler_cert_type"),
             handler_cert_number=cell("handler_cert_number"),
+            handler_address=cell("handler_address"),
             handler_phone=cell("handler_phone"),
+            sms_signature=cell("sms_signature"),
+            signature_type=cell("signature_type"),
+            signature_verified=parse_bool("signature_verified"),
+            is_gateway_signature=parse_bool("is_gateway_signature"),
+            sms_template_content=cell("sms_template_content"),
+            template_has_variable=parse_bool("template_has_variable"),
+            template_param_type=cell("template_param_type"),
+            template_param_length=cell("template_param_length"),
+            business_attribute=cell("business_attribute"),
+            business_type=cell("business_type"),
+            business_subtype=cell("business_subtype"),
+            specific_usage=cell("specific_usage"),
+            diversion_number=cell("diversion_number"),
+            diversion_number_type=cell("diversion_number_type"),
+            diversion_number_usage=cell("diversion_number_usage"),
+            diversion_content=cell("diversion_content"),
+            link_address=cell("link_address"),
+            link_type=cell("link_type"),
             signature=signature,
         ))
 
