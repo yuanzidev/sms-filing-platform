@@ -12,21 +12,47 @@ export type ApiDataStatus = '待处理' | '已入库' | '校验失败' | '已忽
 
 export interface QualificationInfo {
   id: string
-  submit_unit: string | null
-  carrier_enterprise_id: string | null
+  // 企业信息
   enterprise_name: string
   cert_type: string | null
   cert_number: string | null
   app_platform_name: string | null
-  group_code: string | null
+  // 法人
+  legal_representative_name: string | null
+  // 责任人
   responsible_name: string | null
   responsible_cert_type: string | null
   responsible_cert_number: string | null
+  responsible_address: string | null
   responsible_phone: string | null
+  // 经办人
   handler_name: string | null
   handler_cert_type: string | null
   handler_cert_number: string | null
+  handler_address: string | null
   handler_phone: string | null
+  // 签名与模板
+  sms_signature: string | null
+  signature_type: string | null
+  signature_verified: boolean | null
+  is_gateway_signature: boolean | null
+  sms_template_content: string | null
+  template_has_variable: boolean | null
+  template_param_type: string | null
+  template_param_length: string | null
+  // 业务信息
+  business_attribute: string | null
+  business_type: string | null
+  business_subtype: string | null
+  specific_usage: string | null
+  // 引流信息
+  diversion_number: string | null
+  diversion_number_type: string | null
+  diversion_number_usage: string | null
+  diversion_content: string | null
+  link_address: string | null
+  link_type: string | null
+  // 签名
   signature: string
   created_at: string
   updated_at: string
@@ -53,7 +79,6 @@ export interface BatchSignatureResponse {
 export interface PortInfo {
   id: string
   carrier: string
-  operation_type: string | null
   main_port_number: string | null
   sub_port_number: string | null
   port_range: string | null
@@ -62,18 +87,18 @@ export interface PortInfo {
   port_type: string | null
   port_activation_date: string | null
   allow_self_extension: boolean | null
-  business_attribute: string | null
-  business_type: string | null
-  business_subtype: string | null
-  specific_usage: string | null
-  sms_signature: string | null
-  is_gateway_signature: boolean | null
   carrier_room: string | null
   enterprise_room: string | null
   has_authorization: boolean | null
   auth_start_date: string | null
   auth_end_date: string | null
-  sms_template_content: string | null
+  group_code: string | null
+  region: string | null
+  other_room_description: string | null
+  is_green_channel: boolean | null
+  blacklist_whitelist_type: string | null
+  audit_form: string | null
+  customer_type: string | null
   created_at: string
   updated_at: string
 }
