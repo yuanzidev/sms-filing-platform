@@ -1,10 +1,20 @@
+import { useState } from 'react'
+import { ChevronDown, RotateCcw, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { ChevronDown } from 'lucide-react'
-import { useState } from 'react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export interface SearchField {
   name: string
@@ -35,7 +45,10 @@ export function SearchForm({ fields, onSearch, onReset }: SearchFormProps) {
   }
 
   const handleChange = (name: string, value: string) => {
-    setValues((prev) => ({ ...prev, [name]: value === EMPTY_SENTINEL ? '' : value }))
+    setValues((prev) => ({
+      ...prev,
+      [name]: value === EMPTY_SENTINEL ? '' : value,
+    }))
   }
 
   const handleSearch = () => {
@@ -51,22 +64,27 @@ export function SearchForm({ fields, onSearch, onReset }: SearchFormProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3">
+    <div className='border-border/80 bg-card space-y-4 rounded-lg border p-4 shadow-sm shadow-slate-950/5'>
+      <div className='flex flex-wrap items-end gap-3'>
         {basicFields.map((field) => (
-          <div key={field.name} className="space-y-1">
+          <div key={field.name} className='space-y-1'>
             <Label htmlFor={field.name}>{field.label}</Label>
             {field.type === 'select' ? (
               <Select
                 value={selectValue(field.name)}
                 onValueChange={(v) => handleChange(field.name, v)}
               >
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className='w-[140px]'>
                   <SelectValue placeholder={`选择${field.label}`} />
                 </SelectTrigger>
                 <SelectContent>
                   {(field.options ?? []).map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value || EMPTY_SENTINEL}>{opt.label}</SelectItem>
+                    <SelectItem
+                      key={opt.value}
+                      value={opt.value || EMPTY_SENTINEL}
+                    >
+                      {opt.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -76,40 +94,54 @@ export function SearchForm({ fields, onSearch, onReset }: SearchFormProps) {
                 placeholder={field.label}
                 value={values[field.name] ?? ''}
                 onChange={(e) => handleChange(field.name, e.target.value)}
-                className="w-[160px]"
+                className='w-[160px]'
               />
             )}
           </div>
         ))}
-        <div className="flex gap-2 pb-0.5">
-          <Button onClick={handleSearch}>搜索</Button>
-          <Button variant="outline" onClick={handleReset}>重置</Button>
+        <div className='flex gap-2 pb-0.5'>
+          <Button onClick={handleSearch}>
+            <Search className='mr-2 h-4 w-4' />
+            搜索
+          </Button>
+          <Button variant='outline' onClick={handleReset}>
+            <RotateCcw className='mr-2 h-4 w-4' />
+            重置
+          </Button>
         </div>
       </div>
 
       {advancedFields.length > 0 && (
         <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-1">
-              高级搜索 <ChevronDown className={`h-4 w-4 transition-transform ${advancedOpen ? 'rotate-180' : ''}`} />
+            <Button variant='ghost' size='sm' className='gap-1'>
+              高级搜索{' '}
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${advancedOpen ? 'rotate-180' : ''}`}
+              />
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="flex flex-wrap items-end gap-3 pt-3">
+            <div className='flex flex-wrap items-end gap-3 pt-3'>
               {advancedFields.map((field) => (
-                <div key={field.name} className="space-y-1">
+                <div key={field.name} className='space-y-1'>
                   <Label htmlFor={field.name}>{field.label}</Label>
                   {field.type === 'select' ? (
                     <Select
                       value={selectValue(field.name)}
                       onValueChange={(v) => handleChange(field.name, v)}
                     >
-                      <SelectTrigger className="w-[140px]">
+                      <SelectTrigger className='w-[140px]'>
                         <SelectValue placeholder={`选择${field.label}`} />
                       </SelectTrigger>
                       <SelectContent>
                         {(field.options ?? []).map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value || EMPTY_SENTINEL}>{opt.label}</SelectItem>
+                          <SelectItem
+                            key={opt.value}
+                            value={opt.value || EMPTY_SENTINEL}
+                          >
+                            {opt.label}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -119,7 +151,7 @@ export function SearchForm({ fields, onSearch, onReset }: SearchFormProps) {
                       placeholder={field.label}
                       value={values[field.name] ?? ''}
                       onChange={(e) => handleChange(field.name, e.target.value)}
-                      className="w-[160px]"
+                      className='w-[160px]'
                     />
                   )}
                 </div>

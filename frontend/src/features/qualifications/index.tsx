@@ -1,22 +1,23 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Header } from '@/components/layout/header'
-import { Main } from '@/components/layout/main'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Download, Eye, Pencil, Plus, RefreshCw, Search as SearchIcon, Trash2, Upload } from 'lucide-react'
-import { toast } from 'sonner'
-import { DataTable } from '@/components/shared/data-table/data-table'
-import { getQualifications, deleteQualification, downloadQualificationTemplate, importQualifications } from '@/lib/api/qualifications'
 import type { RowSelectionState } from '@tanstack/react-table'
+import {
+  Download,
+  Plus,
+  RefreshCw,
+  Search as SearchIcon,
+  Trash2,
+  Upload,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  getQualifications,
+  deleteQualification,
+  downloadQualificationTemplate,
+  importQualifications,
+} from '@/lib/api/qualifications'
 import type { QualificationInfo } from '@/lib/api/types'
-import { QualificationDialog } from './components/qualification-dialog'
-import { QualificationDetailDialog } from './components/qualification-detail-dialog'
-import { ImportDialog } from '@/components/shared/import-dialog'
 import { formatCN } from '@/lib/time'
 import {
   AlertDialog,
@@ -28,6 +29,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { Search } from '@/components/search'
+import { ActionIconButton } from '@/components/shared/action-icon-button'
+import { DataTable } from '@/components/shared/data-table/data-table'
+import { ImportDialog } from '@/components/shared/import-dialog'
+import { ThemeSwitch } from '@/components/theme-switch'
+import { QualificationDetailDialog } from './components/qualification-detail-dialog'
+import { QualificationDialog } from './components/qualification-dialog'
 
 const PAGE_SIZE = 10
 
@@ -38,15 +51,29 @@ export function QualificationsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [toDelete, setToDelete] = useState<QualificationInfo | undefined>()
   const [importDialogOpen, setImportDialogOpen] = useState(false)
-  const [detailTarget, setDetailTarget] = useState<QualificationInfo | undefined>()
+  const [detailTarget, setDetailTarget] = useState<
+    QualificationInfo | undefined
+  >()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const [searchInputs, setSearchInputs] = useState({ enterprise_name: '', cert_number: '', signature: '' })
-  const [appliedFilters, setAppliedFilters] = useState<{ enterprise_name?: string; cert_number?: string; signature?: string }>({})
+  const [searchInputs, setSearchInputs] = useState({
+    enterprise_name: '',
+    cert_number: '',
+    signature: '',
+  })
+  const [appliedFilters, setAppliedFilters] = useState<{
+    enterprise_name?: string
+    cert_number?: string
+    signature?: string
+  }>({})
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['qualifications', { page, page_size: PAGE_SIZE, ...appliedFilters }],
-    queryFn: () => getQualifications({ page, page_size: PAGE_SIZE, ...appliedFilters }),
+    queryKey: [
+      'qualifications',
+      { page, page_size: PAGE_SIZE, ...appliedFilters },
+    ],
+    queryFn: () =>
+      getQualifications({ page, page_size: PAGE_SIZE, ...appliedFilters }),
   })
 
   const handleSearch = () => {
@@ -83,7 +110,11 @@ export function QualificationsPage() {
 
   const handleBatchDelete = async () => {
     try {
-      await Promise.all(selectedIds.map((idx) => deleteQualification(qualifications[Number(idx)]?.id)))
+      await Promise.all(
+        selectedIds.map((idx) =>
+          deleteQualification(qualifications[Number(idx)]?.id)
+        )
+      )
       toast.success(`已删除 ${selectedCount} 条记录`)
       setRowSelection({})
       queryClient.invalidateQueries({ queryKey: ['qualifications'] })
@@ -92,56 +123,71 @@ export function QualificationsPage() {
     }
   }
 
-  const columns = useMemo<ColumnDef<QualificationInfo>[]>(() => [
-    { accessorKey: 'enterprise_name', header: '企业名称' },
-    { accessorKey: 'legal_representative_name', header: '法人', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'responsible_name', header: '责任人', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'signature', header: '签名', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'business_type', header: '业务类型', cell: ({ getValue }) => getValue() || '-' },
-    {
-      accessorKey: 'created_at',
-      header: '创建时间',
-      cell: ({ getValue }) => formatCN(getValue() as string),
-    },
-    {
-      id: 'actions',
-      header: '操作',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground"
-            onClick={() => { setDetailTarget(row.original) }}
-          >
-            <span className="flex items-center gap-1.5">
-              <Eye className="h-4 w-4" />详情
-            </span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-            onClick={() => { setSelected(row.original); setDialogOpen(true) }}
-          >
-            <span className="flex items-center gap-1.5">
-              <Pencil className="h-4 w-4" />编辑
-            </span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-red-600 hover:bg-red-50 hover:text-red-700"
-            onClick={() => { setToDelete(row.original); setDeleteDialogOpen(true) }}
-          >
-            <span className="flex items-center gap-1.5">
-              <Trash2 className="h-4 w-4" />删除
-            </span>
-          </Button>
-        </div>
-      ),
-    },
-  ], [])
+  const columns = useMemo<ColumnDef<QualificationInfo>[]>(
+    () => [
+      { accessorKey: 'enterprise_name', header: '企业名称' },
+      {
+        accessorKey: 'legal_representative_name',
+        header: '法人',
+        cell: ({ getValue }) => getValue() || '-',
+      },
+      {
+        accessorKey: 'responsible_name',
+        header: '责任人',
+        cell: ({ getValue }) => getValue() || '-',
+      },
+      {
+        accessorKey: 'signature',
+        header: '签名',
+        cell: ({ getValue }) => getValue() || '-',
+      },
+      {
+        accessorKey: 'business_type',
+        header: '业务类型',
+        cell: ({ getValue }) => getValue() || '-',
+      },
+      {
+        accessorKey: 'created_at',
+        header: '创建时间',
+        cell: ({ getValue }) => formatCN(getValue() as string),
+      },
+      {
+        id: 'actions',
+        header: '操作',
+        cell: ({ row }) => (
+          <div className='flex items-center gap-1'>
+            <ActionIconButton
+              label='详情'
+              icon='view'
+              tone='view'
+              onClick={() => {
+                setDetailTarget(row.original)
+              }}
+            />
+            <ActionIconButton
+              label='编辑'
+              icon='edit'
+              tone='edit'
+              onClick={() => {
+                setSelected(row.original)
+                setDialogOpen(true)
+              }}
+            />
+            <ActionIconButton
+              label='删除'
+              icon='delete'
+              tone='delete'
+              onClick={() => {
+                setToDelete(row.original)
+                setDeleteDialogOpen(true)
+              }}
+            />
+          </div>
+        ),
+      },
+    ],
+    []
+  )
 
   return (
     <>
@@ -161,81 +207,112 @@ export function QualificationsPage() {
               管理企业资质信息（企业名称、证件、负责人、经办人等）
             </p>
           </div>
-          <div className="flex space-x-2">
-            <Button onClick={() => { setSelected(undefined); setDialogOpen(true) }}>
-              <Plus className="mr-2 h-4 w-4" />
+          <div className='flex space-x-2'>
+            <Button
+              onClick={() => {
+                setSelected(undefined)
+                setDialogOpen(true)
+              }}
+            >
+              <Plus className='mr-2 h-4 w-4' />
               新建资质
             </Button>
-            <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
-              <Upload className="mr-2 h-4 w-4" />
+            <Button variant='outline' onClick={() => setImportDialogOpen(true)}>
+              <Upload className='mr-2 h-4 w-4' />
               导入数据
             </Button>
-            <Button variant="outline" onClick={() => downloadQualificationTemplate()}>
-              <Download className="mr-2 h-4 w-4" />
+            <Button
+              variant='outline'
+              onClick={() => downloadQualificationTemplate()}
+            >
+              <Download className='mr-2 h-4 w-4' />
               下载模板
             </Button>
             {selectedCount > 0 && (
-              <Button variant="destructive" onClick={handleBatchDelete}>
-                <Trash2 className="mr-2 h-4 w-4" />删除 ({selectedCount})
+              <Button variant='destructive' onClick={handleBatchDelete}>
+                <Trash2 className='mr-2 h-4 w-4' />
+                删除 ({selectedCount})
               </Button>
             )}
             <Button
-              variant="outline"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ['qualifications'] })}
+              variant='outline'
+              onClick={() =>
+                queryClient.invalidateQueries({ queryKey: ['qualifications'] })
+              }
               disabled={isLoading}
             >
-              <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
+              />
               刷新
             </Button>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="mb-4 mt-4 flex flex-wrap items-end gap-3 rounded-lg border p-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-muted-foreground">签名</label>
-            <div className="relative">
-              <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <div className='border-border/80 bg-card mt-4 mb-4 flex flex-wrap items-end gap-3 rounded-lg border p-4 shadow-sm shadow-slate-950/5'>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>签名</label>
+            <div className='relative'>
+              <SearchIcon className='text-muted-foreground pointer-events-none absolute top-2.5 left-2.5 h-4 w-4' />
               <Input
-                placeholder="搜索签名"
+                placeholder='搜索签名'
                 value={searchInputs.signature}
-                onChange={(e) => setSearchInputs((s) => ({ ...s, signature: e.target.value }))}
-                className="w-56 pl-8"
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
+                onChange={(e) =>
+                  setSearchInputs((s) => ({ ...s, signature: e.target.value }))
+                }
+                className='w-56 pl-8'
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSearch()
+                }}
               />
             </div>
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-muted-foreground">企业名称</label>
-            <div className="relative">
-              <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>企业名称</label>
+            <div className='relative'>
+              <SearchIcon className='text-muted-foreground pointer-events-none absolute top-2.5 left-2.5 h-4 w-4' />
               <Input
-                placeholder="搜索企业名称"
+                placeholder='搜索企业名称'
                 value={searchInputs.enterprise_name}
-                onChange={(e) => setSearchInputs((s) => ({ ...s, enterprise_name: e.target.value }))}
-                className="w-56 pl-8"
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
+                onChange={(e) =>
+                  setSearchInputs((s) => ({
+                    ...s,
+                    enterprise_name: e.target.value,
+                  }))
+                }
+                className='w-56 pl-8'
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSearch()
+                }}
               />
             </div>
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-muted-foreground">证件号码</label>
-            <div className="relative">
-              <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>证件号码</label>
+            <div className='relative'>
+              <SearchIcon className='text-muted-foreground pointer-events-none absolute top-2.5 left-2.5 h-4 w-4' />
               <Input
-                placeholder="搜索证件号码"
+                placeholder='搜索证件号码'
                 value={searchInputs.cert_number}
-                onChange={(e) => setSearchInputs((s) => ({ ...s, cert_number: e.target.value }))}
-                className="w-56 pl-8"
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
+                onChange={(e) =>
+                  setSearchInputs((s) => ({
+                    ...s,
+                    cert_number: e.target.value,
+                  }))
+                }
+                className='w-56 pl-8'
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSearch()
+                }}
               />
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleSearch}>
+          <div className='flex gap-2'>
+            <Button size='sm' onClick={handleSearch}>
               搜索
             </Button>
-            <Button variant="ghost" size="sm" onClick={handleReset}>
+            <Button variant='ghost' size='sm' onClick={handleReset}>
               重置
             </Button>
           </div>
@@ -257,22 +334,28 @@ export function QualificationsPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         qualification={selected}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['qualifications'] })}
+        onSuccess={() =>
+          queryClient.invalidateQueries({ queryKey: ['qualifications'] })
+        }
       />
 
       <ImportDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
-        title="资质信息"
+        title='资质信息'
         onDownloadTemplate={downloadQualificationTemplate}
         onImport={importQualifications}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['qualifications'] })}
+        onSuccess={() =>
+          queryClient.invalidateQueries({ queryKey: ['qualifications'] })
+        }
       />
 
       {detailTarget && (
         <QualificationDetailDialog
           open={!!detailTarget}
-          onOpenChange={(open) => { if (!open) setDetailTarget(undefined) }}
+          onOpenChange={(open) => {
+            if (!open) setDetailTarget(undefined)
+          }}
           qualification={detailTarget}
         />
       )}
@@ -289,7 +372,7 @@ export function QualificationsPage() {
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => toDelete && deleteMutation.mutate(toDelete.id)}
-              className="bg-red-600 hover:bg-red-700"
+              className='bg-red-600 hover:bg-red-700'
             >
               删除
             </AlertDialogAction>

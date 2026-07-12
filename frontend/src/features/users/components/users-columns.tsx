@@ -1,9 +1,17 @@
 import { ColumnDef } from '@tanstack/react-table'
+import {
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  UserCheck,
+  UserX,
+  Key,
+} from 'lucide-react'
+import { type User } from '@/lib/api/users'
+import { formatCN } from '@/lib/time'
 import { cn } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
-import { MoreHorizontal, Edit, Trash2, UserCheck, UserX, Key } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,8 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { formatCN } from '@/lib/time'
-import { type User } from '@/lib/api/users'
+import { StatusTag } from '@/components/shared/status-tag'
 import { DataTableColumnHeader } from './data-table-column-header'
 
 interface ColumnActions {
@@ -122,23 +129,11 @@ export const columns = (actions: ColumnActions): ColumnDef<User>[] => [
     ),
     cell: ({ row }) => {
       const status = row.getValue('status') as string
-      const getBadgeVariant = (status: string) => {
-        switch (status) {
-          case 'active':
-            return 'default'
-          case 'inactive':
-            return 'secondary'
-          case 'suspended':
-            return 'destructive'
-          default:
-            return 'outline'
-        }
-      }
+      const label =
+        status === 'active' ? '启用' : status === 'inactive' ? '停用' : '暂停'
       return (
         <div className='flex space-x-2'>
-          <Badge variant={getBadgeVariant(status)} className='capitalize'>
-            {status === 'active' ? '启用' : status === 'inactive' ? '禁用' : '暂停'}
-          </Badge>
+          <StatusTag status={label} />
         </div>
       )
     },
@@ -156,7 +151,7 @@ export const columns = (actions: ColumnActions): ColumnDef<User>[] => [
     cell: ({ row }) => {
       const lastLogin = row.getValue('last_login') as string
       return (
-        <div className='text-sm text-muted-foreground'>
+        <div className='text-muted-foreground text-sm'>
           {formatCN(lastLogin)}
         </div>
       )
@@ -171,7 +166,7 @@ export const columns = (actions: ColumnActions): ColumnDef<User>[] => [
     cell: ({ row }) => {
       const createdAt = row.getValue('created_at') as string
       return (
-        <div className='text-sm text-muted-foreground'>
+        <div className='text-muted-foreground text-sm'>
           {formatCN(createdAt)}
         </div>
       )

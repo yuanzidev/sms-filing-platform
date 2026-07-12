@@ -1,30 +1,17 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Header } from '@/components/layout/header'
-import { Main } from '@/components/layout/main'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Download, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
-import { toast } from 'sonner'
-import { DataTable } from '@/components/shared/data-table/data-table'
-import { getPortInfos, deletePortInfo, downloadPortInfoTemplate, importPortInfos } from '@/lib/api/port-info'
 import type { RowSelectionState } from '@tanstack/react-table'
-import { ImportDialog } from '@/components/shared/import-dialog'
-import { PROVINCES } from '@/components/shared/province-city-fields'
-import { formatCN } from '@/lib/time'
+import { Download, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  getPortInfos,
+  deletePortInfo,
+  downloadPortInfoTemplate,
+  importPortInfos,
+} from '@/lib/api/port-info'
 import type { PortInfo } from '@/lib/api/types'
-import { PortInfoDialog } from './components/port-info-dialog'
+import { formatCN } from '@/lib/time'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +22,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { Search } from '@/components/search'
+import { ActionIconButton } from '@/components/shared/action-icon-button'
+import { DataTable } from '@/components/shared/data-table/data-table'
+import { ImportDialog } from '@/components/shared/import-dialog'
+import { PROVINCES } from '@/components/shared/province-city-fields'
+import { StatusTag } from '@/components/shared/status-tag'
+import { ThemeSwitch } from '@/components/theme-switch'
+import { PortInfoDialog } from './components/port-info-dialog'
 
 const PAGE_SIZE = 10
 const CARRIERS = ['中国移动', '中国联通', '中国电信', '中国广电']
@@ -47,13 +53,20 @@ export function PortInfoPage() {
   const [toDelete, setToDelete] = useState<PortInfo | undefined>()
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const [searchInputs, setSearchInputs] = useState({ carrier: '', province: '' })
-  const [appliedFilters, setAppliedFilters] = useState<{ carrier?: string; province?: string }>({})
+  const [searchInputs, setSearchInputs] = useState({
+    carrier: '',
+    province: '',
+  })
+  const [appliedFilters, setAppliedFilters] = useState<{
+    carrier?: string
+    province?: string
+  }>({})
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
     queryKey: ['port-info', { page, page_size: PAGE_SIZE, ...appliedFilters }],
-    queryFn: () => getPortInfos({ page, page_size: PAGE_SIZE, ...appliedFilters }),
+    queryFn: () =>
+      getPortInfos({ page, page_size: PAGE_SIZE, ...appliedFilters }),
   })
 
   const handleSearch = () => {
@@ -89,7 +102,9 @@ export function PortInfoPage() {
 
   const handleBatchDelete = async () => {
     try {
-      await Promise.all(selectedIds.map((idx) => deletePortInfo(portInfos[Number(idx)]?.id)))
+      await Promise.all(
+        selectedIds.map((idx) => deletePortInfo(portInfos[Number(idx)]?.id))
+      )
       toast.success(`已删除 ${selectedCount} 条记录`)
       setRowSelection({})
       queryClient.invalidateQueries({ queryKey: ['port-info'] })
@@ -98,63 +113,77 @@ export function PortInfoPage() {
     }
   }
 
-  const columns = useMemo<ColumnDef<PortInfo>[]>(() => [
-    {
-      id: 'port_number',
-      header: '端口号',
-      accessorFn: (row) => row.main_port_number || row.sub_port_number || '-',
-    },
-    {
-      accessorKey: 'carrier',
-      header: '运营商',
-      cell: ({ getValue }) => {
-        const carrier = getValue() as string
-        let cls = ''
-        if (carrier === '中国移动') cls = 'text-blue-600 border-blue-200'
-        else if (carrier === '中国联通') cls = 'text-red-600 border-red-200'
-        else if (carrier === '中国电信') cls = 'text-green-600 border-green-200'
-        return <Badge variant="outline" className={cls}>{carrier}</Badge>
+  const columns = useMemo<ColumnDef<PortInfo>[]>(
+    () => [
+      {
+        id: 'port_number',
+        header: '端口号',
+        accessorFn: (row) => row.main_port_number || row.sub_port_number || '-',
       },
-    },
-    { accessorKey: 'province', header: '省份', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'city', header: '城市', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'region', header: '所属地区', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'port_type', header: '端口类型', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'customer_type', header: '客户类型', cell: ({ getValue }) => getValue() || '-' },
-    {
-      accessorKey: 'created_at',
-      header: '创建时间',
-      cell: ({ getValue }) => formatCN(getValue() as string),
-    },
-    {
-      id: 'actions',
-      header: '操作',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-            onClick={() => { setSelected(row.original); setDialogOpen(true) }}
-          >
-            <span className="flex items-center gap-1.5">
-              <Pencil className="h-4 w-4" />编辑
-            </span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-red-600 hover:bg-red-50 hover:text-red-700"
-            onClick={() => { setToDelete(row.original); setDeleteDialogOpen(true) }}
-          >
-            <span className="flex items-center gap-1.5">
-              <Trash2 className="h-4 w-4" />删除
-            </span>
-          </Button>
-        </div>
-      ),
-    },
-  ], [])
+      {
+        accessorKey: 'carrier',
+        header: '运营商',
+        cell: ({ getValue }) => <StatusTag status={getValue() as string} />,
+      },
+      {
+        accessorKey: 'province',
+        header: '省份',
+        cell: ({ getValue }) => getValue() || '-',
+      },
+      {
+        accessorKey: 'city',
+        header: '城市',
+        cell: ({ getValue }) => getValue() || '-',
+      },
+      {
+        accessorKey: 'region',
+        header: '所属地区',
+        cell: ({ getValue }) => getValue() || '-',
+      },
+      {
+        accessorKey: 'port_type',
+        header: '端口类型',
+        cell: ({ getValue }) => getValue() || '-',
+      },
+      {
+        accessorKey: 'customer_type',
+        header: '客户类型',
+        cell: ({ getValue }) => getValue() || '-',
+      },
+      {
+        accessorKey: 'created_at',
+        header: '创建时间',
+        cell: ({ getValue }) => formatCN(getValue() as string),
+      },
+      {
+        id: 'actions',
+        header: '操作',
+        cell: ({ row }) => (
+          <div className='flex items-center gap-1'>
+            <ActionIconButton
+              label='编辑'
+              icon='edit'
+              tone='edit'
+              onClick={() => {
+                setSelected(row.original)
+                setDialogOpen(true)
+              }}
+            />
+            <ActionIconButton
+              label='删除'
+              icon='delete'
+              tone='delete'
+              onClick={() => {
+                setToDelete(row.original)
+                setDeleteDialogOpen(true)
+              }}
+            />
+          </div>
+        ),
+      },
+    ],
+    []
+  )
 
   return (
     <>
@@ -174,76 +203,103 @@ export function PortInfoPage() {
               管理端口详细信息（运营商、端口号、地区、客户类型等）
             </p>
           </div>
-          <div className="flex space-x-2">
-            <Button onClick={() => { setSelected(undefined); setDialogOpen(true) }}>
-              <Plus className="mr-2 h-4 w-4" />
+          <div className='flex space-x-2'>
+            <Button
+              onClick={() => {
+                setSelected(undefined)
+                setDialogOpen(true)
+              }}
+            >
+              <Plus className='mr-2 h-4 w-4' />
               新建端口信息
             </Button>
-            <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
-              <Upload className="mr-2 h-4 w-4" />
+            <Button variant='outline' onClick={() => setImportDialogOpen(true)}>
+              <Upload className='mr-2 h-4 w-4' />
               导入数据
             </Button>
-            <Button variant="outline" onClick={() => downloadPortInfoTemplate()}>
-              <Download className="mr-2 h-4 w-4" />
+            <Button
+              variant='outline'
+              onClick={() => downloadPortInfoTemplate()}
+            >
+              <Download className='mr-2 h-4 w-4' />
               下载模板
             </Button>
             {selectedCount > 0 && (
-              <Button variant="destructive" onClick={handleBatchDelete}>
-                <Trash2 className="mr-2 h-4 w-4" />删除 ({selectedCount})
+              <Button variant='destructive' onClick={handleBatchDelete}>
+                <Trash2 className='mr-2 h-4 w-4' />
+                删除 ({selectedCount})
               </Button>
             )}
             <Button
-              variant="outline"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ['port-info'] })}
+              variant='outline'
+              onClick={() =>
+                queryClient.invalidateQueries({ queryKey: ['port-info'] })
+              }
               disabled={isLoading}
             >
-              <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
+              />
               刷新
             </Button>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="mb-4 mt-4 flex flex-wrap items-end gap-3 rounded-lg border p-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-muted-foreground">运营商</label>
+        <div className='border-border/80 bg-card mt-4 mb-4 flex flex-wrap items-end gap-3 rounded-lg border p-4 shadow-sm shadow-slate-950/5'>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>运营商</label>
             <Select
               value={searchInputs.carrier}
-              onValueChange={(v) => setSearchInputs((s) => ({ ...s, carrier: v === '__all__' ? '' : v }))}
+              onValueChange={(v) =>
+                setSearchInputs((s) => ({
+                  ...s,
+                  carrier: v === '__all__' ? '' : v,
+                }))
+              }
             >
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="全部" />
+              <SelectTrigger className='w-40'>
+                <SelectValue placeholder='全部' />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">全部</SelectItem>
+                <SelectItem value='__all__'>全部</SelectItem>
                 {CARRIERS.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-muted-foreground">接入省</label>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>接入省</label>
             <Select
               value={searchInputs.province}
-              onValueChange={(v) => setSearchInputs((s) => ({ ...s, province: v === '__all__' ? '' : v }))}
+              onValueChange={(v) =>
+                setSearchInputs((s) => ({
+                  ...s,
+                  province: v === '__all__' ? '' : v,
+                }))
+              }
             >
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="全部" />
+              <SelectTrigger className='w-40'>
+                <SelectValue placeholder='全部' />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">全部</SelectItem>
+                <SelectItem value='__all__'>全部</SelectItem>
                 {PROVINCES.map((p) => (
-                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleSearch}>
+          <div className='flex gap-2'>
+            <Button size='sm' onClick={handleSearch}>
               搜索
             </Button>
-            <Button variant="ghost" size="sm" onClick={handleReset}>
+            <Button variant='ghost' size='sm' onClick={handleReset}>
               重置
             </Button>
           </div>
@@ -265,7 +321,9 @@ export function PortInfoPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         portInfo={selected}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['port-info'] })}
+        onSuccess={() =>
+          queryClient.invalidateQueries({ queryKey: ['port-info'] })
+        }
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -280,7 +338,7 @@ export function PortInfoPage() {
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => toDelete && deleteMutation.mutate(toDelete.id)}
-              className="bg-red-600 hover:bg-red-700"
+              className='bg-red-600 hover:bg-red-700'
             >
               删除
             </AlertDialogAction>
@@ -291,10 +349,12 @@ export function PortInfoPage() {
       <ImportDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
-        title="导入端口信息"
+        title='导入端口信息'
         onDownloadTemplate={downloadPortInfoTemplate}
         onImport={importPortInfos}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['port-info'] })}
+        onSuccess={() =>
+          queryClient.invalidateQueries({ queryKey: ['port-info'] })
+        }
       />
     </>
   )

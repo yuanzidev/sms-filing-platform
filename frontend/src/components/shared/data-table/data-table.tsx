@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   type ColumnDef,
   type SortingState,
@@ -7,6 +8,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
+import { Button } from '@/components/ui/button'
 import {
   Table,
   TableBody,
@@ -15,9 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Button } from '@/components/ui/button'
-import { Inbox } from 'lucide-react'
-import { useState } from 'react'
+import { EmptyState } from '@/components/shared/empty-state'
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -56,7 +56,8 @@ export function DataTable<TData, TValue>({
       onSortingChange?.(next)
     },
     onRowSelectionChange: (updater) => {
-      const next = typeof updater === 'function' ? updater(rowSelection) : updater
+      const next =
+        typeof updater === 'function' ? updater(rowSelection) : updater
       setRowSelection(next)
       onRowSelectionChange?.(next)
     },
@@ -64,20 +65,23 @@ export function DataTable<TData, TValue>({
     state: { sorting, rowSelection },
   })
 
-  const totalPages = Math.ceil(total / pageSize)
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   return (
-    <div className="space-y-4">
-      <div className="overflow-x-auto rounded-md border">
+    <div className='space-y-4'>
+      <div className='bg-card overflow-hidden rounded-lg border shadow-sm shadow-slate-950/5'>
         <Table>
-          <TableHeader>
+          <TableHeader className='bg-muted/50'>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead key={header.id} className='h-11 px-3'>
                     {header.isPlaceholder
                       ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
                   </TableHead>
                 ))}
               </TableRow>
@@ -86,48 +90,61 @@ export function DataTable<TData, TValue>({
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && 'selected'}
+                  className='hover:bg-primary/5 data-[state=selected]:bg-primary/10'
+                >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    <TableCell key={cell.id} className='px-3 py-3'>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-32 text-center">
-                  <div className="flex flex-col items-center gap-2 py-4">
-                    <Inbox className="h-10 w-10 text-muted-foreground/40" />
-                    <p className="text-sm font-medium">暂无数据</p>
-                    <p className="text-xs text-muted-foreground">尝试调整筛选条件或新建记录</p>
-                  </div>
+                <TableCell
+                  colSpan={columns.length}
+                  className='h-32 text-center'
+                >
+                  <EmptyState
+                    title='暂无数据'
+                    description='尝试调整筛选条件，或新建一条记录。'
+                    className='border-0 bg-transparent py-10'
+                  />
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1}
-        >
-          上一页
-        </Button>
-        <span className="text-sm text-muted-foreground">
-          第 {page} / {totalPages} 页，共 {total} 条
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onPageChange(page + 1)}
-          disabled={page >= totalPages}
-        >
-          下一页
-        </Button>
+      <div className='flex flex-wrap items-center justify-between gap-3'>
+        <span className='text-muted-foreground text-sm'>共 {total} 条记录</span>
+        <div className='flex items-center gap-2'>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => onPageChange(page - 1)}
+            disabled={page <= 1}
+          >
+            上一页
+          </Button>
+          <span className='text-muted-foreground text-sm'>
+            第 {page} / {totalPages} 页
+          </span>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => onPageChange(page + 1)}
+            disabled={page >= totalPages}
+          >
+            下一页
+          </Button>
+        </div>
       </div>
     </div>
   )

@@ -1,27 +1,16 @@
 import { useState, useMemo } from 'react'
-import { Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Header } from '@/components/layout/header'
-import { Main } from '@/components/layout/main'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Download, Plus, RefreshCw, Search as SearchIcon } from 'lucide-react'
+import { toast } from 'sonner'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Separator } from '@/components/ui/separator'
-import { Plus, RefreshCw, Eye, Download, Trash2, Search as SearchIcon } from 'lucide-react'
-import { DataTable } from '@/components/shared/data-table/data-table'
-import { getFilingTasks, deleteFilingTask, downloadFilingTaskFile } from '@/lib/api/filing-tasks'
-import { formatCN } from '@/lib/time'
+  getFilingTasks,
+  deleteFilingTask,
+  downloadFilingTaskFile,
+} from '@/lib/api/filing-tasks'
 import type { FilingTask } from '@/lib/api/types'
+import { formatCN } from '@/lib/time'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,7 +21,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { Search } from '@/components/search'
+import { ActionIconButton } from '@/components/shared/action-icon-button'
+import { DataTable } from '@/components/shared/data-table/data-table'
+import { ThemeSwitch } from '@/components/theme-switch'
 
 const PAGE_SIZE = 10
 
@@ -77,7 +82,8 @@ export function FilingManagementPage() {
 
   const { data: taskDetail, isLoading: detailLoading } = useQuery({
     queryKey: ['filing-task-detail', detailId],
-    queryFn: () => import('@/lib/api/filing-tasks').then((m) => m.getFilingTask(detailId!)),
+    queryFn: () =>
+      import('@/lib/api/filing-tasks').then((m) => m.getFilingTask(detailId!)),
     enabled: !!detailId,
   })
 
@@ -106,68 +112,60 @@ export function FilingManagementPage() {
   const tasks = data?.data ?? []
   const total = data?.total ?? 0
 
-  const columns = useMemo<ColumnDef<FilingTask>[]>(() => [
-    { accessorKey: 'task_name', header: '任务名称' },
-    {
-      accessorKey: 'created_at',
-      header: '生成时间',
-      cell: ({ getValue }) => formatCN(getValue() as string),
-    },
-    { accessorKey: 'operator_name', header: '操作人' },
-    { accessorKey: 'qualification_count', header: '资质数' },
-    { accessorKey: 'port_count', header: '端口数' },
-    {
-      id: 'group',
-      header: '字段组',
-      accessorFn: (row) => {
-        let label = row.export_group_name
-        if (row.group_by_field) label += ` (${row.group_by_field})`
-        return label
+  const columns = useMemo<ColumnDef<FilingTask>[]>(
+    () => [
+      { accessorKey: 'task_name', header: '任务名称' },
+      {
+        accessorKey: 'created_at',
+        header: '生成时间',
+        cell: ({ getValue }) => formatCN(getValue() as string),
       },
-    },
-    {
-      accessorKey: 'file_size',
-      header: '文件大小',
-      cell: ({ getValue }) => formatFileSize(getValue() as number | null),
-    },
-    {
-      id: 'actions',
-      header: '操作',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground"
-            onClick={() => setDetailId(row.original.id)}
-          >
-            <span className="flex items-center gap-1.5">
-              <Eye className="h-4 w-4" />查看
-            </span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDownload(row.original.id)}
-          >
-            <span className="flex items-center gap-1.5">
-              <Download className="h-4 w-4" />下载
-            </span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-red-600 hover:bg-red-50 hover:text-red-700"
-            onClick={() => setDeleteId(row.original.id)}
-          >
-            <span className="flex items-center gap-1.5">
-              <Trash2 className="h-4 w-4" />删除
-            </span>
-          </Button>
-        </div>
-      ),
-    },
-  ], [])
+      { accessorKey: 'operator_name', header: '操作人' },
+      { accessorKey: 'qualification_count', header: '资质数' },
+      { accessorKey: 'port_count', header: '端口数' },
+      {
+        id: 'group',
+        header: '字段组',
+        accessorFn: (row) => {
+          let label = row.export_group_name
+          if (row.group_by_field) label += ` (${row.group_by_field})`
+          return label
+        },
+      },
+      {
+        accessorKey: 'file_size',
+        header: '文件大小',
+        cell: ({ getValue }) => formatFileSize(getValue() as number | null),
+      },
+      {
+        id: 'actions',
+        header: '操作',
+        cell: ({ row }) => (
+          <div className='flex items-center gap-1'>
+            <ActionIconButton
+              label='查看'
+              icon='view'
+              tone='view'
+              onClick={() => setDetailId(row.original.id)}
+            />
+            <ActionIconButton
+              label='下载'
+              icon='download'
+              tone='download'
+              onClick={() => handleDownload(row.original.id)}
+            />
+            <ActionIconButton
+              label='删除'
+              icon='delete'
+              tone='delete'
+              onClick={() => setDeleteId(row.original.id)}
+            />
+          </div>
+        ),
+      },
+    ],
+    []
+  )
 
   return (
     <>
@@ -187,17 +185,19 @@ export function FilingManagementPage() {
               管理报备任务，查看导出文件并支持按日期和关键词筛选
             </p>
           </div>
-          <div className="flex space-x-2">
+          <div className='flex space-x-2'>
             <Button
-              variant="outline"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ['filing-tasks'] })}
+              variant='outline'
+              onClick={() =>
+                queryClient.invalidateQueries({ queryKey: ['filing-tasks'] })
+              }
             >
-              <RefreshCw className="mr-2 h-4 w-4" />
+              <RefreshCw className='mr-2 h-4 w-4' />
               刷新
             </Button>
             <Button asChild>
-              <Link to="/filing-management/create">
-                <Plus className="mr-2 h-4 w-4" />
+              <Link to='/filing-management/create'>
+                <Plus className='mr-2 h-4 w-4' />
                 新建报备
               </Link>
             </Button>
@@ -205,43 +205,43 @@ export function FilingManagementPage() {
         </div>
 
         {/* Filters */}
-        <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border p-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-muted-foreground">开始日期</label>
+        <div className='border-border/80 bg-card mb-4 flex flex-wrap items-end gap-3 rounded-lg border p-4 shadow-sm shadow-slate-950/5'>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>开始日期</label>
             <Input
-              type="date"
+              type='date'
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-40"
+              className='w-40'
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-muted-foreground">结束日期</label>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>结束日期</label>
             <Input
-              type="date"
+              type='date'
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-40"
+              className='w-40'
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-muted-foreground">关键词</label>
-            <div className="relative">
-              <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>关键词</label>
+            <div className='relative'>
+              <SearchIcon className='text-muted-foreground pointer-events-none absolute top-2.5 left-2.5 h-4 w-4' />
               <Input
-                type="text"
-                placeholder="搜索任务名称"
+                type='text'
+                placeholder='搜索任务名称'
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
-                className="w-48 pl-8"
+                className='w-48 pl-8'
               />
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleSearch}>
+          <div className='flex gap-2'>
+            <Button size='sm' onClick={handleSearch}>
               搜索
             </Button>
-            <Button variant="ghost" size="sm" onClick={handleReset}>
+            <Button variant='ghost' size='sm' onClick={handleReset}>
               重置
             </Button>
           </div>
@@ -256,45 +256,82 @@ export function FilingManagementPage() {
           onPageChange={setPage}
         />
 
-        <Dialog open={!!detailId} onOpenChange={(open) => !open && setDetailId(null)}>
-          <DialogContent className="max-w-lg">
+        <Dialog
+          open={!!detailId}
+          onOpenChange={(open) => !open && setDetailId(null)}
+        >
+          <DialogContent className='max-w-lg'>
             <DialogHeader>
               <DialogTitle>任务详情</DialogTitle>
             </DialogHeader>
             {detailLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-5 w-1/2" />
-                <Skeleton className="h-5 w-full" />
+              <div className='space-y-3'>
+                <Skeleton className='h-5 w-3/4' />
+                <Skeleton className='h-5 w-1/2' />
+                <Skeleton className='h-5 w-full' />
               </div>
             ) : taskDetail ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-muted-foreground">任务名称：</span>{taskDetail.task_name}</div>
-                  <div><span className="text-muted-foreground">操作人：</span>{taskDetail.operator_name}</div>
-                  <div><span className="text-muted-foreground">字段组：</span>{taskDetail.export_group_name}</div>
-                  <div><span className="text-muted-foreground">排序字段：</span>{taskDetail.group_by_field || '-'}</div>
-                  <div><span className="text-muted-foreground">资质数量：</span>{taskDetail.qualification_count}</div>
-                  <div><span className="text-muted-foreground">端口数量：</span>{taskDetail.port_count}</div>
-                  <div><span className="text-muted-foreground">文件大小：</span>{formatFileSize(taskDetail.file_size)}</div>
-                  <div><span className="text-muted-foreground">生成时间：</span>{formatCN(taskDetail.created_at)}</div>
+              <div className='space-y-4'>
+                <div className='grid grid-cols-2 gap-3 text-sm'>
+                  <div>
+                    <span className='text-muted-foreground'>任务名称：</span>
+                    {taskDetail.task_name}
+                  </div>
+                  <div>
+                    <span className='text-muted-foreground'>操作人：</span>
+                    {taskDetail.operator_name}
+                  </div>
+                  <div>
+                    <span className='text-muted-foreground'>字段组：</span>
+                    {taskDetail.export_group_name}
+                  </div>
+                  <div>
+                    <span className='text-muted-foreground'>排序字段：</span>
+                    {taskDetail.group_by_field || '-'}
+                  </div>
+                  <div>
+                    <span className='text-muted-foreground'>资质数量：</span>
+                    {taskDetail.qualification_count}
+                  </div>
+                  <div>
+                    <span className='text-muted-foreground'>端口数量：</span>
+                    {taskDetail.port_count}
+                  </div>
+                  <div>
+                    <span className='text-muted-foreground'>文件大小：</span>
+                    {formatFileSize(taskDetail.file_size)}
+                  </div>
+                  <div>
+                    <span className='text-muted-foreground'>生成时间：</span>
+                    {formatCN(taskDetail.created_at)}
+                  </div>
                 </div>
                 <Separator />
-                <div className="text-sm">
-                  <span className="text-muted-foreground">资质ID列表：</span>
-                  <pre className="mt-1 max-h-24 overflow-auto rounded bg-muted p-2 text-xs">
-                    {JSON.stringify(taskDetail.qualification_ids ?? [], null, 2)}
+                <div className='text-sm'>
+                  <span className='text-muted-foreground'>资质ID列表：</span>
+                  <pre className='bg-muted mt-1 max-h-24 overflow-auto rounded p-2 text-xs'>
+                    {JSON.stringify(
+                      taskDetail.qualification_ids ?? [],
+                      null,
+                      2
+                    )}
                   </pre>
                 </div>
-                <div className="text-sm">
-                  <span className="text-muted-foreground">端口ID列表：</span>
-                  <pre className="mt-1 max-h-24 overflow-auto rounded bg-muted p-2 text-xs">
+                <div className='text-sm'>
+                  <span className='text-muted-foreground'>端口ID列表：</span>
+                  <pre className='bg-muted mt-1 max-h-24 overflow-auto rounded p-2 text-xs'>
                     {JSON.stringify(taskDetail.port_ids ?? [], null, 2)}
                   </pre>
                 </div>
                 {taskDetail.download_url && (
-                  <Button className="w-full" onClick={() => window.open(taskDetail.download_url!, '_blank')}>
-                    <Download className="mr-2 h-4 w-4" />下载 Excel 文件
+                  <Button
+                    className='w-full'
+                    onClick={() =>
+                      window.open(taskDetail.download_url!, '_blank')
+                    }
+                  >
+                    <Download className='mr-2 h-4 w-4' />
+                    下载 Excel 文件
                   </Button>
                 )}
               </div>
@@ -302,7 +339,10 @@ export function FilingManagementPage() {
           </DialogContent>
         </Dialog>
 
-        <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialog
+          open={!!deleteId}
+          onOpenChange={(open) => !open && setDeleteId(null)}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>确认删除</AlertDialogTitle>
@@ -312,7 +352,9 @@ export function FilingManagementPage() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>取消</AlertDialogCancel>
-              <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>
+              <AlertDialogAction
+                onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+              >
                 删除
               </AlertDialogAction>
             </AlertDialogFooter>
