@@ -214,6 +214,13 @@ def import_qualifications(
         if h in header_to_field:
             col_map[header_to_field[h]] = col_idx
 
+    missing = [h for h, f in header_to_field.items() if f in ("enterprise_name", "signature") and f not in col_map]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"模板不匹配：缺少必填列「{'」「'.join(missing)}」。请确认使用了正确的资质导入模板（首页 → 资质管理 → 下载模板）",
+        )
+
     objects: list[QualificationInfo] = []
     for row_idx, row in enumerate(rows[1:], start=2):
         # Skip completely empty rows

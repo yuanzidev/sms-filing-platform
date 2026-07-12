@@ -182,6 +182,12 @@ def import_port_infos(
         if h in header_to_field:
             col_map[header_to_field[h]] = col_idx
 
+    if "carrier" not in col_map:
+        raise HTTPException(
+            status_code=400,
+            detail="模板不匹配：缺少必填列「运营商」。请确认使用了正确的端口信息导入模板（首页 → 端口管理 → 下载模板）",
+        )
+
     objects: list[PortInfo] = []
     for row_idx, row in enumerate(rows[1:], start=2):
         if all(c is None or str(c).strip() == "" for c in row):
