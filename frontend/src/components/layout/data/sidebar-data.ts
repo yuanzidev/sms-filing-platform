@@ -6,6 +6,7 @@ import {
   IconSettings,
   IconUserCog,
   IconUsers,
+  IconMessageReport,
   IconList,
 } from '@tabler/icons-react'
 import { type SidebarData } from '../types'
@@ -19,7 +20,7 @@ export const sidebarData: SidebarData = {
   teams: [
     {
       name: 'SMS Filing',
-      logo: IconList,
+      logo: IconMessageReport,
       plan: '报备管理平台',
     },
   ],
