@@ -59,7 +59,7 @@ export function PortInfoDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className='flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-4xl flex-col gap-0 overflow-hidden p-0'
+        className='flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-6xl flex-col gap-0 overflow-hidden p-0'
       >
         <DialogHeader className='shrink-0 border-b px-6 py-4'>
           <div className='flex items-start justify-between gap-4'>
@@ -86,81 +86,48 @@ export function PortInfoDetailDialog({
               <Skeleton className='h-4 w-1/2' />
             </div>
           ) : (
-            <div className='grid gap-6 md:grid-cols-2'>
+            <div className='grid gap-6 md:grid-cols-2 xl:grid-cols-3'>
               <section>
-                <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>
-                  基础信息
-                </h4>
+                <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>基础信息</h4>
                 <FieldRow label='运营商' value={d.carrier} />
                 <FieldRow label='主端口号' value={d.main_port_number} />
                 <FieldRow label='子端口号' value={d.sub_port_number} />
                 <FieldRow label='端口范围' value={d.port_range} />
                 <FieldRow label='端口类型' value={d.port_type} />
                 <FieldRow label='客户类型' value={d.customer_type} />
-              </section>
-
-              <section>
-                <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>
-                  接入信息
-                </h4>
-                <FieldRow label='省份' value={d.province} />
-                <FieldRow label='城市' value={d.city} />
-                <FieldRow label='所属地区' value={d.region} />
-                <FieldRow label='集团编码' value={d.group_code} />
                 <FieldRow label='端口开通日期' value={d.port_activation_date} />
               </section>
 
               <section>
-                <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>
-                  机房与授权
-                </h4>
+                <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>接入信息</h4>
+                <FieldRow label='省份' value={d.province} />
+                <FieldRow label='城市' value={d.city} />
+                <FieldRow label='所属地区' value={d.region} />
+                <FieldRow label='集团编码' value={d.group_code} />
+              </section>
+
+              <section>
+                <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>机房与授权</h4>
                 <FieldRow label='运营商机房' value={d.carrier_room} />
                 <FieldRow label='企业机房' value={d.enterprise_room} />
-                <FieldRow
-                  label='其他机房说明'
-                  value={d.other_room_description}
-                />
-                <FieldRow
-                  label='是否具有授权书'
-                  value={booleanText(d.has_authorization)}
-                />
+                <FieldRow label='其他机房说明' value={d.other_room_description} />
+                <FieldRow label='是否具有授权书' value={booleanText(d.has_authorization)} />
                 <FieldRow label='授权开始日期' value={d.auth_start_date} />
                 <FieldRow label='授权截止日期' value={d.auth_end_date} />
               </section>
 
               <section>
-                <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>
-                  扩展配置
-                </h4>
-                <FieldRow
-                  label='允许自行扩展'
-                  value={booleanText(d.allow_self_extension)}
-                />
-                <FieldRow
-                  label='是否绿色通道'
-                  value={booleanText(d.is_green_channel)}
-                />
-                <FieldRow
-                  label='黑白名单类型'
-                  value={d.blacklist_whitelist_type}
-                />
+                <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>扩展配置</h4>
+                <FieldRow label='允许自行扩展' value={booleanText(d.allow_self_extension)} />
+                <FieldRow label='是否绿色通道' value={booleanText(d.is_green_channel)} />
+                <FieldRow label='黑白名单类型' value={d.blacklist_whitelist_type} />
                 <FieldRow label='端口审核表' value={d.audit_form} />
               </section>
 
-              <section className='md:col-span-2'>
-                <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>
-                  时间信息
-                </h4>
-                <div className='grid gap-x-6 md:grid-cols-2'>
-                  <FieldRow
-                    label='创建时间'
-                    value={displayDateTime(d.created_at)}
-                  />
-                  <FieldRow
-                    label='更新时间'
-                    value={displayDateTime(d.updated_at)}
-                  />
-                </div>
+              <section>
+                <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>时间信息</h4>
+                <FieldRow label='创建时间' value={displayDateTime(d.created_at)} />
+                <FieldRow label='更新时间' value={displayDateTime(d.updated_at)} />
               </section>
             </div>
           )}
