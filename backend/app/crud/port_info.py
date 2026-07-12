@@ -21,7 +21,6 @@ def list_port_infos(
     limit: int = 20,
     carrier: str | None = None,
     province: str | None = None,
-    business_type: str | None = None,
 ) -> tuple[list[PortInfo], int]:
     query = select(PortInfo)
 
@@ -29,8 +28,6 @@ def list_port_infos(
         query = query.where(PortInfo.carrier == carrier)
     if province:
         query = query.where(PortInfo.province == province)
-    if business_type:
-        query = query.where(PortInfo.business_type == business_type)
 
     count = session.exec(select(func.count()).select_from(query.subquery())).one()
     results = session.exec(
