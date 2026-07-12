@@ -254,108 +254,93 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                   </FormItem>
                 )}
               />
-            </div>
-
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-semibold mb-3">机房信息</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name="carrier_room"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>运营商机房</FormLabel>
-                      <FormControl>
-                        <Input placeholder="运营商机房" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="enterprise_room"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>企业机房</FormLabel>
-                      <FormControl>
-                        <Input placeholder="企业机房" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="other_room_description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>其他接入机房说明</FormLabel>
-                      <FormControl>
-                        <Input placeholder="其他机房说明" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-semibold mb-3">授权配置</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name="has_authorization"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-end space-x-3 space-y-0 pb-2">
-                      <FormControl>
-                        <Checkbox checked={field.value ?? false} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <FormLabel className="text-sm font-normal">有授权书</FormLabel>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="auth_start_date"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>授权开始日期</FormLabel>
-                      <FormControl>
-                        <Input placeholder="YYYY-MM-DD" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="auth_end_date"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>授权截止日期</FormLabel>
-                      <FormControl>
-                        <Input placeholder="YYYY-MM-DD" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-6">
+              <FormField
+                control={form.control}
+                name="carrier_room"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>运营商机房</FormLabel>
+                    <FormControl>
+                      <Input placeholder="运营商接入机房及设备" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="enterprise_room"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>企业机房</FormLabel>
+                    <FormControl>
+                      <Input placeholder="企业接入机房及设备" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="other_room_description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>其他接入机房说明</FormLabel>
+                    <FormControl>
+                      <Input placeholder="其他机房说明" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="has_authorization"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-end space-x-3 space-y-0 pb-2">
+                    <FormControl>
+                      <Checkbox checked={field.value ?? false} onCheckedChange={field.onChange} />
+                    </FormControl>
+                    <FormLabel className="text-sm font-normal">是否具有授权书</FormLabel>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="auth_start_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>授权开始日期</FormLabel>
+                    <FormControl>
+                      <Input placeholder="YYYY-MM-DD" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="auth_end_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>授权截止日期</FormLabel>
+                    <FormControl>
+                      <Input placeholder="YYYY-MM-DD" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="allow_self_extension"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormItem className="flex flex-row items-end space-x-3 space-y-0 pb-2">
                     <FormControl>
                       <Checkbox checked={field.value ?? false} onCheckedChange={field.onChange} />
                     </FormControl>
-                    <FormLabel className="text-sm font-normal">允许自扩展</FormLabel>
+                    <FormLabel className="text-sm font-normal">是否允许自行扩展</FormLabel>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -364,7 +349,7 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 control={form.control}
                 name="is_green_channel"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormItem className="flex flex-row items-end space-x-3 space-y-0 pb-2">
                     <FormControl>
                       <Checkbox checked={field.value ?? false} onCheckedChange={field.onChange} />
                     </FormControl>
@@ -373,9 +358,6 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                   </FormItem>
                 )}
               />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="blacklist_whitelist_type"

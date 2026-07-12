@@ -44,12 +44,8 @@ export const sidebarData: SidebarData = {
         },
         {
           title: '端口管理',
+          url: '/port-info',
           icon: IconPlugConnected,
-          items: [
-            { title: '端口信息', url: '/port-info' },
-            { title: '主端口', url: '/ports/main' },
-            { title: '子端口', url: '/ports/sub' },
-          ],
         },
         {
           title: '导出字段组',
