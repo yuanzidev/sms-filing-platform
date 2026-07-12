@@ -24,6 +24,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { createPortInfo, updatePortInfo } from '@/lib/api/port-info'
 import { ProvinceCityFields } from '@/components/shared/province-city-fields'
+import { DatePicker } from '@/components/ui/date-picker-single'
 import type { PortInfo } from '@/lib/api/types'
 
 const formSchema = z.object({
@@ -219,7 +220,7 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                   <FormItem>
                     <FormLabel>端口开通日期</FormLabel>
                     <FormControl>
-                      <Input placeholder="YYYY-MM-DD" {...field} value={field.value || ''} />
+                      <DatePicker value={field.value || ''} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -313,7 +314,7 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                   <FormItem>
                     <FormLabel>授权开始日期</FormLabel>
                     <FormControl>
-                      <Input placeholder="YYYY-MM-DD" {...field} value={field.value || ''} />
+                      <DatePicker value={field.value || ''} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -326,7 +327,7 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                   <FormItem>
                     <FormLabel>授权截止日期</FormLabel>
                     <FormControl>
-                      <Input placeholder="YYYY-MM-DD" {...field} value={field.value || ''} />
+                      <DatePicker value={field.value || ''} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
