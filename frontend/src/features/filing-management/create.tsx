@@ -144,10 +144,9 @@ export function FilingCreatePage() {
       enableSorting: false,
     },
     { accessorKey: 'enterprise_name', header: '企业名称' },
-    { accessorKey: 'cert_type', header: '证件类型', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'cert_number', header: '证件号码', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'responsible_name', header: '负责人', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'app_platform_name', header: '平台', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'legal_representative_name', header: '法人', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'signature', header: '签名', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'handler_name', header: '经办人', cell: ({ getValue }) => getValue() || '-' },
   ], [])
 
   const estimatedRows = selectedIds.length * (portCount ? Number(portCount) : 0)

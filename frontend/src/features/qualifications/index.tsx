@@ -94,12 +94,10 @@ export function QualificationsPage() {
 
   const columns = useMemo<ColumnDef<QualificationInfo>[]>(() => [
     { accessorKey: 'enterprise_name', header: '企业名称' },
-    { accessorKey: 'submit_unit', header: '提交单位', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'cert_number', header: '证件号码', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'responsible_name', header: '负责人', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'handler_name', header: '经办人', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'legal_representative_name', header: '法人', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'responsible_name', header: '责任人', cell: ({ getValue }) => getValue() || '-' },
     { accessorKey: 'signature', header: '签名', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'app_platform_name', header: '平台', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'business_type', header: '业务类型', cell: ({ getValue }) => getValue() || '-' },
     {
       accessorKey: 'created_at',
       header: '创建时间',

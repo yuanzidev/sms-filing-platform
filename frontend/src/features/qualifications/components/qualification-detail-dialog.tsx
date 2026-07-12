@@ -49,6 +49,9 @@ export function QualificationDetailDialog({ open, onOpenChange, qualification }:
     { name: '责任人身份证反面', match: '责任人身份证反面' },
     { name: '经办人身份证正面', match: '经办人身份证正面' },
     { name: '经办人身份证反面', match: '经办人身份证反面' },
+    { name: '签名承诺函', match: 'signature_proof_image' },
+    { name: '经办人照片', match: 'handler_photo' },
+    { name: '引流证明材料', match: 'diversion_proof_image' },
   ]
 
   return (
@@ -70,12 +73,15 @@ export function QualificationDetailDialog({ open, onOpenChange, qualification }:
             <div>
               <h4 className="mb-2 text-sm font-semibold border-b pb-1">企业信息</h4>
               <FieldRow label="企业名称" value={d.enterprise_name} />
-              <FieldRow label="提交单位" value={d.submit_unit} />
-              <FieldRow label="运营商企业ID" value={d.carrier_enterprise_id} />
               <FieldRow label="单位证件类型" value={d.cert_type} />
               <FieldRow label="单位证件号码" value={d.cert_number} />
               <FieldRow label="APP/平台名称" value={d.app_platform_name} />
-              <FieldRow label="集团编码" value={d.group_code} />
+            </div>
+
+            {/* 法人信息 */}
+            <div>
+              <h4 className="mb-2 text-sm font-semibold border-b pb-1">法人信息</h4>
+              <FieldRow label="法人姓名" value={d.legal_representative_name} />
             </div>
 
             {/* 责任人信息 */}
@@ -85,6 +91,7 @@ export function QualificationDetailDialog({ open, onOpenChange, qualification }:
               <FieldRow label="证件类型" value={d.responsible_cert_type} />
               <FieldRow label="证件号码" value={d.responsible_cert_number} />
               <FieldRow label="手机号" value={d.responsible_phone} />
+              <FieldRow label="地址" value={d.responsible_address} />
             </div>
 
             {/* 经办人信息 */}
@@ -94,7 +101,40 @@ export function QualificationDetailDialog({ open, onOpenChange, qualification }:
               <FieldRow label="证件类型" value={d.handler_cert_type} />
               <FieldRow label="证件号码" value={d.handler_cert_number} />
               <FieldRow label="手机号" value={d.handler_phone} />
-              <FieldRow label="签名" value={d.signature} />
+              <FieldRow label="地址" value={d.handler_address} />
+            </div>
+
+            {/* 签名与模板 */}
+            <div>
+              <h4 className="mb-2 text-sm font-semibold border-b pb-1">签名与模板</h4>
+              <FieldRow label="短信签名" value={d.sms_signature} />
+              <FieldRow label="签名类型" value={d.signature_type} />
+              <FieldRow label="签名是否已认证" value={d.signature_verified} />
+              <FieldRow label="是否网关签名" value={d.is_gateway_signature} />
+              <FieldRow label="模板内容" value={d.sms_template_content} />
+              <FieldRow label="模板是否有变量" value={d.template_has_variable} />
+              <FieldRow label="模板参数类型" value={d.template_param_type} />
+              <FieldRow label="模板参数长度" value={d.template_param_length} />
+            </div>
+
+            {/* 业务信息 */}
+            <div>
+              <h4 className="mb-2 text-sm font-semibold border-b pb-1">业务信息</h4>
+              <FieldRow label="业务属性" value={d.business_attribute} />
+              <FieldRow label="业务类型" value={d.business_type} />
+              <FieldRow label="业务细类" value={d.business_subtype} />
+              <FieldRow label="具体用途" value={d.specific_usage} />
+            </div>
+
+            {/* 引流信息 */}
+            <div>
+              <h4 className="mb-2 text-sm font-semibold border-b pb-1">引流信息</h4>
+              <FieldRow label="引流号码" value={d.diversion_number} />
+              <FieldRow label="引流号码类型" value={d.diversion_number_type} />
+              <FieldRow label="引流号码用途" value={d.diversion_number_usage} />
+              <FieldRow label="引流内容" value={d.diversion_content} />
+              <FieldRow label="链接地址" value={d.link_address} />
+              <FieldRow label="链接类型" value={d.link_type} />
             </div>
 
             {/* 图片附件 */}
