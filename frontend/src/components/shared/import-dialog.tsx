@@ -57,8 +57,16 @@ export function ImportDialog({
       setFile(null)
       onSuccess()
     } catch (err: any) {
-      const detail = err?.response?.data?.detail || '导入失败，请检查文件格式和数据'
-      setError(detail)
+      let detail = err?.response?.data?.detail
+      if (!detail) {
+        detail = '导入失败，请检查文件格式和数据'
+      } else if (Array.isArray(detail)) {
+        // FastAPI 422 validation errors: [{msg, loc}, ...]
+        detail = detail.map((d: any) => d.msg || JSON.stringify(d)).join('；')
+      } else if (typeof detail === 'object') {
+        detail = detail.msg || detail.message || JSON.stringify(detail)
+      }
+      setError(String(detail))
     } finally {
       setLoading(false)
     }
