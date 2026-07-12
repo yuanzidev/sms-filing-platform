@@ -7,7 +7,6 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   Select,
@@ -16,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Download, Pencil, Plus, RefreshCw, Search as SearchIcon, Trash2, Upload } from 'lucide-react'
+import { Download, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { getPortInfos, deletePortInfo, downloadPortInfoTemplate, importPortInfos } from '@/lib/api/port-info'
@@ -48,8 +47,8 @@ export function PortInfoPage() {
   const [toDelete, setToDelete] = useState<PortInfo | undefined>()
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const [searchInputs, setSearchInputs] = useState({ carrier: '', province: '', business_type: '' })
-  const [appliedFilters, setAppliedFilters] = useState<{ carrier?: string; province?: string; business_type?: string }>({})
+  const [searchInputs, setSearchInputs] = useState({ carrier: '', province: '' })
+  const [appliedFilters, setAppliedFilters] = useState<{ carrier?: string; province?: string }>({})
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
@@ -61,13 +60,12 @@ export function PortInfoPage() {
     setAppliedFilters({
       carrier: searchInputs.carrier || undefined,
       province: searchInputs.province || undefined,
-      business_type: searchInputs.business_type.trim() || undefined,
     })
     setPage(1)
   }
 
   const handleReset = () => {
-    setSearchInputs({ carrier: '', province: '', business_type: '' })
+    setSearchInputs({ carrier: '', province: '' })
     setAppliedFilters({})
     setPage(1)
   }
@@ -118,11 +116,11 @@ export function PortInfoPage() {
         return <Badge variant="outline" className={cls}>{carrier}</Badge>
       },
     },
-    { accessorKey: 'business_type', header: '业务类型', cell: ({ getValue }) => getValue() || '-' },
     { accessorKey: 'province', header: '省份', cell: ({ getValue }) => getValue() || '-' },
     { accessorKey: 'city', header: '城市', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'sms_signature', header: '短信签名', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'region', header: '所属地区', cell: ({ getValue }) => getValue() || '-' },
     { accessorKey: 'port_type', header: '端口类型', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'customer_type', header: '客户类型', cell: ({ getValue }) => getValue() || '-' },
     {
       accessorKey: 'created_at',
       header: '创建时间',
@@ -173,7 +171,7 @@ export function PortInfoPage() {
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>端口信息管理</h2>
             <p className='text-muted-foreground'>
-              管理端口详细信息（运营商、端口号、业务类型、签名等）
+              管理端口详细信息（运营商、端口号、地区、客户类型等）
             </p>
           </div>
           <div className="flex space-x-2">
@@ -240,19 +238,6 @@ export function PortInfoPage() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-muted-foreground">业务类型</label>
-            <div className="relative">
-              <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="如 验证码"
-                value={searchInputs.business_type}
-                onChange={(e) => setSearchInputs((s) => ({ ...s, business_type: e.target.value }))}
-                className="w-40 pl-8"
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
-              />
-            </div>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleSearch}>

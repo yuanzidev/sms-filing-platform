@@ -28,7 +28,6 @@ import type { PortInfo } from '@/lib/api/types'
 
 const formSchema = z.object({
   carrier: z.string().min(1, '运营商不能为空'),
-  operation_type: z.string().optional(),
   main_port_number: z.string().optional(),
   sub_port_number: z.string().optional(),
   port_range: z.string().optional(),
@@ -37,18 +36,18 @@ const formSchema = z.object({
   port_type: z.string().optional(),
   port_activation_date: z.string().optional(),
   allow_self_extension: z.boolean().optional(),
-  business_attribute: z.string().optional(),
-  business_type: z.string().optional(),
-  business_subtype: z.string().optional(),
-  specific_usage: z.string().optional(),
-  sms_signature: z.string().optional(),
-  is_gateway_signature: z.boolean().optional(),
   carrier_room: z.string().optional(),
   enterprise_room: z.string().optional(),
   has_authorization: z.boolean().optional(),
   auth_start_date: z.string().optional(),
   auth_end_date: z.string().optional(),
-  sms_template_content: z.string().optional(),
+  group_code: z.string().optional(),
+  region: z.string().optional(),
+  other_room_description: z.string().optional(),
+  is_green_channel: z.boolean().optional(),
+  blacklist_whitelist_type: z.string().optional(),
+  audit_form: z.string().optional(),
+  customer_type: z.string().optional(),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -63,7 +62,6 @@ interface Props {
 function toDefaultValues(p?: PortInfo): FormData {
   return {
     carrier: p?.carrier || '',
-    operation_type: p?.operation_type || '',
     main_port_number: p?.main_port_number || '',
     sub_port_number: p?.sub_port_number || '',
     port_range: p?.port_range || '',
@@ -72,18 +70,18 @@ function toDefaultValues(p?: PortInfo): FormData {
     port_type: p?.port_type || '',
     port_activation_date: p?.port_activation_date || '',
     allow_self_extension: p?.allow_self_extension ?? false,
-    business_attribute: p?.business_attribute || '',
-    business_type: p?.business_type || '',
-    business_subtype: p?.business_subtype || '',
-    specific_usage: p?.specific_usage || '',
-    sms_signature: p?.sms_signature || '',
-    is_gateway_signature: p?.is_gateway_signature ?? false,
     carrier_room: p?.carrier_room || '',
     enterprise_room: p?.enterprise_room || '',
     has_authorization: p?.has_authorization ?? false,
     auth_start_date: p?.auth_start_date || '',
     auth_end_date: p?.auth_end_date || '',
-    sms_template_content: p?.sms_template_content || '',
+    group_code: p?.group_code || '',
+    region: p?.region || '',
+    other_room_description: p?.other_room_description || '',
+    is_green_channel: p?.is_green_channel ?? false,
+    blacklist_whitelist_type: p?.blacklist_whitelist_type || '',
+    audit_form: p?.audit_form || '',
+    customer_type: p?.customer_type || '',
   }
 }
 
@@ -164,19 +162,6 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
               />
               <FormField
                 control={form.control}
-                name="operation_type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>操作类型</FormLabel>
-                    <FormControl>
-                      <Input placeholder="新增/变更" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
                 name="port_type"
                 render={({ field }) => (
                   <FormItem>
@@ -227,9 +212,6 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                   </FormItem>
                 )}
               />
-              <div className="grid grid-cols-2 gap-4">
-                <ProvinceCityFields form={form} />
-              </div>
               <FormField
                 control={form.control}
                 name="port_activation_date"
@@ -243,95 +225,40 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                   </FormItem>
                 )}
               />
-            </div>
-
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-semibold mb-3">业务信息</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name="business_attribute"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>业务属性</FormLabel>
-                      <FormControl>
-                        <Input placeholder="政务/商用" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="business_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>业务类型</FormLabel>
-                      <FormControl>
-                        <Input placeholder="短信验证码/通知" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="business_subtype"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>业务子类型</FormLabel>
-                      <FormControl>
-                        <Input placeholder="子类型" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="specific_usage"
-                  render={({ field }) => (
-                    <FormItem className="col-span-2">
-                      <FormLabel>具体用途</FormLabel>
-                      <FormControl>
-                        <Input placeholder="具体用途描述" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-semibold mb-3">签名与机房</h3>
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="sms_signature"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>短信签名</FormLabel>
-                      <FormControl>
-                        <Input placeholder="【品牌名】" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="is_gateway_signature"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-end space-x-3 space-y-0 pb-2">
-                      <FormControl>
-                        <Checkbox checked={field.value ?? false} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <FormLabel className="text-sm font-normal">网关签名</FormLabel>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <ProvinceCityFields form={form} />
+              </div>
+              <FormField
+                control={form.control}
+                name="group_code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>集团编码</FormLabel>
+                    <FormControl>
+                      <Input placeholder="集团编码" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="region"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>所属地区</FormLabel>
+                    <FormControl>
+                      <Input placeholder="所属地区" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold mb-3">机房信息</h3>
+              <div className="grid grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="carrier_room"
@@ -353,6 +280,19 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                       <FormLabel>企业机房</FormLabel>
                       <FormControl>
                         <Input placeholder="企业机房" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="other_room_description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>其他接入机房说明</FormLabel>
+                      <FormControl>
+                        <Input placeholder="其他机房说明" {...field} value={field.value || ''} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -406,33 +346,76 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
               </div>
             </div>
 
-            <FormField
-              control={form.control}
-              name="sms_template_content"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>短信模板内容</FormLabel>
-                  <FormControl>
-                    <Input placeholder="模板正文" {...field} value={field.value || ''} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="flex flex-wrap gap-6">
+              <FormField
+                control={form.control}
+                name="allow_self_extension"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox checked={field.value ?? false} onCheckedChange={field.onChange} />
+                    </FormControl>
+                    <FormLabel className="text-sm font-normal">允许自扩展</FormLabel>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="is_green_channel"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox checked={field.value ?? false} onCheckedChange={field.onChange} />
+                    </FormControl>
+                    <FormLabel className="text-sm font-normal">是否绿色通道</FormLabel>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-            <FormField
-              control={form.control}
-              name="allow_self_extension"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox checked={field.value ?? false} onCheckedChange={field.onChange} />
-                  </FormControl>
-                  <FormLabel className="text-sm font-normal">允许自扩展</FormLabel>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="blacklist_whitelist_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>黑白名单类型</FormLabel>
+                    <FormControl>
+                      <Input placeholder="黑名单/白名单/无" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="audit_form"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>端口审核表</FormLabel>
+                    <FormControl>
+                      <Input placeholder="审核表信息" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="customer_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>客户类型</FormLabel>
+                    <FormControl>
+                      <Input placeholder="企业/个人" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isPending}>
