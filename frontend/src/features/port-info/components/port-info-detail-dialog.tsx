@@ -66,7 +66,7 @@ export function PortInfoDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className='flex max-h-[92vh] w-[calc(100vw-4rem)] max-w-[1200px] flex-col gap-0 overflow-hidden p-0'
+        className='flex max-h-[92vh] w-[calc(100vw-4rem)] max-w-[1200px] sm:max-w-[1200px] flex-col gap-0 overflow-hidden p-0'
       >
         <DialogHeader className='shrink-0 border-b px-6 py-3'>
           <div className='flex items-start justify-between gap-4'>
