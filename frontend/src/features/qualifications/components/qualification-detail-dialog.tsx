@@ -23,9 +23,9 @@ interface Props {
 
 function FieldRow({ label, value }: { label: string; value: unknown }) {
   return (
-    <div className='flex items-baseline gap-1.5 py-0.5'>
-      <span className='text-muted-foreground shrink-0 text-xs'>{label}:</span>
-      <span className='text-sm truncate' title={value != null && value !== '' ? String(value) : undefined}>
+    <div className='flex items-start gap-3 py-1.5'>
+      <span className='text-muted-foreground shrink-0 text-sm'>{label}</span>
+      <span className='text-sm'>
         {value != null && value !== '' ? String(value) : '-'}
       </span>
     </div>
@@ -34,8 +34,8 @@ function FieldRow({ label, value }: { label: string; value: unknown }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className='rounded border bg-muted/30 px-3 py-2'>
-      <h4 className='mb-1.5 text-xs font-semibold text-muted-foreground'>{title}</h4>
+    <div>
+      <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>{title}</h4>
       {children}
     </div>
   )
@@ -78,20 +78,20 @@ export function QualificationDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className='flex max-h-[92vh] w-[calc(100vw-2rem)] max-w-[1400px] flex-col gap-0 overflow-hidden p-0'
+        className='flex max-h-[92vh] w-[calc(100vw-4rem)] max-w-[1200px] flex-col gap-0 overflow-hidden p-0'
       >
         <DialogHeader className='shrink-0 border-b px-6 py-3'>
-          <div className='flex items-center justify-between gap-4'>
-            <DialogTitle className='text-base'>资质详情 — {d.enterprise_name}</DialogTitle>
+          <div className='flex items-start justify-between gap-4'>
+            <DialogTitle>资质详情 — {d.enterprise_name}</DialogTitle>
             <DialogClose asChild>
-              <Button type='button' variant='ghost' size='icon' className='-mr-2 size-8 shrink-0' aria-label='关闭'>
+              <Button type='button' variant='ghost' size='icon' className='-mt-1 -mr-2 size-8 shrink-0' aria-label='关闭'>
                 <XIcon className='h-4 w-4' />
               </Button>
             </DialogClose>
           </div>
         </DialogHeader>
 
-        <div className='min-h-0 flex-1 overflow-y-auto px-4 py-3'>
+        <div className='min-h-0 flex-1 overflow-y-auto px-6 py-4'>
           {isLoading ? (
             <div className='space-y-3'>
               <Skeleton className='h-4 w-full' />
@@ -99,8 +99,8 @@ export function QualificationDetailDialog({
               <Skeleton className='h-4 w-1/2' />
             </div>
           ) : (
-            <div className='space-y-3'>
-              <div className='grid gap-3 lg:grid-cols-3 xl:grid-cols-4'>
+            <div className='space-y-6'>
+              <div className='grid gap-x-8 gap-y-6 md:grid-cols-2'>
                 <Section title='企业信息'>
                   <FieldRow label='企业名称' value={d.enterprise_name} />
                   <FieldRow label='单位证件类型' value={d.cert_type} />
@@ -132,12 +132,12 @@ export function QualificationDetailDialog({
                   <FieldRow label='签名' value={d.signature} />
                   <FieldRow label='短信签名' value={d.sms_signature} />
                   <FieldRow label='签名类型' value={d.signature_type} />
-                  <FieldRow label='已认证' value={d.signature_verified} />
-                  <FieldRow label='网关签名' value={d.is_gateway_signature} />
+                  <FieldRow label='签名是否已认证' value={d.signature_verified} />
+                  <FieldRow label='是否网关签名' value={d.is_gateway_signature} />
                   <FieldRow label='模板内容' value={d.sms_template_content} />
-                  <FieldRow label='模板有变量' value={d.template_has_variable} />
-                  <FieldRow label='参数类型' value={d.template_param_type} />
-                  <FieldRow label='参数长度' value={d.template_param_length} />
+                  <FieldRow label='模板是否有变量' value={d.template_has_variable} />
+                  <FieldRow label='模板参数类型' value={d.template_param_type} />
+                  <FieldRow label='模板参数长度' value={d.template_param_length} />
                 </Section>
 
                 <Section title='业务信息'>
@@ -149,8 +149,8 @@ export function QualificationDetailDialog({
 
                 <Section title='引流信息'>
                   <FieldRow label='引流号码' value={d.diversion_number} />
-                  <FieldRow label='号码类型' value={d.diversion_number_type} />
-                  <FieldRow label='号码用途' value={d.diversion_number_usage} />
+                  <FieldRow label='引流号码类型' value={d.diversion_number_type} />
+                  <FieldRow label='引流号码用途' value={d.diversion_number_usage} />
                   <FieldRow label='引流内容' value={d.diversion_content} />
                   <FieldRow label='链接地址' value={d.link_address} />
                   <FieldRow label='链接类型' value={d.link_type} />
@@ -158,28 +158,28 @@ export function QualificationDetailDialog({
               </div>
 
               <div>
-                <h4 className='mb-1.5 text-xs font-semibold text-muted-foreground'>附件图片</h4>
-                <div className='grid grid-cols-4 gap-3 xl:grid-cols-8'>
+                <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>附件图片</h4>
+                <div className='grid grid-cols-2 gap-4 md:grid-cols-4'>
                   {imageFields.map((field) => {
                     const matched = imageAttachments.filter((a) => a.field_name === field.match)
                     return (
-                      <div key={field.name}>
-                        <span className='text-muted-foreground block pb-0.5 text-xs'>{field.name}</span>
+                      <div key={field.name} className='space-y-1'>
+                        <span className='text-muted-foreground text-xs'>{field.name}</span>
                         {matched.length > 0 ? (
                           matched.map((a) => (
-                            <div key={a.id} className='rounded border p-0.5'>
+                            <div key={a.id} className='rounded border p-1'>
                               <img
                                 src={getImageUrl(a.id)}
                                 alt={field.name}
-                                className='bg-muted h-24 w-full rounded object-contain'
+                                className='bg-muted h-32 w-full rounded object-contain'
                               />
-                              <div className='text-muted-foreground mt-0.5 text-[10px] leading-tight'>
+                              <div className='text-muted-foreground mt-1 text-xs'>
                                 {a.original_name} ({(a.file_size / 1024).toFixed(1)}KB)
                               </div>
                             </div>
                           ))
                         ) : (
-                          <div className='text-muted-foreground flex h-16 items-center justify-center rounded border border-dashed text-[10px]'>暂无</div>
+                          <div className='text-muted-foreground flex h-20 items-center justify-center rounded border border-dashed text-xs'>暂无</div>
                         )}
                       </div>
                     )
@@ -191,7 +191,7 @@ export function QualificationDetailDialog({
         </div>
 
         <div className='flex shrink-0 justify-end border-t px-6 py-3'>
-          <Button variant='outline' size='sm' onClick={() => onOpenChange(false)}>关闭</Button>
+          <Button variant='outline' onClick={() => onOpenChange(false)}>关闭</Button>
         </div>
       </DialogContent>
     </Dialog>
