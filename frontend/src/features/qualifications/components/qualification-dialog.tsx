@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -346,12 +346,15 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
     }
   }
 
-  const handleOpenChange = (newOpen: boolean) => {
-    if (newOpen) {
+  useEffect(() => {
+    if (open) {
       cleanupImages()
       form.reset(defaultValues)
       setOpenPanels(makeDefaultOpenMap(!qualification))
     }
+  }, [open])
+
+  const handleOpenChange = (newOpen: boolean) => {
     onOpenChange(newOpen)
   }
 

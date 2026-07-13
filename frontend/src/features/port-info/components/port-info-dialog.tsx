@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -126,10 +126,13 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
     }
   }
 
-  const handleOpenChange = (newOpen: boolean) => {
-    if (newOpen) {
+  useEffect(() => {
+    if (open) {
       form.reset(toDefaultValues(portInfo))
     }
+  }, [open])
+
+  const handleOpenChange = (newOpen: boolean) => {
     onOpenChange(newOpen)
   }
 
