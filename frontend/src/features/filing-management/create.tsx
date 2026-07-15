@@ -90,8 +90,8 @@ export function FilingCreatePage() {
 
   // Fetch qualifications
   const { data: qualData } = useQuery({
-    queryKey: ['qualifications', { page: qualPage, page_size: 10, enterprise_name: qualSearch || undefined }],
-    queryFn: () => getQualifications({ page: qualPage, page_size: 10, enterprise_name: qualSearch || undefined }),
+    queryKey: ['qualifications', { page: qualPage, page_size: 10, signature: qualSearch || undefined }],
+    queryFn: () => getQualifications({ page: qualPage, page_size: 10, signature: qualSearch || undefined }),
   })
 
   // Fetch export groups
@@ -248,7 +248,7 @@ export function FilingCreatePage() {
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
               <Input
-                placeholder="搜索企业名称"
+                placeholder="搜索签名"
                 value={qualSearch}
                 onChange={(e) => {
                   setQualSearch(e.target.value)
