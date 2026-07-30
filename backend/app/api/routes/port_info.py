@@ -302,7 +302,7 @@ def import_port_infos(
 def read_port_infos(
     session: SessionDep,
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=500),
     carrier: str | None = None,
     province: str | None = None,
 ) -> Any:
