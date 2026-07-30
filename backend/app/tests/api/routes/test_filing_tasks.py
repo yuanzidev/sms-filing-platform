@@ -28,10 +28,7 @@ def _create_qualification(client, headers, name="测试企业"):
         headers=headers,
         json={
             "enterprise_name": name,
-            "sms_signature": "签名X",
-            "legal_representative_cert_type": "身份证",
-            "legal_representative_cert_number": "110101199001011234",
-            "legal_representative_cert_address": "北京市朝阳区XX路1号",
+            "signature": "签名X",
         },
     )
     assert r.status_code == 200, r.text
@@ -42,13 +39,10 @@ def _create_port(client, headers, main_port_number, sub_port_number=None):
     payload = {
         "carrier": "中国移动",
         "main_port_number": main_port_number,
-        "enterprise_name": "测试企业",
         "group_code": "G001",
         "carrier_room": "机房A",
         "enterprise_room": "机房B",
         "port_type": "短信",
-        "operation_type": "新增",
-        "authorization_letter": "AUTH001",
     }
     if sub_port_number is not None:
         payload["sub_port_number"] = sub_port_number
