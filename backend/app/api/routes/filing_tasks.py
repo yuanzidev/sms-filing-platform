@@ -1,6 +1,5 @@
 """Filing tasks API routes — export task management."""
 import io
-import random
 import uuid
 from datetime import date, datetime
 from typing import Any
@@ -335,15 +334,17 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
     if not qualifications:
         raise HTTPException(status_code=404, detail="未找到匹配的资质信息")
 
-    # 3. Load ports randomly
-    all_ports = list(session.exec(select(PortInfo)).all())
-    if not all_ports:
-        raise HTTPException(status_code=404, detail="端口信息为空，请先导入端口数据")
+    # 3. Load ports by explicit IDs
+    if not create.port_ids:
+        raise HTTPException(status_code=400, detail="至少选择一个端口")
 
-    shuffled = list(all_ports)
-    random.shuffle(shuffled)
-    port_count = create.port_count if create.port_count is not None else len(shuffled)
-    selected_ports = shuffled[:port_count]
+    selected_ports = list(
+        session.exec(
+            select(PortInfo).where(PortInfo.id.in_(create.port_ids))  # type: ignore
+        ).all()
+    )
+    if len(selected_ports) != len(create.port_ids):
+        raise HTTPException(status_code=400, detail="部分端口ID无效")
     selected_port_ids = [p.id for p in selected_ports]
 
     # 4. Create task record first (so we have an ID)

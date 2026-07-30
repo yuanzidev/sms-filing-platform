@@ -33,7 +33,7 @@ class FilingTask(FilingTaskBase, table=True):
 class FilingTaskCreate(SQLModel):
     task_name: str | None = None  # auto-generated if not provided
     qualification_ids: list[uuid.UUID]
-    port_count: int | None = None  # None means all ports
+    port_ids: list[uuid.UUID]
     export_group_id: uuid.UUID
     group_by_field: str | None = None
 
