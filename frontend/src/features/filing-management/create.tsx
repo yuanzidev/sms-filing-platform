@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { Fragment, useState, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
@@ -22,13 +22,14 @@ import {
 } from '@/components/ui/select'
 import { getQualifications } from '@/lib/api/qualifications'
 import { getExportGroups } from '@/lib/api/export-groups'
+import { getPortInfos } from '@/lib/api/port-info'
 import { useCreateFilingTask } from '@/hooks/use-filing-tasks'
-import type { QualificationInfo, ExportGroup } from '@/lib/api/types'
+import type { QualificationInfo, ExportGroup, PortInfo } from '@/lib/api/types'
 import { toast } from 'sonner'
-import { ArrowLeft, ArrowRight, Loader2, Upload } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Loader2, Upload } from 'lucide-react'
 import { SignatureImportDialog } from './components/signature-import-dialog'
 
-type Step = 1 | 2 | 3
+type Step = 1 | 2 | 3 | 4
 
 const FIELD_LABEL_MAP: Record<string, string> = {
   carrier: '运营商',
@@ -83,15 +84,20 @@ export function FilingCreatePage() {
   const [qualSearch, setQualSearch] = useState('')
   const [selectedRows, setSelectedRows] = useState<Record<number, boolean>>({})
 
-  // Step 2 state
+  // Step 2 state (port selection)
+  const [portSearch, setPortSearch] = useState('')
+  const [portCarrierFilter, setPortCarrierFilter] = useState<string>('')
+  const [selectedPortIds, setSelectedPortIds] = useState<Record<string, boolean>>({})
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+
+  // Step 3 state (configure export)
   const [exportGroupId, setExportGroupId] = useState<string>('')
   const [groupByField, setGroupByField] = useState<string>('__none__')
-  const [portCount, setPortCount] = useState('')
 
   // Fetch qualifications
   const { data: qualData } = useQuery({
-    queryKey: ['qualifications', { page: qualPage, page_size: 10, signature: qualSearch || undefined }],
-    queryFn: () => getQualifications({ page: qualPage, page_size: 10, signature: qualSearch || undefined }),
+    queryKey: ['qualifications', { page: qualPage, page_size: 10, sms_signature: qualSearch || undefined }],
+    queryFn: () => getQualifications({ page: qualPage, page_size: 10, sms_signature: qualSearch || undefined }),
   })
 
   // Fetch export groups
@@ -99,6 +105,14 @@ export function FilingCreatePage() {
     queryKey: ['export-groups'],
     queryFn: () => getExportGroups(),
   })
+
+  // Fetch all ports for selection (small dataset, < 100 rows)
+  const { data: portData } = useQuery({
+    queryKey: ['port-info-all'],
+    queryFn: () => getPortInfos({ page: 1, page_size: 500 }),
+  })
+
+  const allPorts: PortInfo[] = portData?.data ?? []
 
   const createMutation = useCreateFilingTask()
 
@@ -145,11 +159,100 @@ export function FilingCreatePage() {
     },
     { accessorKey: 'enterprise_name', header: '企业名称' },
     { accessorKey: 'legal_representative_name', header: '法人', cell: ({ getValue }) => getValue() || '-' },
-    { accessorKey: 'signature', header: '签名', cell: ({ getValue }) => getValue() || '-' },
+    { accessorKey: 'sms_signature', header: '短信签名', cell: ({ getValue }) => getValue() || '-' },
     { accessorKey: 'handler_name', header: '经办人', cell: ({ getValue }) => getValue() || '-' },
   ], [])
 
-  const estimatedRows = selectedIds.length * (portCount ? Number(portCount) : 0)
+  // Group ports by main_port_number
+  const portGroups = useMemo(() => {
+    const groups: Record<string, PortInfo[]> = {}
+    for (const p of allPorts) {
+      const key = p.main_port_number
+      if (!groups[key]) groups[key] = []
+      groups[key].push(p)
+    }
+    // Sort each group: main port (sub_port_number is null/empty) first, then by sub_port_number
+    for (const key of Object.keys(groups)) {
+      groups[key].sort((a, b) => {
+        const aSub = a.sub_port_number || ''
+        const bSub = b.sub_port_number || ''
+        if (aSub === '' && bSub !== '') return -1
+        if (bSub === '' && aSub !== '') return 1
+        return aSub.localeCompare(bSub)
+      })
+    }
+    return groups
+  }, [allPorts])
+
+  const carrierOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of allPorts) set.add(p.carrier)
+    return Array.from(set).sort()
+  }, [allPorts])
+
+  const filteredGroups = useMemo(() => {
+    const result: Record<string, PortInfo[]> = {}
+    const search = portSearch.trim().toLowerCase()
+    for (const [key, ports] of Object.entries(portGroups)) {
+      if (portCarrierFilter && !ports.some((p) => p.carrier === portCarrierFilter)) continue
+      if (search) {
+        const matched = ports.some(
+          (p) =>
+            p.main_port_number.toLowerCase().includes(search) ||
+            (p.sub_port_number || '').toLowerCase().includes(search) ||
+            key.toLowerCase().includes(search)
+        )
+        if (!matched) continue
+      }
+      result[key] = ports
+    }
+    return result
+  }, [portGroups, portCarrierFilter, portSearch])
+
+  const selectedPortIdList = useMemo(
+    () => Object.entries(selectedPortIds).filter(([, v]) => v).map(([id]) => id),
+    [selectedPortIds]
+  )
+
+  const selectedGroupCount = useMemo(() => {
+    const set = new Set<string>()
+    for (const id of selectedPortIdList) {
+      const p = allPorts.find((x) => x.id === id)
+      if (p) set.add(p.main_port_number)
+    }
+    return set.size
+  }, [selectedPortIdList, allPorts])
+
+  function groupSelectionState(_key: string, ports: PortInfo[]): 'none' | 'partial' | 'all' {
+    const selectedCount = ports.filter((p) => selectedPortIds[p.id]).length
+    if (selectedCount === 0) return 'none'
+    if (selectedCount === ports.length) return 'all'
+    return 'partial'
+  }
+
+  function toggleGroup(key: string, ports: PortInfo[]) {
+    const state = groupSelectionState(key, ports)
+    setSelectedPortIds((prev) => {
+      const next = { ...prev }
+      const shouldSelect = state !== 'all'
+      for (const p of ports) next[p.id] = shouldSelect
+      return next
+    })
+  }
+
+  function togglePort(id: string) {
+    setSelectedPortIds((prev) => {
+      const next = { ...prev }
+      next[id] = !next[id]
+      return next
+    })
+  }
+
+  function toggleGroupExpanded(key: string) {
+    setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const estimatedRows = selectedIds.length * selectedPortIdList.length
 
   const handleSignatureImport = (matchedIds: string[]) => {
     setSelectedRows((prev) => {
@@ -172,7 +275,7 @@ export function FilingCreatePage() {
     createMutation.mutate(
       {
         qualification_ids: selectedIds,
-        port_count: portCount ? Number(portCount) : undefined,
+        port_ids: selectedPortIdList,
         export_group_id: exportGroupId,
         group_by_field: groupByField === '__none__' ? undefined : (groupByField || undefined),
       },
@@ -222,7 +325,7 @@ export function FilingCreatePage() {
         <div className="space-y-6">
           {/* Step indicator */}
           <div className="flex items-center gap-2">
-            {([1, 2, 3] as Step[]).map((s, i) => (
+            {([1, 2, 3, 4] as Step[]).map((s, i) => (
               <div key={s} className="flex items-center gap-2">
                 <div
                   className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
@@ -232,9 +335,9 @@ export function FilingCreatePage() {
                   {step > s ? '✓' : s}
                 </div>
                 <span className={`text-sm ${step >= s ? 'font-medium' : 'text-muted-foreground'}`}>
-                  {s === 1 ? '选择资质' : s === 2 ? '配置导出' : '确认生成'}
+                  {s === 1 ? '选择资质' : s === 2 ? '选择端口' : s === 3 ? '配置导出' : '确认生成'}
                 </span>
-                {i < 2 && <div className="mx-2 h-px w-8 bg-border" />}
+                {i < 3 && <div className="mx-2 h-px w-8 bg-border" />}
               </div>
             ))}
           </div>
@@ -289,8 +392,125 @@ export function FilingCreatePage() {
         </Card>
       )}
 
-      {/* Step 2: Configure export */}
+      {/* Step 2: Select ports */}
       {step === 2 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>选择端口</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Input
+                placeholder="搜索端口号"
+                value={portSearch}
+                onChange={(e) => setPortSearch(e.target.value)}
+                className="w-64"
+              />
+              <Select value={portCarrierFilter} onValueChange={setPortCarrierFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="全部运营商" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">全部运营商</SelectItem>
+                  {carrierOptions.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">
+                已选 {selectedGroupCount} 个主端口 / {selectedPortIdList.length} 行
+              </span>
+            </div>
+
+            <div className="rounded-lg border">
+              <div className="max-h-[480px] overflow-auto">
+                {Object.keys(filteredGroups).length === 0 ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">
+                    没有匹配的端口
+                  </div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {Object.entries(filteredGroups).map(([key, ports]) => {
+                        const state = groupSelectionState(key, ports)
+                        const expanded = expandedGroups[key] ?? false
+                        return (
+                          <Fragment key={key}>
+                            <tr
+                              className="border-b bg-muted/30 cursor-pointer hover:bg-muted/50"
+                              onClick={() => toggleGroupExpanded(key)}
+                            >
+                              <td className="w-10 p-3">
+                                <Checkbox
+                                  checked={state === 'all' ? true : state === 'partial' ? 'indeterminate' : false}
+                                  onCheckedChange={() => toggleGroup(key, ports)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label={`全选主端口 ${key}`}
+                                />
+                              </td>
+                              <td className="p-3 font-medium">
+                                <div className="flex items-center gap-2">
+                                  {expanded
+                                    ? <ChevronDown className="h-4 w-4" />
+                                    : <ChevronRight className="h-4 w-4" />}
+                                  {key}
+                                </div>
+                              </td>
+                              <td className="p-3 text-muted-foreground text-right">
+                                {ports.filter((p) => selectedPortIds[p.id]).length}/{ports.length}
+                              </td>
+                            </tr>
+                            {expanded && ports.map((p) => (
+                              <tr
+                                key={p.id}
+                                className="border-b last:border-0 hover:bg-accent/30"
+                              >
+                                <td className="w-10 p-3 pl-8">
+                                  <Checkbox
+                                    checked={!!selectedPortIds[p.id]}
+                                    onCheckedChange={() => togglePort(p.id)}
+                                    aria-label={`选择端口 ${p.sub_port_number || '主端口'}`}
+                                  />
+                                </td>
+                                <td className="p-3">
+                                  <div className="flex items-center gap-3">
+                                    <span className="font-mono">
+                                      {p.sub_port_number || '—'}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {p.carrier} · {p.province || '-'} · {p.city || '-'} · {p.port_type || '-'}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td />
+                              </tr>
+                            ))}
+                          </Fragment>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => setStep(1)}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> 上一步
+              </Button>
+              <Button
+                onClick={() => setStep(3)}
+                disabled={selectedPortIdList.length === 0}
+              >
+                下一步 <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 3: Configure export */}
+      {step === 3 && (
         <Card>
           <CardHeader>
             <CardTitle>配置导出</CardTitle>
@@ -335,23 +555,11 @@ export function FilingCreatePage() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">随机端口数量（可选）</label>
-              <Input
-                type="number"
-                placeholder="留空使用全量端口"
-                value={portCount}
-                onChange={(e) => setPortCount(e.target.value)}
-                className="w-full max-w-sm"
-              />
-              <p className="text-xs text-muted-foreground">不填写则使用全部可用端口</p>
-            </div>
-
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(1)}>
+              <Button variant="outline" onClick={() => setStep(2)}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> 上一步
               </Button>
-              <Button onClick={() => setStep(3)} disabled={!exportGroupId}>
+              <Button onClick={() => setStep(4)} disabled={!exportGroupId}>
                 下一步 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -359,8 +567,8 @@ export function FilingCreatePage() {
         </Card>
       )}
 
-      {/* Step 3: Confirm */}
-      {step === 3 && (
+      {/* Step 4: Confirm */}
+      {step === 4 && (
         <Card>
           <CardHeader>
             <CardTitle>确认生成</CardTitle>
@@ -373,7 +581,7 @@ export function FilingCreatePage() {
               </div>
               <div>
                 <span className="text-sm text-muted-foreground">端口数量</span>
-                <p className="text-xl font-bold">{portCount ? `${portCount}（随机抽取）` : '全量'}</p>
+                <p className="text-xl font-bold">{selectedPortIdList.length}</p>
               </div>
               <div>
                 <span className="text-sm text-muted-foreground">导出字段组</span>
@@ -385,12 +593,12 @@ export function FilingCreatePage() {
               </div>
               <div className="col-span-2">
                 <span className="text-sm text-muted-foreground">预计行数（资质 × 端口）</span>
-                <p className="text-xl font-bold">{estimatedRows > 0 ? estimatedRows.toLocaleString() : '端口全量后确定'}</p>
+                <p className="text-xl font-bold">{estimatedRows.toLocaleString()}</p>
               </div>
             </div>
 
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(2)}>
+              <Button variant="outline" onClick={() => setStep(3)}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> 上一步
               </Button>
               <Button onClick={handleCreate} disabled={createMutation.isPending}>

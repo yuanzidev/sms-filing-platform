@@ -19,6 +19,9 @@ export interface QualificationInfo {
   app_platform_name: string | null
   // 法人
   legal_representative_name: string | null
+  legal_representative_cert_type: string
+  legal_representative_cert_number: string
+  legal_representative_cert_address: string
   // 责任人
   responsible_name: string | null
   responsible_cert_type: string | null
@@ -52,8 +55,6 @@ export interface QualificationInfo {
   diversion_content: string | null
   link_address: string | null
   link_type: string | null
-  // 签名
-  signature: string
   created_at: string
   updated_at: string
 }
@@ -79,20 +80,23 @@ export interface BatchSignatureResponse {
 export interface PortInfo {
   id: string
   carrier: string
-  main_port_number: string | null
+  main_port_number: string
+  enterprise_name: string
   sub_port_number: string | null
   port_range: string | null
   province: string | null
   city: string | null
-  port_type: string | null
+  port_type: string
+  operation_type: string
   port_activation_date: string | null
   allow_self_extension: boolean | null
-  carrier_room: string | null
-  enterprise_room: string | null
+  carrier_room: string
+  enterprise_room: string
   has_authorization: boolean | null
+  authorization_letter: string
   auth_start_date: string | null
   auth_end_date: string | null
-  group_code: string | null
+  group_code: string
   region: string | null
   other_room_description: string | null
   is_green_channel: boolean | null
@@ -327,7 +331,7 @@ export interface FilingTasksResponse {
 
 export interface CreateFilingTaskRequest {
   qualification_ids: string[]
-  port_count?: number | null
+  port_ids: string[]
   export_group_id: string
   group_by_field?: string | null
 }
