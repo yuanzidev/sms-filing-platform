@@ -86,7 +86,7 @@ export function FilingCreatePage() {
 
   // Step 2 state (port selection)
   const [portSearch, setPortSearch] = useState('')
-  const [portCarrierFilter, setPortCarrierFilter] = useState<string>('')
+  const [portCarrierFilter, setPortCarrierFilter] = useState<string>('__all__')
   const [selectedPortIds, setSelectedPortIds] = useState<Record<string, boolean>>({})
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
 
@@ -194,7 +194,7 @@ export function FilingCreatePage() {
     const result: Record<string, PortInfo[]> = {}
     const search = portSearch.trim().toLowerCase()
     for (const [key, ports] of Object.entries(portGroups)) {
-      if (portCarrierFilter && !ports.some((p) => p.carrier === portCarrierFilter)) continue
+      if (portCarrierFilter !== '__all__' && !ports.some((p) => p.carrier === portCarrierFilter)) continue
       if (search) {
         const matched = ports.some(
           (p) =>
@@ -411,7 +411,7 @@ export function FilingCreatePage() {
                   <SelectValue placeholder="全部运营商" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">全部运营商</SelectItem>
+                  <SelectItem value="__all__">全部运营商</SelectItem>
                   {carrierOptions.map((c) => (
                     <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
