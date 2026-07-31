@@ -146,3 +146,12 @@ def test_create_filing_task_rejects_invalid_port_ids(
     )
     assert r.status_code == 400
     assert "无效" in r.json()["detail"]
+
+
+def test_build_field_map_uses_legal_rep_id_card_labels():
+    from app.api.routes.filing_tasks import build_field_map
+    m = build_field_map()
+    assert m.get("handler_id_front") == "法人身份证正面"
+    assert m.get("handler_id_back") == "法人身份证反面"
+    assert "经办人身份证正面" not in m.values()
+    assert "经办人身份证反面" not in m.values()

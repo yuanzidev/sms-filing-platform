@@ -80,8 +80,8 @@ def build_field_map() -> dict[str, str]:
         "cert_image": "单位证件图片",
         "responsible_id_front": "责任人身份证正面",
         "responsible_id_back": "责任人身份证反面",
-        "handler_id_front": "经办人身份证正面",
-        "handler_id_back": "经办人身份证反面",
+        "handler_id_front": "法人身份证正面",
+        "handler_id_back": "法人身份证反面",
         # Image field from port_info
         "auth_image": "授权书图片",
     }
@@ -358,8 +358,8 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
         "单位证件图片": "cert_image",
         "责任人身份证正面": "responsible_id_front",
         "责任人身份证反面": "responsible_id_back",
-        "经办人身份证正面": "handler_id_front",
-        "经办人身份证反面": "handler_id_back",
+        "法人身份证正面": "handler_id_front",
+        "法人身份证反面": "handler_id_back",
         "授权书图片": "auth_image",
     }
     qual_images: dict[uuid.UUID, dict[str, bytes]] = {}
