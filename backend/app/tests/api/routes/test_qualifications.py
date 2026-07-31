@@ -133,9 +133,9 @@ def test_import_accepts_renamed_link_address_header(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
     headers = [
-        "企业名称", "法人证件类型", "法人证件号码", "法人证件地址", "引流链接",
+        "企业名称", "法人证件类型", "法人证件号码", "法人证件地址", "引流链接", "短信签名",
     ]
-    rows = [["测试企业链接", "身份证", "110101199001011234", "北京市朝阳区XX路1号", "https://example.com"]]
+    rows = [["测试企业链接", "身份证", "110101199001011234", "北京市朝阳区XX路1号", "https://example.com", "【测试签名】"]]
     data = _build_xlsx(headers, rows)
 
     files = {"file": ("test.xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
@@ -146,7 +146,7 @@ def test_import_accepts_renamed_link_address_header(
     )
     assert r.status_code == 200
     assert r.json()["count"] == 1
-    # 验证值确实落到 link_address 字段
+    # 验证值确实落到 link_address 和 sms_signature 字段
     list_r = client.get(
         f"{settings.API_V1_STR}/qualifications",
         headers=superuser_token_headers,
@@ -155,4 +155,5 @@ def test_import_accepts_renamed_link_address_header(
     assert list_r.status_code == 200
     item = list_r.json()["data"][0]
     assert item["link_address"] == "https://example.com"
+    assert item["sms_signature"] == "【测试签名】"
 
