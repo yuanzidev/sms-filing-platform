@@ -43,11 +43,12 @@ const IMAGE_FIELDS = [
   { name: 'cert_image', label: '单位证件图片' },
   { name: 'responsible_id_front', label: '责任人身份证正面' },
   { name: 'responsible_id_back', label: '责任人身份证反面' },
-  { name: 'handler_id_front', label: '经办人身份证正面' },
-  { name: 'handler_id_back', label: '经办人身份证反面' },
+  { name: 'handler_id_front', label: '法人身份证正面' },
+  { name: 'handler_id_back', label: '法人身份证反面' },
   { name: 'signature_proof_image', label: '签名举证附件' },
   { name: 'handler_photo', label: '经办人现场照片' },
-  { name: 'diversion_proof_image', label: '引流举证附件' },
+  { name: 'diversion_proof_image', label: '引流号码举证附件' },
+  { name: 'diversion_link_proof_image', label: '引流链接举证' },
 ]
 
 const PANEL_KEYS = [
@@ -925,7 +926,7 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
                   name="link_address"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>链接地址</FormLabel>
+                      <FormLabel>引流链接</FormLabel>
                       <FormControl>
                         <Input placeholder="链接 URL" {...field} value={field.value || ''} />
                       </FormControl>
