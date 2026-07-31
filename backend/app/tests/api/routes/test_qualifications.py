@@ -100,3 +100,59 @@ def test_import_success_with_required_fields(
     assert r.status_code == 200
     assert r.json()["count"] == 1
 
+
+def test_template_column_order_matches_new_spec(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    from io import BytesIO
+    from openpyxl import load_workbook
+
+    r = client.get(
+        f"{settings.API_V1_STR}/qualifications/template", headers=superuser_token_headers
+    )
+    assert r.status_code == 200
+    wb = load_workbook(BytesIO(r.content))
+    ws = wb.active
+    headers = [c.value for c in ws[1]]
+    # 新模板 45 列关键位置断言
+    assert headers[13] == "引流链接", f"col14 应为「引流链接」，实际：{headers[13]}"
+    assert headers[15] == "引流号码举证附件", f"col16 应为「引流号码举证附件」，实际：{headers[15]}"
+    assert headers[16] == "引流链接举证", f"col17 应为「引流链接举证」，实际：{headers[16]}"
+    assert headers[20] == "法人身份证正面", f"col21 应为「法人身份证正面」，实际：{headers[20]}"
+    assert headers[21] == "法人身份证反面", f"col22 应为「法人身份证反面」，实际：{headers[21]}"
+    # 旧名不应存在
+    assert "链接地址" not in headers
+    assert "经办人身份证正面" not in headers
+    assert "经办人身份证反面" not in headers
+    assert "引流举证附件" not in headers
+    # 总列数
+    assert len([h for h in headers if h]) == 45
+
+
+def test_import_accepts_renamed_link_address_header(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    headers = [
+        "企业名称", "法人证件类型", "法人证件号码", "法人证件地址", "引流链接",
+    ]
+    rows = [["测试企业链接", "身份证", "110101199001011234", "北京市朝阳区XX路1号", "https://example.com"]]
+    data = _build_xlsx(headers, rows)
+
+    files = {"file": ("test.xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/import",
+        headers=superuser_token_headers,
+        files=files,
+    )
+    assert r.status_code == 200
+    assert r.json()["count"] == 1
+    # 验证值确实落到 link_address 字段
+    list_r = client.get(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        params={"enterprise_name": "测试企业链接"},
+    )
+    assert list_r.status_code == 200
+    item = list_r.json()["data"][0]
+    assert item["link_address"] == "https://example.com"
+
