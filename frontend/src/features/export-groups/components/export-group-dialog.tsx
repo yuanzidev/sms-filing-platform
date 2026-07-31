@@ -80,7 +80,7 @@ const AVAILABLE_FIELDS = [
   { key: 'diversion_number_type', label: '引流号码类型' },
   { key: 'diversion_number_usage', label: '引流号码用途' },
   { key: 'diversion_content', label: '引流内容' },
-  { key: 'link_address', label: '链接地址' },
+  { key: 'link_address', label: '引流链接' },
   { key: 'link_type', label: '链接类型' },
   { key: 'enterprise_name', label: '企业名称' },
   { key: 'operation_type', label: '操作类型' },
