@@ -110,6 +110,9 @@ export function QualificationDetailDialog({
 
                 <Section title='法人信息'>
                   <FieldRow label='法人姓名' value={d.legal_representative_name} />
+                  <FieldRow label='法人证件类型' value={d.legal_representative_cert_type} />
+                  <FieldRow label='法人证件号码' value={d.legal_representative_cert_number} />
+                  <FieldRow label='法人证件地址' value={d.legal_representative_cert_address} />
                 </Section>
 
                 <Section title='责任人信息'>
@@ -129,7 +132,6 @@ export function QualificationDetailDialog({
                 </Section>
 
                 <Section title='签名与模板'>
-                  <FieldRow label='签名' value={d.signature} />
                   <FieldRow label='短信签名' value={d.sms_signature} />
                   <FieldRow label='签名类型' value={d.signature_type} />
                   <FieldRow label='签名是否已认证' value={d.signature_verified} />

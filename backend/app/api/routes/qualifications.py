@@ -46,6 +46,9 @@ _QUALIFICATION_HEADERS = [
     "单位证件号码",
     "APP/平台名称",
     "法人姓名",
+    "法人证件类型",
+    "法人证件号码",
+    "法人证件地址",
     "责任人姓名",
     "责任人证件类型",
     "责任人证件号码",
@@ -74,7 +77,6 @@ _QUALIFICATION_HEADERS = [
     "引流内容",
     "链接地址",
     "链接类型",
-    "签名",
     "单位证件图片",
     "责任人身份证正面",
     "责任人身份证反面",
@@ -103,7 +105,7 @@ def download_qualification_template() -> Any:
         "示例企业有限公司",
         "营业执照", "91110108MA01XXXXX",
         "示例平台",
-        "张三",  # 法人
+        "张三", "身份证", "110101199001011234", "北京市朝阳区XX路1号",
         "李四", "身份证", "110101199001011234", "北京市朝阳区XX路1号", "13800138000",
         "王五", "身份证", "110101199501011234", "北京市海淀区XX路2号", "13900139000",
         "【示例平台】", "自营签名", "是", "否",
@@ -111,7 +113,6 @@ def download_qualification_template() -> Any:
         "营销类", "验证码", "登录验证", "用户登录验证",
         "13800000000", "手机号", "业务联系", "欢迎使用我们的服务",
         "https://example.com", "H5",
-        "示例签名",
     ]
     for col_idx, val in enumerate(example_data, 1):
         ws.cell(row=2, column=col_idx, value=val)
@@ -141,8 +142,8 @@ def download_qualification_template() -> Any:
     img_buf = io.BytesIO()
     sample_img.save(img_buf, format="PNG")
 
-    # First image column is column 35 (1-based) = "AI2"
-    cell_images = {"AI2": img_buf.getvalue()}
+    # First image column is column 34 (1-based) = "AH2"
+    cell_images = {"AH2": img_buf.getvalue()}
     xlsx_bytes = inject_cell_images(xlsx_bytes, cell_images)
 
     return StreamingResponse(
@@ -177,6 +178,9 @@ def import_qualifications(
         "单位证件号码": "cert_number",
         "APP/平台名称": "app_platform_name",
         "法人姓名": "legal_representative_name",
+        "法人证件类型": "legal_representative_cert_type",
+        "法人证件号码": "legal_representative_cert_number",
+        "法人证件地址": "legal_representative_cert_address",
         "责任人姓名": "responsible_name",
         "责任人证件类型": "responsible_cert_type",
         "责任人证件号码": "responsible_cert_number",
@@ -205,7 +209,6 @@ def import_qualifications(
         "引流内容": "diversion_content",
         "链接地址": "link_address",
         "链接类型": "link_type",
-        "签名": "signature",
     }
 
     header_row = [str(c) if c else "" for c in rows[0]]
@@ -214,7 +217,7 @@ def import_qualifications(
         if h in header_to_field:
             col_map[header_to_field[h]] = col_idx
 
-    missing = [h for h, f in header_to_field.items() if f in ("enterprise_name", "signature") and f not in col_map]
+    missing = [h for h, f in header_to_field.items() if f in ("enterprise_name", "legal_representative_cert_type", "legal_representative_cert_number", "legal_representative_cert_address") and f not in col_map]
     if missing:
         raise HTTPException(
             status_code=400,
@@ -248,9 +251,17 @@ def import_qualifications(
         if not enterprise_name:
             raise HTTPException(status_code=400, detail=f"第{row_idx}行: 企业名称不能为空")
 
-        signature = cell("signature")
-        if not signature:
-            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 签名不能为空")
+        legal_rep_cert_type = cell("legal_representative_cert_type")
+        if not legal_rep_cert_type:
+            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 法人证件类型不能为空")
+
+        legal_rep_cert_number = cell("legal_representative_cert_number")
+        if not legal_rep_cert_number:
+            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 法人证件号码不能为空")
+
+        legal_rep_cert_address = cell("legal_representative_cert_address")
+        if not legal_rep_cert_address:
+            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 法人证件地址不能为空")
 
         objects.append(QualificationInfo(
             enterprise_name=enterprise_name,
@@ -258,6 +269,9 @@ def import_qualifications(
             cert_number=cell("cert_number"),
             app_platform_name=cell("app_platform_name"),
             legal_representative_name=cell("legal_representative_name"),
+            legal_representative_cert_type=legal_rep_cert_type,
+            legal_representative_cert_number=legal_rep_cert_number,
+            legal_representative_cert_address=legal_rep_cert_address,
             responsible_name=cell("responsible_name"),
             responsible_cert_type=cell("responsible_cert_type"),
             responsible_cert_number=cell("responsible_cert_number"),
@@ -286,7 +300,6 @@ def import_qualifications(
             diversion_content=cell("diversion_content"),
             link_address=cell("link_address"),
             link_type=cell("link_type"),
-            signature=signature,
         ))
 
     if not objects:
@@ -344,12 +357,12 @@ def read_qualifications(
     page_size: int = Query(20, ge=1, le=100),
     enterprise_name: str | None = None,
     cert_number: str | None = None,
-    signature: str | None = None,
+    sms_signature: str | None = None,
 ) -> Any:
     skip = (page - 1) * page_size
     items, total = list_qualifications(
         session=session, skip=skip, limit=page_size,
-        enterprise_name=enterprise_name, cert_number=cert_number, signature=signature,
+        enterprise_name=enterprise_name, cert_number=cert_number, sms_signature=sms_signature,
     )
     return QualificationInfosPublic(data=items, total=total, page=page, page_size=page_size)
 

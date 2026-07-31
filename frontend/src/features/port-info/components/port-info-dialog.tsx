@@ -30,20 +30,23 @@ import type { PortInfo } from '@/lib/api/types'
 
 const formSchema = z.object({
   carrier: z.string().min(1, '运营商不能为空'),
-  main_port_number: z.string().optional(),
+  main_port_number: z.string().min(1, '主端口号不能为空'),
+  enterprise_name: z.string().min(1, '企业名称不能为空'),
   sub_port_number: z.string().optional(),
   port_range: z.string().optional(),
   province: z.string().optional(),
   city: z.string().optional(),
-  port_type: z.string().optional(),
+  port_type: z.string().min(1, '端口类型不能为空'),
+  operation_type: z.string().min(1, '操作类型不能为空'),
   port_activation_date: z.string().optional(),
   allow_self_extension: z.boolean().optional(),
-  carrier_room: z.string().optional(),
-  enterprise_room: z.string().optional(),
+  carrier_room: z.string().min(1, '运营商接入机房及设备不能为空'),
+  enterprise_room: z.string().min(1, '企业接入机房及设备不能为空'),
   has_authorization: z.boolean().optional(),
+  authorization_letter: z.string().min(1, '授权书不能为空'),
   auth_start_date: z.string().optional(),
   auth_end_date: z.string().optional(),
-  group_code: z.string().optional(),
+  group_code: z.string().min(1, '集团编码不能为空'),
   region: z.string().optional(),
   other_room_description: z.string().optional(),
   is_green_channel: z.boolean().optional(),
@@ -65,16 +68,19 @@ function toDefaultValues(p?: PortInfo): FormData {
   return {
     carrier: p?.carrier || '',
     main_port_number: p?.main_port_number || '',
+    enterprise_name: p?.enterprise_name || '',
     sub_port_number: p?.sub_port_number || '',
     port_range: p?.port_range || '',
     province: p?.province || '',
     city: p?.city || '',
     port_type: p?.port_type || '',
+    operation_type: p?.operation_type || '',
     port_activation_date: p?.port_activation_date || '',
     allow_self_extension: p?.allow_self_extension ?? false,
     carrier_room: p?.carrier_room || '',
     enterprise_room: p?.enterprise_room || '',
     has_authorization: p?.has_authorization ?? false,
+    authorization_letter: p?.authorization_letter || '',
     auth_start_date: p?.auth_start_date || '',
     auth_end_date: p?.auth_end_date || '',
     group_code: p?.group_code || '',
@@ -171,9 +177,35 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 name="port_type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>端口类型</FormLabel>
+                    <FormLabel>端口类型 *</FormLabel>
                     <FormControl>
-                      <Input placeholder="主端口/子端口" {...field} value={field.value || ''} />
+                      <Input placeholder="主端口/子端口" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="enterprise_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>企业名称 *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="企业名称" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="operation_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>操作类型 *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="操作类型" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -184,7 +216,7 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 name="main_port_number"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>主端口号</FormLabel>
+                    <FormLabel>主端口号 *</FormLabel>
                     <FormControl>
                       <Input placeholder="主端口号码" {...field} value={field.value || ''} />
                     </FormControl>
@@ -239,7 +271,7 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 name="group_code"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>集团编码</FormLabel>
+                    <FormLabel>集团编码 *</FormLabel>
                     <FormControl>
                       <Input placeholder="集团编码" {...field} value={field.value || ''} />
                     </FormControl>
@@ -265,7 +297,7 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 name="carrier_room"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>运营商机房</FormLabel>
+                    <FormLabel>运营商接入机房及设备 *</FormLabel>
                     <FormControl>
                       <Input placeholder="运营商接入机房及设备" {...field} value={field.value || ''} />
                     </FormControl>
@@ -278,7 +310,7 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 name="enterprise_room"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>企业机房</FormLabel>
+                    <FormLabel>企业接入机房及设备 *</FormLabel>
                     <FormControl>
                       <Input placeholder="企业接入机房及设备" {...field} value={field.value || ''} />
                     </FormControl>
@@ -308,6 +340,19 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                       <Checkbox checked={field.value ?? false} onCheckedChange={field.onChange} />
                     </FormControl>
                     <FormLabel className="text-sm font-normal">是否具有授权书</FormLabel>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="authorization_letter"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>授权书 *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="授权书编号或名称" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

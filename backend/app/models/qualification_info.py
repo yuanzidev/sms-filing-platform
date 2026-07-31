@@ -16,6 +16,9 @@ class QualificationInfoBase(SQLModel):
 
     # 法人
     legal_representative_name: str | None = Field(default=None, max_length=100)
+    legal_representative_cert_type: str = Field(max_length=50)
+    legal_representative_cert_number: str = Field(max_length=100)
+    legal_representative_cert_address: str = Field(max_length=500)
 
     # 责任人
     responsible_name: str | None = Field(default=None, max_length=100)
@@ -55,9 +58,6 @@ class QualificationInfoBase(SQLModel):
     link_address: str | None = Field(default=None, max_length=500)
     link_type: str | None = Field(default=None, max_length=50)
 
-    # 签名（必填）
-    signature: str = Field(max_length=200, index=True)
-
 
 class QualificationInfo(QualificationInfoBase, table=True):
     __tablename__ = "qualification_info"
@@ -76,6 +76,9 @@ class QualificationInfoUpdate(SQLModel):
     cert_number: str | None = None
     app_platform_name: str | None = None
     legal_representative_name: str | None = None
+    legal_representative_cert_type: str | None = None
+    legal_representative_cert_number: str | None = None
+    legal_representative_cert_address: str | None = None
     responsible_name: str | None = None
     responsible_cert_type: str | None = None
     responsible_cert_number: str | None = None
@@ -104,7 +107,6 @@ class QualificationInfoUpdate(SQLModel):
     diversion_content: str | None = None
     link_address: str | None = None
     link_type: str | None = None
-    signature: str | None = None
 
 
 class QualificationInfoPublic(QualificationInfoBase):

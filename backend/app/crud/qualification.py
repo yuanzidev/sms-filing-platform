@@ -21,7 +21,7 @@ def list_qualifications(
     limit: int = 20,
     enterprise_name: str | None = None,
     cert_number: str | None = None,
-    signature: str | None = None,
+    sms_signature: str | None = None,
 ) -> tuple[list[QualificationInfo], int]:
     query = select(QualificationInfo)
 
@@ -29,8 +29,8 @@ def list_qualifications(
         query = query.where(QualificationInfo.enterprise_name.contains(enterprise_name))
     if cert_number:
         query = query.where(QualificationInfo.cert_number.contains(cert_number))
-    if signature:
-        query = query.where(QualificationInfo.signature.contains(signature))
+    if sms_signature:
+        query = query.where(QualificationInfo.sms_signature.contains(sms_signature))
 
     count = session.exec(select(func.count()).select_from(query.subquery())).one()
     results = session.exec(
@@ -68,8 +68,8 @@ def get_qualifications_by_signatures(
 ) -> tuple[list[QualificationInfo], list[str]]:
     unique_sigs = list(dict.fromkeys(signatures))  # 去重保序
     results = session.exec(
-        select(QualificationInfo).where(QualificationInfo.signature.in_(unique_sigs))
+        select(QualificationInfo).where(QualificationInfo.sms_signature.in_(unique_sigs))
     ).all()
-    matched_sigs = {r.signature for r in results}
+    matched_sigs = {r.sms_signature for r in results}
     unmatched = [s for s in unique_sigs if s not in matched_sigs]
     return list(results), unmatched

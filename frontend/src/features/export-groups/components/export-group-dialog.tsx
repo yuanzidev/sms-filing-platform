@@ -82,7 +82,12 @@ const AVAILABLE_FIELDS = [
   { key: 'diversion_content', label: '引流内容' },
   { key: 'link_address', label: '链接地址' },
   { key: 'link_type', label: '链接类型' },
-  { key: 'signature', label: '签名' },
+  { key: 'enterprise_name', label: '企业名称' },
+  { key: 'operation_type', label: '操作类型' },
+  { key: 'authorization_letter', label: '授权书' },
+  { key: 'legal_representative_cert_type', label: '法人证件类型' },
+  { key: 'legal_representative_cert_number', label: '法人证件号码' },
+  { key: 'legal_representative_cert_address', label: '法人证件地址' },
 ]
 
 const formSchema = z.object({

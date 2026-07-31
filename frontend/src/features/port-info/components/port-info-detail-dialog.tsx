@@ -91,9 +91,11 @@ export function PortInfoDetailDialog({
               <Section title='基础信息'>
                 <FieldRow label='运营商' value={d.carrier} />
                 <FieldRow label='主端口号' value={d.main_port_number} />
+                <FieldRow label='企业名称' value={d.enterprise_name} />
                 <FieldRow label='子端口号' value={d.sub_port_number} />
                 <FieldRow label='端口范围' value={d.port_range} />
                 <FieldRow label='端口类型' value={d.port_type} />
+                <FieldRow label='操作类型' value={d.operation_type} />
                 <FieldRow label='客户类型' value={d.customer_type} />
                 <FieldRow label='端口开通日期' value={d.port_activation_date} />
               </Section>
@@ -110,6 +112,7 @@ export function PortInfoDetailDialog({
                 <FieldRow label='企业机房' value={d.enterprise_room} />
                 <FieldRow label='其他机房说明' value={d.other_room_description} />
                 <FieldRow label='是否具有授权书' value={booleanText(d.has_authorization)} />
+                <FieldRow label='授权书' value={d.authorization_letter} />
                 <FieldRow label='授权开始日期' value={d.auth_start_date} />
                 <FieldRow label='授权截止日期' value={d.auth_end_date} />
               </Section>

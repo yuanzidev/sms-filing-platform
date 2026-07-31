@@ -40,16 +40,19 @@ router = APIRouter(
 _PORT_HEADERS = [
     "运营商",
     "主端口号",
+    "企业名称",
     "子端口号",
     "码号使用范围",
     "接入省",
     "接入地市",
     "端口类型",
+    "操作类型",
     "端口入网时间",
     "是否允许自行扩展",
     "运营商接入机房及设备",
     "企业接入机房及设备",
     "是否具有授权书",
+    "授权书",
     "授权开始日期",
     "授权结束日期",
     "集团编码",
@@ -78,15 +81,15 @@ def download_port_info_template() -> Any:
 
     example_data = [
         "中国移动",
-        "10690001", "0001",
+        "10690001", "示例企业有限公司", "0001",
         "全国",
         "广东", "深圳",
-        "短信",
+        "短信", "新增",
         "2024-01-15",
         "是",
         "运营商XX机房-XX设备",
         "企业XX机房-XX设备",
-        "是",
+        "是", "授权书编号001",
         "2024-01-01", "2025-12-31",
         "G001",
         "华南地区",
@@ -123,8 +126,8 @@ def download_port_info_template() -> Any:
     img_buf = io.BytesIO()
     sample_img.save(img_buf, format="PNG")
 
-    # Authorization image column = column 22 (1-based) = "V2"
-    cell_images = {"V2": img_buf.getvalue()}
+    # Authorization image column = column 25 (1-based) = "Y2"
+    cell_images = {"Y2": img_buf.getvalue()}
     xlsx_bytes = inject_cell_images(xlsx_bytes, cell_images)
 
     return StreamingResponse(
@@ -155,16 +158,19 @@ def import_port_infos(
     header_to_field = {
         "运营商": "carrier",
         "主端口号": "main_port_number",
+        "企业名称": "enterprise_name",
         "子端口号": "sub_port_number",
         "码号使用范围": "port_range",
         "接入省": "province",
         "接入地市": "city",
         "端口类型": "port_type",
+        "操作类型": "operation_type",
         "端口入网时间": "port_activation_date",
         "是否允许自行扩展": "allow_self_extension",
         "运营商接入机房及设备": "carrier_room",
         "企业接入机房及设备": "enterprise_room",
         "是否具有授权书": "has_authorization",
+        "授权书": "authorization_letter",
         "授权开始日期": "auth_start_date",
         "授权结束日期": "auth_end_date",
         "集团编码": "group_code",
@@ -182,10 +188,12 @@ def import_port_infos(
         if h in header_to_field:
             col_map[header_to_field[h]] = col_idx
 
-    if "carrier" not in col_map:
+    required_fields = ["carrier", "main_port_number", "enterprise_name", "port_type", "operation_type", "carrier_room", "enterprise_room", "authorization_letter", "group_code"]
+    missing = [h for h, f in header_to_field.items() if f in required_fields and f not in col_map]
+    if missing:
         raise HTTPException(
             status_code=400,
-            detail="模板不匹配：缺少必填列「运营商」。请确认使用了正确的端口信息导入模板（首页 → 端口管理 → 下载模板）",
+            detail=f"模板不匹配：缺少必填列「{'」「'.join(missing)}」。请确认使用了正确的端口信息导入模板（首页 → 端口管理 → 下载模板）",
         )
 
     objects: list[PortInfo] = []
@@ -239,22 +247,57 @@ def import_port_infos(
         if not carrier:
             raise HTTPException(status_code=400, detail=f"第{row_idx}行: 运营商不能为空")
 
+        main_port_number = cell("main_port_number")
+        if not main_port_number:
+            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 主端口号不能为空")
+
+        enterprise_name = cell("enterprise_name")
+        if not enterprise_name:
+            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 企业名称不能为空")
+
+        port_type = cell("port_type")
+        if not port_type:
+            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 端口类型不能为空")
+
+        operation_type = cell("operation_type")
+        if not operation_type:
+            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 操作类型不能为空")
+
+        carrier_room = cell("carrier_room")
+        if not carrier_room:
+            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 运营商接入机房及设备不能为空")
+
+        enterprise_room = cell("enterprise_room")
+        if not enterprise_room:
+            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 企业接入机房及设备不能为空")
+
+        authorization_letter = cell("authorization_letter")
+        if not authorization_letter:
+            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 授权书不能为空")
+
+        group_code = cell("group_code")
+        if not group_code:
+            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 集团编码不能为空")
+
         objects.append(PortInfo(
             carrier=carrier,
-            main_port_number=cell("main_port_number"),
+            main_port_number=main_port_number,
+            enterprise_name=enterprise_name,
             sub_port_number=cell("sub_port_number"),
             port_range=cell("port_range"),
             province=cell("province"),
             city=cell("city"),
-            port_type=cell("port_type"),
+            port_type=port_type,
+            operation_type=operation_type,
             port_activation_date=parse_date("port_activation_date"),
             allow_self_extension=parse_bool("allow_self_extension"),
-            carrier_room=cell("carrier_room"),
-            enterprise_room=cell("enterprise_room"),
+            carrier_room=carrier_room,
+            enterprise_room=enterprise_room,
             has_authorization=parse_bool("has_authorization"),
+            authorization_letter=authorization_letter,
             auth_start_date=parse_date("auth_start_date"),
             auth_end_date=parse_date("auth_end_date"),
-            group_code=cell("group_code"),
+            group_code=group_code,
             region=cell("region"),
             other_room_description=cell("other_room_description"),
             is_green_channel=parse_bool("is_green_channel"),

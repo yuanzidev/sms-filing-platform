@@ -77,6 +77,9 @@ const formSchema = z.object({
   cert_number: z.string().optional(),
   app_platform_name: z.string().optional(),
   legal_representative_name: z.string().optional(),
+  legal_representative_cert_type: z.string().min(1, '法人证件类型不能为空'),
+  legal_representative_cert_number: z.string().min(1, '法人证件号码不能为空'),
+  legal_representative_cert_address: z.string().min(1, '法人证件地址不能为空'),
   responsible_name: z.string().optional(),
   responsible_cert_type: z.string().optional(),
   responsible_cert_number: z.string().optional(),
@@ -105,7 +108,6 @@ const formSchema = z.object({
   diversion_content: z.string().optional(),
   link_address: z.string().optional(),
   link_type: z.string().optional(),
-  signature: z.string().min(1, '签名不能为空'),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -266,6 +268,9 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
         cert_number: qualification.cert_number || '',
         app_platform_name: qualification.app_platform_name || '',
         legal_representative_name: qualification.legal_representative_name || '',
+        legal_representative_cert_type: qualification.legal_representative_cert_type || '',
+        legal_representative_cert_number: qualification.legal_representative_cert_number || '',
+        legal_representative_cert_address: qualification.legal_representative_cert_address || '',
         responsible_name: qualification.responsible_name || '',
         responsible_cert_type: qualification.responsible_cert_type || '',
         responsible_cert_number: qualification.responsible_cert_number || '',
@@ -294,7 +299,6 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
         diversion_content: qualification.diversion_content || '',
         link_address: qualification.link_address || '',
         link_type: qualification.link_type || '',
-        signature: qualification.signature || '',
       }
     : {
         enterprise_name: '',
@@ -302,6 +306,9 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
         cert_number: '',
         app_platform_name: '',
         legal_representative_name: '',
+        legal_representative_cert_type: '',
+        legal_representative_cert_number: '',
+        legal_representative_cert_address: '',
         responsible_name: '',
         responsible_cert_type: '',
         responsible_cert_number: '',
@@ -330,7 +337,6 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
         diversion_content: '',
         link_address: '',
         link_type: '',
-        signature: '',
       }
 
   const form = useForm<FormData>({
@@ -478,6 +484,45 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
                       <FormLabel>法人姓名</FormLabel>
                       <FormControl>
                         <Input placeholder="法人代表姓名" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="legal_representative_cert_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>法人证件类型 *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="如: 身份证" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="legal_representative_cert_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>法人证件号码 *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="法人证件号码" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="legal_representative_cert_address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>法人证件地址 *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="法人证件地址" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -631,19 +676,6 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
             {/* ── 签名与模板 ────────────────────────────────── */}
             <Panel panelKey="signature_template" title="签名与模板">
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="signature"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>签名 *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="如：张三 经办" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
                 <FormField
                   control={form.control}
                   name="sms_signature"

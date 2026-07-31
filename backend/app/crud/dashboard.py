@@ -104,7 +104,7 @@ def get_expiring_authorizations(session: Session, days: int = 30) -> list[dict[s
             "main_port_number": r.main_port_number,
             "sub_port_number": r.sub_port_number,
             "province": r.province,
-            "enterprise_name": "",
+            "enterprise_name": r.enterprise_name or "",
             "auth_end_date": r.auth_end_date.isoformat() if r.auth_end_date else None,
         }
         for r in results

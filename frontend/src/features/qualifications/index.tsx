@@ -58,12 +58,12 @@ export function QualificationsPage() {
   const [searchInputs, setSearchInputs] = useState({
     enterprise_name: '',
     cert_number: '',
-    signature: '',
+    sms_signature: '',
   })
   const [appliedFilters, setAppliedFilters] = useState<{
     enterprise_name?: string
     cert_number?: string
-    signature?: string
+    sms_signature?: string
   }>({})
   const queryClient = useQueryClient()
 
@@ -80,13 +80,13 @@ export function QualificationsPage() {
     setAppliedFilters({
       enterprise_name: searchInputs.enterprise_name.trim() || undefined,
       cert_number: searchInputs.cert_number.trim() || undefined,
-      signature: searchInputs.signature.trim() || undefined,
+      sms_signature: searchInputs.sms_signature.trim() || undefined,
     })
     setPage(1)
   }
 
   const handleReset = () => {
-    setSearchInputs({ enterprise_name: '', cert_number: '', signature: '' })
+    setSearchInputs({ enterprise_name: '', cert_number: '', sms_signature: '' })
     setAppliedFilters({})
     setPage(1)
   }
@@ -137,7 +137,7 @@ export function QualificationsPage() {
         cell: ({ getValue }) => getValue() || '-',
       },
       {
-        accessorKey: 'signature',
+        accessorKey: 'sms_signature',
         header: '签名',
         cell: ({ getValue }) => getValue() || '-',
       },
@@ -257,9 +257,9 @@ export function QualificationsPage() {
               <SearchIcon className='text-muted-foreground pointer-events-none absolute top-2.5 left-2.5 h-4 w-4' />
               <Input
                 placeholder='搜索签名'
-                value={searchInputs.signature}
+                value={searchInputs.sms_signature}
                 onChange={(e) =>
-                  setSearchInputs((s) => ({ ...s, signature: e.target.value }))
+                  setSearchInputs((s) => ({ ...s, sms_signature: e.target.value }))
                 }
                 className='w-56 pl-8'
                 onKeyDown={(e) => {
