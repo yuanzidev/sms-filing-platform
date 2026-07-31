@@ -67,11 +67,12 @@ export function QualificationDetailDialog({
     { name: '单位证件图片', match: '单位证件图片' },
     { name: '责任人身份证正面', match: '责任人身份证正面' },
     { name: '责任人身份证反面', match: '责任人身份证反面' },
-    { name: '经办人身份证正面', match: '经办人身份证正面' },
-    { name: '经办人身份证反面', match: '经办人身份证反面' },
+    { name: '法人身份证正面', match: '法人身份证正面' },
+    { name: '法人身份证反面', match: '法人身份证反面' },
     { name: '签名举证附件', match: '签名举证附件' },
+    { name: '引流号码举证附件', match: '引流号码举证附件' },
+    { name: '引流链接举证', match: '引流链接举证' },
     { name: '经办人现场照片', match: '经办人现场照片' },
-    { name: '引流举证附件', match: '引流举证附件' },
   ]
 
   return (
@@ -154,7 +155,7 @@ export function QualificationDetailDialog({
                   <FieldRow label='引流号码类型' value={d.diversion_number_type} />
                   <FieldRow label='引流号码用途' value={d.diversion_number_usage} />
                   <FieldRow label='引流内容' value={d.diversion_content} />
-                  <FieldRow label='链接地址' value={d.link_address} />
+                  <FieldRow label='引流链接' value={d.link_address} />
                   <FieldRow label='链接类型' value={d.link_type} />
                 </Section>
               </div>
