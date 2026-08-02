@@ -253,3 +253,53 @@ def test_delete_filing_task_keeps_usage(
         assert len(usages) >= 1
         for u in usages:
             assert u.filing_task_id is None
+
+
+def test_sub_port_availability(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """子端口可用性查询：已占用的号码计入 used，available = total - used"""
+    from sqlmodel import select
+
+    from app.core.db import engine
+    from app.models import FilingSubPortUsage, User
+
+    # 先插入 2 条占用记录，确保 used > 0
+    with Session(engine) as session:
+        operator = session.exec(
+            select(User).where(User.email == settings.FIRST_SUPERUSER)
+        ).first()
+        assert operator is not None
+        session.add_all(
+            [
+                FilingSubPortUsage(
+                    main_port_number="10698AVAIL",
+                    port_number="100003",
+                    operator_id=operator.id,
+                ),
+                FilingSubPortUsage(
+                    main_port_number="10698AVAIL",
+                    port_number="100005",
+                    operator_id=operator.id,
+                ),
+            ]
+        )
+        session.commit()
+
+    r = client.get(
+        f"{settings.API_V1_STR}/filing-tasks/sub-port-availability",
+        headers=superuser_token_headers,
+        params={
+            "main_port_numbers": "10698AVAIL",
+            "range_start": 100001,
+            "range_end": 100010,
+        },
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert "10698AVAIL" in data
+    info = data["10698AVAIL"]
+    assert info["total"] == 10
+    assert info["used"] == 2
+    assert info["available"] == 8
+    assert info["available"] + info["used"] == info["total"]

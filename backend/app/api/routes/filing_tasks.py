@@ -238,6 +238,30 @@ def _task_to_detail(session, task) -> FilingTaskDetail:
     )
 
 
+@router.get("/sub-port-availability")
+def check_sub_port_availability(
+    session: SessionDep,
+    _current_user: CurrentUser,
+    main_port_numbers: str = Query(...),
+    range_start: int = Query(...),
+    range_end: int = Query(...),
+) -> dict:
+    from app.crud.filing_sub_port_usage import count_used_in_range
+    total = range_end - range_start + 1
+    result = {}
+    for mpn in main_port_numbers.split(","):
+        mpn = mpn.strip()
+        if not mpn:
+            continue
+        used = count_used_in_range(session, mpn, range_start, range_end)
+        result[mpn] = {
+            "used": used,
+            "total": total,
+            "available": max(0, total - used),
+        }
+    return result
+
+
 @router.get("", response_model=FilingTasksPublic)
 @router.get("/", include_in_schema=False, response_model=FilingTasksPublic)
 def read_tasks(
