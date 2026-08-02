@@ -12,6 +12,7 @@ from sqlmodel import select
 from app.api.deps import CurrentUser, SessionDep
 from app.core.storage import get_storage
 from app.services.operation_log import log_operation
+from app.services.export_field_registry import REGISTRY, field_map, field_source
 from app.crud.export_group import get_export_group
 from app.crud.filing_task import (
     create_filing_task as crud_create_filing_task,
@@ -36,84 +37,23 @@ from app.models import (
 router = APIRouter(prefix="/filing-tasks", tags=["filing-tasks"])
 
 
-def build_field_map() -> dict[str, str]:
-    """Map logical field_name to the Chinese label used as column header."""
-    return {
-        "carrier": "运营商",
-        "operation_type": "操作类型",
-        "main_port_number": "主端口号",
-        "sub_port_number": "子端口号",
-        "port_range": "码号使用范围",
-        "province": "接入省",
-        "city": "接入地市",
-        "port_type": "端口类型",
-        "port_activation_date": "端口入网时间",
-        "allow_self_extension": "是否允许自行扩展",
-        "business_attribute": "业务属性",
-        "business_type": "业务类型",
-        "business_subtype": "业务细类",
-        "specific_usage": "具体用途",
-        "sms_signature": "短信签名",
-        "is_gateway_signature": "是否网关签名",
-        "carrier_room": "运营商接入机房及设备",
-        "enterprise_room": "企业接入机房及设备",
-        "has_authorization": "是否具有授权书",
-        "auth_start_date": "授权开始日期",
-        "auth_end_date": "授权结束日期",
-        "sms_template_content": "短信模板内容",
-        "submit_unit": "报送单位",
-        "carrier_enterprise_id": "运营商企业ID",
-        "enterprise_name": "企业名称",
-        "cert_type": "单位证件类型",
-        "cert_number": "单位证件号码",
-        "app_platform_name": "APP/平台名称",
-        "group_code": "集团编码",
-        "responsible_name": "责任人姓名",
-        "responsible_cert_type": "责任人证件类型",
-        "responsible_cert_number": "责任人证件号码",
-        "responsible_phone": "责任人手机号",
-        "handler_name": "经办人姓名",
-        "handler_cert_type": "经办人证件类型",
-        "handler_cert_number": "经办人证件号码",
-        "handler_phone": "经办人手机号",
-        # Image fields from qualification
-        "cert_image": "单位证件图片",
-        "responsible_id_front": "责任人身份证正面",
-        "responsible_id_back": "责任人身份证反面",
-        "handler_id_front": "法人身份证正面",
-        "handler_id_back": "法人身份证反面",
-        # Image field from port_info
-        "auth_image": "授权书图片",
-    }
-
-
-def get_field_value(qualification: QualificationInfo, port: PortInfo, field_name: str) -> str:
-    """Get field value from port_info or qualification_info directly."""
-    pi_fields = {
-        "carrier", "operation_type", "main_port_number", "sub_port_number",
-        "port_range", "province", "city", "port_type", "port_activation_date",
-        "allow_self_extension", "business_attribute", "business_type",
-        "business_subtype", "specific_usage", "sms_signature",
-        "is_gateway_signature", "carrier_room", "enterprise_room",
-        "has_authorization", "auth_start_date", "auth_end_date",
-        "sms_template_content",
-    }
-    qi_fields = {
-        "submit_unit", "carrier_enterprise_id", "enterprise_name", "cert_type",
-        "cert_number", "app_platform_name", "group_code", "responsible_name",
-        "responsible_cert_type", "responsible_cert_number", "responsible_phone",
-        "handler_name", "handler_cert_type", "handler_cert_number", "handler_phone",
-    }
-    img_fields = {
-        "cert_image", "responsible_id_front", "responsible_id_back",
-        "handler_id_front", "handler_id_back", "auth_image",
-    }
-
-    if field_name in img_fields:
+def get_field_value(
+    qualification: QualificationInfo,
+    port: PortInfo,
+    field_name: str,
+    allocated_sub_port: str | None = None,
+) -> str:
+    """Get field value via registry source dispatch."""
+    if field_name == "sub_port_number" and allocated_sub_port is not None:
+        return allocated_sub_port
+    source = field_source(field_name)
+    if source is None:
+        return ""
+    if source in ("image_qualification", "image_port"):
         return "[图片]"
-    if field_name in pi_fields:
+    if source == "port":
         value = getattr(port, field_name, "")
-    elif field_name in qi_fields:
+    elif source == "qualification":
         value = getattr(qualification, field_name, "")
     else:
         return ""
@@ -122,7 +62,7 @@ def get_field_value(qualification: QualificationInfo, port: PortInfo, field_name
         return ""
     if isinstance(value, bool):
         return "是" if value else "否"
-    if isinstance(value, date | datetime):
+    if isinstance(value, (date, datetime)):
         return value.isoformat()
     return str(value)
 
@@ -140,11 +80,8 @@ def generate_excel(
     field_name is the logical name (e.g. "cert_image").
     """
     qual_images = qual_images or {}
-    field_map = build_field_map()
-    img_field_names = {
-        "cert_image", "responsible_id_front", "responsible_id_back",
-        "handler_id_front", "handler_id_back", "auth_image",
-    }
+    fm = field_map()
+    img_field_names = {f.name for f in REGISTRY if f.source.startswith("image")}
     wb = Workbook()
     ws = wb.active
     ws.title = "报备导出"
@@ -159,7 +96,7 @@ def generate_excel(
     )
 
     sorted_fields = sorted(export_group.fields, key=lambda f: f.sort_order)
-    col_names = [f.field_name for f in sorted_fields if f.field_name in field_map]
+    col_names = [f.field_name for f in sorted_fields if f.field_name in fm]
 
     # Build column index for image fields
     img_col_map: dict[str, int] = {}
@@ -169,7 +106,7 @@ def generate_excel(
 
     # Write headers
     for col_idx, field_name in enumerate(col_names, 1):
-        cell = ws.cell(row=1, column=col_idx, value=field_map[field_name])
+        cell = ws.cell(row=1, column=col_idx, value=fm[field_name])
         cell.font = header_font
         cell.fill = header_fill
         cell.alignment = header_alignment
