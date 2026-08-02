@@ -52,3 +52,17 @@ def test_business_fields_source_is_qualification():
     """business_* 字段实际在 qualification_info 模型上，source 必须是 qualification"""
     for name in ("business_attribute", "business_type", "business_subtype", "specific_usage"):
         assert field_source(name) == "qualification", f"{name} 应来自 qualification"
+
+
+def test_port_enterprise_name_in_registry():
+    fm = field_map()
+    assert fm.get("port_enterprise_name") == "主端口备案公司"
+    source = field_source("port_enterprise_name")
+    assert source == "port"
+
+
+def test_qualification_enterprise_name_unchanged():
+    f = get_field("enterprise_name")
+    assert f is not None
+    assert f.label == "企业名称"
+    assert f.source == "qualification"

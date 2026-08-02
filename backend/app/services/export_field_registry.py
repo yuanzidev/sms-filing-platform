@@ -36,6 +36,7 @@ REGISTRY: list[ExportField] = [
     ExportField("blacklist_whitelist_type", "黑白名单类型", "port", "端口信息"),
     ExportField("audit_form", "端口审核表", "port", "端口信息"),
     ExportField("customer_type", "客户类型", "port", "端口信息"),
+    ExportField("port_enterprise_name", "主端口备案公司", "port", "端口信息"),
 
     # ── 业务信息（来源 qualification：这些字段实际在 qualification_info 模型上） ──
     ExportField("business_attribute", "业务属性", "qualification", "业务信息"),

@@ -53,8 +53,13 @@ def get_field_value(
         return ""
     if source in ("image_qualification", "image_port"):
         return "[图片]"
+    # 端口字段名 → 模型属性名 别名映射（如 port_enterprise_name → enterprise_name）
+    _PORT_ALIAS: dict[str, str] = {
+        "port_enterprise_name": "enterprise_name",
+    }
     if source == "port":
-        value = getattr(port, field_name, "")
+        attr = _PORT_ALIAS.get(field_name, field_name)
+        value = getattr(port, attr, "")
     elif source == "qualification":
         value = getattr(qualification, field_name, "")
     else:
