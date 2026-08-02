@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   getQualification,
@@ -207,17 +206,17 @@ export function QualificationDetailDialog({
         </div>
       </DialogContent>
 
-      {/* 图片全屏查看 — Portal 到 body 确保在弹窗之上 */}
-      {lightboxSrc && createPortal(
+      {/* 图片全屏查看 — 在 Dialog 内部渲染但 z-[9999] 高于 overlay */}
+      {lightboxSrc && (
         <div
           className='fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 cursor-pointer'
-          onClick={() => setLightboxSrc(null)}
+          onClick={(e) => { e.stopPropagation(); setLightboxSrc(null) }}
         >
           <Button
             variant='ghost'
             size='icon'
             className='absolute top-4 right-4 text-white hover:bg-white/20'
-            onClick={() => setLightboxSrc(null)}
+            onClick={(e) => { e.stopPropagation(); setLightboxSrc(null) }}
           >
             <XIcon className='h-6 w-6' />
           </Button>
@@ -227,8 +226,7 @@ export function QualificationDetailDialog({
             className='max-h-[90vh] max-w-[90vw] rounded object-contain'
             onClick={(e) => e.stopPropagation()}
           />
-        </div>,
-        document.body
+        </div>
       )}
     </Dialog>
   )
