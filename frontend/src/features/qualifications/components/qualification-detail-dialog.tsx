@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   getQualification,
@@ -13,7 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { XIcon } from 'lucide-react'
+import { XIcon, ZoomIn } from 'lucide-react'
 
 interface Props {
   open: boolean
@@ -57,6 +58,8 @@ export function QualificationDetailDialog({
     queryFn: () => getQualificationAttachments(qualification.id),
     enabled: open,
   })
+
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
 
   const d = detail ?? qualification
   const imageAttachments = attachments ?? []
@@ -171,11 +174,16 @@ export function QualificationDetailDialog({
                         {matched.length > 0 ? (
                           matched.map((a) => (
                             <div key={a.id} className='rounded border p-1'>
-                              <img
-                                src={getImageUrl(a.id)}
-                                alt={field.name}
-                                className='bg-muted h-32 w-full rounded object-contain'
-                              />
+                              <div className='relative group cursor-pointer' onClick={() => setLightboxSrc(getImageUrl(a.id))}>
+                                <img
+                                  src={getImageUrl(a.id)}
+                                  alt={field.name}
+                                  className='bg-muted h-32 w-full rounded object-contain'
+                                />
+                                <div className='absolute inset-0 flex items-center justify-center rounded bg-black/0 group-hover:bg-black/30 transition-colors'>
+                                  <ZoomIn className='h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
+                                </div>
+                              </div>
                               <div className='text-muted-foreground mt-1 text-xs'>
                                 {a.original_name} ({(a.file_size / 1024).toFixed(1)}KB)
                               </div>
@@ -197,6 +205,29 @@ export function QualificationDetailDialog({
           <Button variant='outline' onClick={() => onOpenChange(false)}>关闭</Button>
         </div>
       </DialogContent>
+
+      {/* 图片全屏查看 */}
+      {lightboxSrc && (
+        <div
+          className='fixed inset-0 z-50 flex items-center justify-center bg-black/80 cursor-pointer'
+          onClick={() => setLightboxSrc(null)}
+        >
+          <Button
+            variant='ghost'
+            size='icon'
+            className='absolute top-4 right-4 text-white hover:bg-white/20 z-10'
+            onClick={() => setLightboxSrc(null)}
+          >
+            <XIcon className='h-6 w-6' />
+          </Button>
+          <img
+            src={lightboxSrc}
+            alt='全屏查看'
+            className='max-h-[90vh] max-w-[90vw] rounded object-contain'
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </Dialog>
   )
 }

@@ -5,7 +5,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Form, HTTPException, Query, UploadFile
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
@@ -21,9 +21,9 @@ def upload_file(
     session: SessionDep,
     current_user: CurrentUser,
     file: UploadFile,
-    entity_type: str = "",
-    entity_id: str = "",
-    field_name: str = "",
+    entity_type: str = Form(""),
+    entity_id: str = Form(""),
+    field_name: str = Form(""),
 ) -> FileAttachmentPublic:
     """Upload a file/image. Returns file metadata."""
     if not file.filename:
