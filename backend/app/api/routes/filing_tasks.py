@@ -11,8 +11,6 @@ from sqlmodel import select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.storage import get_storage
-from app.services.operation_log import log_operation
-from app.services.export_field_registry import REGISTRY, field_map, field_source
 from app.crud.export_group import get_export_group
 from app.crud.filing_task import (
     create_filing_task as crud_create_filing_task,
@@ -33,6 +31,9 @@ from app.models import (
     QualificationInfo,
     User,
 )
+from app.services.export_field_registry import REGISTRY, field_map, field_source
+from app.services.operation_log import log_operation
+from app.services.sub_port_allocator import allocate_sub_ports
 
 router = APIRouter(prefix="/filing-tasks", tags=["filing-tasks"])
 
@@ -73,13 +74,19 @@ def generate_excel(
     export_group: ExportGroup,
     group_by_field: str | None = None,
     qual_images: dict[uuid.UUID, dict[str, bytes]] | None = None,
+    allocated_sub_ports: dict[tuple[uuid.UUID, str], str] | None = None,
+    auto_allocate_sub_ports: bool = False,
 ) -> io.BytesIO:
     """Generate Excel bytes from qualification+port Cartesian product.
 
     qual_images: {qual_id: {field_name: image_bytes}} for cell-embedded images.
     field_name is the logical name (e.g. "cert_image").
+
+    auto_allocate_sub_ports: 为 True 时只输出主端口行，子端口号取 allocated_sub_ports
+    中按 (qualification_id, main_port_number) 分配的结果。
     """
     qual_images = qual_images or {}
+    allocated_sub_ports = allocated_sub_ports or {}
     fm = field_map()
     img_field_names = {f.name for f in REGISTRY if f.source.startswith("image")}
     wb = Workbook()
@@ -112,23 +119,33 @@ def generate_excel(
         cell.alignment = header_alignment
         cell.border = thin_border
 
-    # Build rows: Cartesian product
-    rows: list[tuple[QualificationInfo, PortInfo]] = [
-        (q, p) for q in qualifications for p in ports
-    ]
+    # Build rows: Cartesian product (auto 模式下仅主端口行，附带分配的子端口号)
+    rows: list[tuple[QualificationInfo, PortInfo, str | None]]
+    if auto_allocate_sub_ports:
+        main_port_dict: dict[str, PortInfo] = {}
+        for p in ports:
+            if not p.sub_port_number and p.main_port_number not in main_port_dict:
+                main_port_dict[p.main_port_number] = p
+        rows = [
+            (q, main_port_dict[mpn], allocated_sub_ports.get((q.id, mpn), ""))
+            for q in qualifications
+            for mpn in main_port_dict
+        ]
+    else:
+        rows = [(q, p, None) for q in qualifications for p in ports]
 
     # Sort by group_by_field if specified
     if group_by_field:
-        rows.sort(key=lambda r: get_field_value(r[0], r[1], group_by_field))
+        rows.sort(key=lambda r: get_field_value(r[0], r[1], group_by_field, r[2]))
 
     # Write data rows, inserting blank separator between groups
     row_idx = 2
     prev_group_value: str | None = None
     cell_images: dict[str, bytes] = {}
 
-    for q, p in rows:
+    for q, p, allocated_sub in rows:
         if group_by_field:
-            current_value = get_field_value(q, p, group_by_field)
+            current_value = get_field_value(q, p, group_by_field, allocated_sub)
             if prev_group_value is not None and current_value != prev_group_value:
                 for col_idx in range(1, len(col_names) + 1):
                     cell = ws.cell(row=row_idx, column=col_idx, value="")
@@ -137,7 +154,7 @@ def generate_excel(
             prev_group_value = current_value
 
         for col_idx, field_name in enumerate(col_names, 1):
-            value = get_field_value(q, p, field_name)
+            value = get_field_value(q, p, field_name, allocated_sub)
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
             cell.border = thin_border
 
@@ -321,6 +338,41 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
     except Exception:
         pass  # Image loading failure should not block export
 
+    # 5.5 自动分配子端口号（可选）
+    allocated_sub_ports: dict[tuple[uuid.UUID, str], str] = {}
+    auto_allocate = create.auto_allocate_sub_ports
+
+    if auto_allocate:
+        try:
+            range_start = create.sub_port_range_start
+            range_end = create.sub_port_range_end
+            if not (range_start and range_end):
+                raise HTTPException(status_code=400, detail="自动分配子端口时必须提供范围")
+            if range_start > range_end:
+                raise HTTPException(status_code=400, detail="子端口范围起始必须 ≤ 结束")
+
+            main_ports = [p for p in selected_ports if not p.sub_port_number]
+            if not main_ports:
+                raise HTTPException(status_code=400, detail="未找到主端口行（sub_port_number 为空的端口记录）")
+            main_port_numbers = sorted({p.main_port_number for p in main_ports})
+
+            allocation = allocate_sub_ports(
+                session=session,
+                main_port_numbers=main_port_numbers,
+                range_start=range_start,
+                range_end=range_end,
+                qualifications=qualifications,
+                operator_id=current_user.id,
+                filing_task_id=task.id,
+            )
+            for mpn, pairs in allocation.items():
+                for qual, num in pairs:
+                    allocated_sub_ports[(qual.id, mpn)] = num
+        except HTTPException:
+            # 分配失败时清理已创建的报备任务记录
+            delete_filing_task(session=session, db_obj=task)
+            raise
+
     # 6. Generate Excel
     try:
         excel_bytes = generate_excel(
@@ -329,6 +381,8 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
             export_group=export_group,
             group_by_field=create.group_by_field,
             qual_images=qual_images,
+            allocated_sub_ports=allocated_sub_ports,
+            auto_allocate_sub_ports=auto_allocate,
         )
     except Exception as e:
         delete_filing_task(session=session, db_obj=task)

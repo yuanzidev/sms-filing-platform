@@ -36,6 +36,10 @@ class FilingTaskCreate(SQLModel):
     port_ids: list[uuid.UUID]
     export_group_id: uuid.UUID
     group_by_field: str | None = None
+    # 自动分配子端口号模式
+    auto_allocate_sub_ports: bool = False
+    sub_port_range_start: int | None = None
+    sub_port_range_end: int | None = None
 
 
 class FilingTaskPublic(SQLModel):
