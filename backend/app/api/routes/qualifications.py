@@ -163,6 +163,7 @@ def download_qualification_template() -> Any:
         "6. 系统会自动提取每行单元格内嵌的图片，并与对应字段关联",
         "7. 支持的图片格式：PNG、JPEG、GIF、BMP、WEBP，单张不超过 10MB",
         "8. 法人证件类型/号码/地址：选填；运营商报备强依赖时再填",
+        "9. 支持图片的列：单位证件图片、责任人身份证正面/反面、法人身份证正面/反面、签名举证附件、引流号码举证附件、引流链接举证、经办人现场照片；图片文件建议小于 10MB，支持 PNG、JPEG 格式",
     ]
     for i, note in enumerate(notes, 2):
         instructions.cell(row=i, column=1, value=note)

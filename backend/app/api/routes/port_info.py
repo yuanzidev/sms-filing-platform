@@ -113,6 +113,7 @@ def download_port_info_template() -> Any:
         "6. 系统会自动提取每行单元格内嵌的图片，并与对应字段关联",
         "7. 支持的图片格式：PNG、JPEG、GIF、BMP、WEBP，单张不超过 10MB",
         "8. 操作类型、集团编码：选填",
+        "9. 授权书图片列支持插入图片文件；导出时图片会嵌入 Excel 单元格",
     ]
     for i, note in enumerate(notes, 2):
         instructions.cell(row=i, column=1, value=note)
