@@ -6,6 +6,10 @@ export const getPortInfos = async (params?: {
   page_size?: number
   carrier?: string
   province?: string
+  keyword?: string
+  city?: string
+  port_type?: string
+  main_port_number?: string
 }): Promise<PortInfoListResponse> => {
   const response = await api.get('/api/v1/port-info', { params })
   return response.data

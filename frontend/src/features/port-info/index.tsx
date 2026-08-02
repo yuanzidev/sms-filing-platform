@@ -34,6 +34,7 @@ import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
+import { Input } from '@/components/ui/input'
 import { ActionIconButton } from '@/components/shared/action-icon-button'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { ImportDialog } from '@/components/shared/import-dialog'
@@ -63,13 +64,43 @@ export function PortInfoPage() {
     carrier?: string
     province?: string
   }>({})
+  const [keyword, setKeyword] = useState('')
+  const [cityFilter, setCityFilter] = useState('__all__')
+  const [portTypeFilter, setPortTypeFilter] = useState('__all__')
+  const [mainPortFilter, setMainPortFilter] = useState('')
   const queryClient = useQueryClient()
 
+  const filters = {
+    page,
+    page_size: PAGE_SIZE,
+    carrier: appliedFilters.carrier,
+    province: appliedFilters.province,
+    keyword: keyword || undefined,
+    city: cityFilter !== '__all__' ? cityFilter : undefined,
+    port_type: portTypeFilter !== '__all__' ? portTypeFilter : undefined,
+    main_port_number: mainPortFilter || undefined,
+  }
+
   const { data, isLoading } = useQuery({
-    queryKey: ['port-info', { page, page_size: PAGE_SIZE, ...appliedFilters }],
-    queryFn: () =>
-      getPortInfos({ page, page_size: PAGE_SIZE, ...appliedFilters }),
+    queryKey: ['port-info', filters],
+    queryFn: () => getPortInfos(filters),
   })
+
+  const cityOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of data?.data ?? []) {
+      if (p.city) set.add(p.city)
+    }
+    return Array.from(set).sort()
+  }, [data])
+
+  const portTypeOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of data?.data ?? []) {
+      if (p.port_type) set.add(p.port_type)
+    }
+    return Array.from(set).sort()
+  }, [data])
 
   const handleSearch = () => {
     setAppliedFilters({
@@ -82,6 +113,10 @@ export function PortInfoPage() {
   const handleReset = () => {
     setSearchInputs({ carrier: '', province: '' })
     setAppliedFilters({})
+    setKeyword('')
+    setCityFilter('__all__')
+    setPortTypeFilter('__all__')
+    setMainPortFilter('')
     setPage(1)
   }
 
@@ -300,6 +335,62 @@ export function PortInfoPage() {
                 {PROVINCES.map((p) => (
                   <SelectItem key={p} value={p}>
                     {p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>关键词</label>
+            <Input
+              placeholder='搜索端口号/企业名称'
+              value={keyword}
+              onChange={(e) => {
+                setKeyword(e.target.value)
+                setPage(1)
+              }}
+              className='w-48'
+            />
+          </div>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>城市</label>
+            <Select
+              value={cityFilter}
+              onValueChange={(v) => {
+                setCityFilter(v)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className='w-32'>
+                <SelectValue placeholder='城市' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='__all__'>全部城市</SelectItem>
+                {cityOptions.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>端口类型</label>
+            <Select
+              value={portTypeFilter}
+              onValueChange={(v) => {
+                setPortTypeFilter(v)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className='w-32'>
+                <SelectValue placeholder='端口类型' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='__all__'>全部类型</SelectItem>
+                {portTypeOptions.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
                   </SelectItem>
                 ))}
               </SelectContent>
