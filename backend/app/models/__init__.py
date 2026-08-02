@@ -39,6 +39,7 @@ from .filing_task import (
     FilingTaskPublic,
     FilingTasksPublic,
 )
+from .filing_sub_port_usage import FilingSubPortUsage
 from .login_log import (
     LoginLog,
     LoginLogBase,
@@ -154,6 +155,7 @@ __all__ = [
     "FilingTaskDetail",
     "FilingTaskPublic",
     "FilingTasksPublic",
+    "FilingSubPortUsage",
     "MainPort",
     "MainPortCreate",
     "MainPortPublic",
