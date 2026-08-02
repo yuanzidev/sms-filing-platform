@@ -31,6 +31,12 @@ from .filing_task import (
     get_filing_task,
     list_filing_tasks,
 )
+from .filing_sub_port_usage import (
+    bulk_create_usages,
+    count_used_in_range,
+    get_used_numbers,
+    list_usages_by_task,
+)
 from .port import (
     create_main_port,
     create_sub_port,
@@ -125,6 +131,10 @@ __all__ = [
     "get_filing_task",
     "list_filing_tasks",
     "delete_filing_task",
+    "bulk_create_usages",
+    "count_used_in_range",
+    "get_used_numbers",
+    "list_usages_by_task",
     "get_stats",
     "get_trends",
     "get_carrier_distribution",
