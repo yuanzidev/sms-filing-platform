@@ -12,6 +12,7 @@ from sqlmodel import select
 from app.api.deps import CurrentUser, SessionDep
 from app.core.storage import get_storage
 from app.crud.export_group import get_export_group
+from app.crud.filing_sub_port_usage import delete_usages_by_task
 from app.crud.filing_task import (
     create_filing_task as crud_create_filing_task,
 )
@@ -33,7 +34,7 @@ from app.models import (
 )
 from app.services.export_field_registry import REGISTRY, field_map, field_source
 from app.services.operation_log import log_operation
-from app.services.sub_port_allocator import allocate_sub_ports
+from app.services.sub_port_allocator import MAX_RANGE_SIZE, allocate_sub_ports
 
 router = APIRouter(prefix="/filing-tasks", tags=["filing-tasks"])
 
@@ -374,6 +375,11 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
                 raise HTTPException(status_code=400, detail="自动分配子端口时必须提供范围")
             if range_start > range_end:
                 raise HTTPException(status_code=400, detail="子端口范围起始必须 ≤ 结束")
+            if range_end - range_start + 1 > MAX_RANGE_SIZE:
+                raise HTTPException(status_code=400, detail="子端口范围过大（最多 100 万个号码）")
+            # 固定 6 位格式（与默认值 100001 及规范一致），防止不同位数范围产生重复号码
+            if not (100000 <= range_start <= 999999 and 100000 <= range_end <= 999999):
+                raise HTTPException(status_code=400, detail="子端口范围必须是6位数字（100000-999999）")
 
             main_ports = [p for p in selected_ports if not p.sub_port_number]
             if not main_ports:
@@ -409,6 +415,8 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
             auto_allocate_sub_ports=auto_allocate,
         )
     except Exception as e:
+        # 任务失败未产出文件：释放本任务已分配的子端口占用，避免永久烧号
+        delete_usages_by_task(session=session, filing_task_id=task.id)
         delete_filing_task(session=session, db_obj=task)
         raise HTTPException(status_code=500, detail=f"生成Excel失败: {e}")
 
@@ -420,6 +428,8 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
         storage = get_storage()
         storage.upload(key=file_key, data=file_data, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     except Exception as e:
+        # 任务失败未产出文件：释放本任务已分配的子端口占用，避免永久烧号
+        delete_usages_by_task(session=session, filing_task_id=task.id)
         delete_filing_task(session=session, db_obj=task)
         raise HTTPException(status_code=500, detail=f"文件上传失败: {e}")
 

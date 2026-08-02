@@ -3,6 +3,7 @@ import uuid
 from typing import Generator
 
 import pytest
+from fastapi import HTTPException
 from sqlmodel import Session, delete
 
 from app.core.db import engine
@@ -13,6 +14,7 @@ from app.models import (
     User,
 )
 from app.services.sub_port_allocator import (
+    MAX_RANGE_SIZE,
     SubPortConflict,
     SubPortRangeExhausted,
     allocate_sub_ports,
@@ -25,7 +27,9 @@ def _cleanup() -> Generator[None, None, None]:
     with Session(engine) as session:
         session.execute(delete(FilingSubPortUsage))
         session.execute(delete(QualificationInfo))
-        session.execute(delete(User))
+        # 只清理本测试创建的 user（_make_user 的 email 前缀），
+        # 避免误删 session 级 superuser 导致其他测试模块登录失败
+        session.execute(delete(User).where(User.email.like("alloc-test-%")))
         session.commit()
 
 
@@ -139,6 +143,50 @@ def test_allocate_range_exhausted():
             )
         assert exc_info.value.status_code == 409
         assert "10698Y" in exc_info.value.detail
+
+
+def test_allocate_range_too_large():
+    """范围超过 100 万 → 400，不进入分配"""
+    quals = [_make_qual("企业A")]
+    with Session(engine) as session:
+        session.add(quals[0])
+        session.commit()
+        session.refresh(quals[0])
+
+        with pytest.raises(HTTPException) as exc:
+            allocate_sub_ports(
+                session=session,
+                main_port_numbers=["10698BIG"],
+                range_start=1,
+                range_end=MAX_RANGE_SIZE + 1,
+                qualifications=quals,
+                operator_id=uuid.uuid4(),
+                filing_task_id=uuid.uuid4(),
+            )
+        assert exc.value.status_code == 400
+        assert "范围过大" in exc.value.detail
+
+
+def test_allocate_six_digit_padding():
+    """短数字范围（如 1-2）也输出固定 6 位补零格式，避免跨宽度重复"""
+    quals = [_make_qual("企业A")]
+    with Session(engine) as session:
+        session.add(quals[0])
+        user = _make_user(session)
+        session.commit()
+        session.refresh(quals[0])
+
+        result = allocate_sub_ports(
+            session=session,
+            main_port_numbers=["10698PAD"],
+            range_start=1,
+            range_end=2,
+            qualifications=quals,
+            operator_id=user.id,
+            filing_task_id=None,
+        )
+        num = result["10698PAD"][0][1]
+        assert num in {"000001", "000002"}
 
 
 def test_allocate_concurrent_safety():

@@ -34,6 +34,7 @@ from .filing_task import (
 from .filing_sub_port_usage import (
     bulk_create_usages,
     count_used_in_range,
+    delete_usages_by_task,
     get_used_numbers,
     list_usages_by_task,
 )
@@ -133,6 +134,7 @@ __all__ = [
     "delete_filing_task",
     "bulk_create_usages",
     "count_used_in_range",
+    "delete_usages_by_task",
     "get_used_numbers",
     "list_usages_by_task",
     "get_stats",

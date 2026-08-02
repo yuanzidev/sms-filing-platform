@@ -198,6 +198,116 @@ def test_create_filing_task_range_exhausted_409(
     assert "10698EXH" in r.json()["detail"]
 
 
+def test_auto_sub_ports_range_too_large_rejected(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """范围超过 100 万 → 400"""
+    qual_id = _create_qualification(client, superuser_token_headers, "范围过大企业")
+    port_id = _create_port(client, superuser_token_headers, "10698TOOBIG")
+    group_id = _create_export_group_all_fields(client, superuser_token_headers, "范围过大组")
+
+    r = client.post(
+        f"{settings.API_V1_STR}/filing-tasks",
+        headers=superuser_token_headers,
+        json={
+            "qualification_ids": [qual_id],
+            "port_ids": [port_id],
+            "export_group_id": group_id,
+            "auto_allocate_sub_ports": True,
+            "sub_port_range_start": 100000,
+            "sub_port_range_end": 2000000,
+        },
+    )
+    assert r.status_code == 400
+    assert "范围过大" in r.json()["detail"]
+
+
+def test_auto_sub_ports_non_6digit_rejected(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """范围不是 6 位数字 → 400"""
+    qual_id = _create_qualification(client, superuser_token_headers, "非6位企业")
+    port_id = _create_port(client, superuser_token_headers, "10698NOT6")
+    group_id = _create_export_group_all_fields(client, superuser_token_headers, "非6位组")
+
+    r = client.post(
+        f"{settings.API_V1_STR}/filing-tasks",
+        headers=superuser_token_headers,
+        json={
+            "qualification_ids": [qual_id],
+            "port_ids": [port_id],
+            "export_group_id": group_id,
+            "auto_allocate_sub_ports": True,
+            "sub_port_range_start": 10,
+            "sub_port_range_end": 99,
+        },
+    )
+    assert r.status_code == 400
+    assert "6位" in r.json()["detail"]
+
+
+def test_failed_upload_releases_sub_ports(
+    client: TestClient, superuser_token_headers: dict[str, str], monkeypatch
+) -> None:
+    """文件上传失败时，已分配的子端口占用被释放，不残留"""
+    from sqlmodel import select
+
+    from app.core.db import engine
+    from app.models import FilingSubPortUsage
+
+    qual_id = _create_qualification(client, superuser_token_headers, "上传失败企业")
+    port_id = _create_port(client, superuser_token_headers, "10698UPLFAIL")
+
+    r = client.post(
+        f"{settings.API_V1_STR}/export-groups",
+        headers=superuser_token_headers,
+        json={
+            "name": "上传失败组",
+            "fields": [
+                {"field_name": "main_port_number", "field_label": "主端口号", "sort_order": 1},
+                {"field_name": "sub_port_number", "field_label": "子端口号", "sort_order": 2},
+            ],
+        },
+    )
+    group_id = r.json()["id"]
+
+    from app.api.routes import filing_tasks
+
+    class _FailingStorage:
+        def download(self, path):
+            raise RuntimeError("storage down")
+
+        def upload(self, key, data, content_type):
+            raise RuntimeError("storage down")
+
+        def delete(self, path):
+            pass
+
+    monkeypatch.setattr(filing_tasks, "get_storage", lambda: _FailingStorage())
+
+    r = client.post(
+        f"{settings.API_V1_STR}/filing-tasks",
+        headers=superuser_token_headers,
+        json={
+            "qualification_ids": [qual_id],
+            "port_ids": [port_id],
+            "export_group_id": group_id,
+            "auto_allocate_sub_ports": True,
+            "sub_port_range_start": 600001,
+            "sub_port_range_end": 600100,
+        },
+    )
+    assert r.status_code == 500
+
+    # 失败路径不残留占用记录
+    with Session(engine) as session:
+        stmt = select(FilingSubPortUsage).where(
+            FilingSubPortUsage.main_port_number == "10698UPLFAIL"
+        )
+        usages = list(session.exec(stmt).all())
+        assert len(usages) == 0
+
+
 def test_delete_filing_task_keeps_usage(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:

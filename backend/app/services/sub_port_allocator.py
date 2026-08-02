@@ -13,6 +13,13 @@ from app.models import QualificationInfo
 
 MAX_RETRY = 3
 
+# 子端口号统一固定 6 位补零格式（与默认值 100001 及规范示例一致），
+# 避免同一主端口先后使用不同位数范围时产生重复号码。
+WIDTH = 6
+
+# 范围大小上限：超过即拒绝，防止超大范围在内存中构造号码集合导致 OOM。
+MAX_RANGE_SIZE = 1_000_000
+
 
 class SubPortRangeExhausted(HTTPException):
     def __init__(
@@ -59,6 +66,11 @@ def allocate_sub_ports(
         return {}
 
     range_size = range_end - range_start + 1
+    if range_size > MAX_RANGE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail="子端口范围过大（最多 100 万个号码）",
+        )
     if range_size < need_per_main:
         raise SubPortRangeExhausted(
             main_port_numbers[0],
@@ -68,8 +80,6 @@ def allocate_sub_ports(
             range_end,
         )
 
-    width = len(str(range_end))
-
     for attempt in range(MAX_RETRY):
         try:
             result: dict[str, list[tuple[QualificationInfo, str]]] = {}
@@ -77,7 +87,7 @@ def allocate_sub_ports(
             for mpn in main_port_numbers:
                 used = get_used_numbers(session, mpn)
                 all_in_range = {
-                    str(n).zfill(width)
+                    str(n).zfill(WIDTH)
                     for n in range(range_start, range_end + 1)
                 }
                 available = list(all_in_range - used)

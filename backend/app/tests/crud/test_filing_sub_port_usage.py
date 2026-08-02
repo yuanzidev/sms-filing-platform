@@ -73,6 +73,21 @@ def test_count_used_in_range():
         assert count_used_in_range(session, "10698Z", 100000, 100005) == 2
 
 
+def test_count_used_in_range_six_digit_padding():
+    """占用按固定 6 位格式匹配：短数字范围也能命中 6 位补零的占用记录"""
+    with Session(engine) as session:
+        user = _make_user(session)
+        bulk_create_usages(session, [
+            _make_record("10698PAD", "000123", user.id),
+            _make_record("10698PAD", "000456", user.id),
+        ])
+        session.commit()
+        # 范围 123-456（非 6 位输入）按 6 位补零匹配
+        assert count_used_in_range(session, "10698PAD", 123, 456) == 2
+        # 范围 100000-200000 不含上述占用
+        assert count_used_in_range(session, "10698PAD", 100000, 200000) == 0
+
+
 def test_list_usages_by_task():
     with Session(engine) as session:
         user = _make_user(session)
