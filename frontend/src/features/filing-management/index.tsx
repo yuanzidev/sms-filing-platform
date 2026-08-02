@@ -230,7 +230,7 @@ export function FilingManagementPage() {
               <SearchIcon className='text-muted-foreground pointer-events-none absolute top-2.5 left-2.5 h-4 w-4' />
               <Input
                 type='text'
-                placeholder='搜索任务名称'
+                placeholder='搜索任务名称、操作人、字段组'
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 className='w-48 pl-8'

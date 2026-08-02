@@ -98,6 +98,7 @@ export function FilingCreatePage() {
   // Step 4 state (configure export)
   const [exportGroupId, setExportGroupId] = useState<string>('')
   const [groupByField, setGroupByField] = useState<string>('__none__')
+  const [taskName, setTaskName] = useState('')
 
   // Fetch qualifications
   const { data: qualData } = useQuery({
@@ -289,6 +290,7 @@ export function FilingCreatePage() {
         port_ids: selectedPortIdList,
         export_group_id: exportGroupId,
         group_by_field: groupByField === '__none__' ? undefined : (groupByField || undefined),
+        task_name: taskName.trim() || undefined,
         auto_allocate_sub_ports: true,
         sub_port_range_start: Number(subPortRangeStart),
         sub_port_range_end: Number(subPortRangeEnd),
@@ -615,6 +617,16 @@ export function FilingCreatePage() {
             </div>
 
             <div className="space-y-2">
+              <label className="text-sm font-medium">任务名称（可选）</label>
+              <Input
+                placeholder="留空则自动生成"
+                value={taskName}
+                onChange={(e) => setTaskName(e.target.value)}
+                className="w-full max-w-sm"
+              />
+            </div>
+
+            <div className="space-y-2">
               <label className="text-sm font-medium">分组排序字段（可选）</label>
               <Select value={groupByField} onValueChange={setGroupByField} disabled={!exportGroupId}>
                 <SelectTrigger className="w-full max-w-sm">
@@ -666,6 +678,10 @@ export function FilingCreatePage() {
               <div>
                 <span className="text-sm text-muted-foreground">分组字段</span>
                 <p className="text-lg font-medium">{groupByField && groupByField !== '__none__' ? getFieldLabel(groupByField) : '无'}</p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">任务名称</span>
+                <p className="text-lg font-medium">{taskName || '（自动生成）'}</p>
               </div>
               <div className="col-span-2">
                 <span className="text-sm text-muted-foreground">预计行数（资质 × 端口）</span>
