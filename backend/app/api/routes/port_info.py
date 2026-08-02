@@ -40,7 +40,7 @@ router = APIRouter(
 _PORT_HEADERS = [
     "运营商",
     "主端口号",
-    "企业名称",
+    "主端口备案公司",
     "子端口号",
     "码号使用范围",
     "接入省",
@@ -160,7 +160,7 @@ def import_port_infos(
     header_to_field = {
         "运营商": "carrier",
         "主端口号": "main_port_number",
-        "企业名称": "enterprise_name",
+        "主端口备案公司": "enterprise_name",
         "子端口号": "sub_port_number",
         "码号使用范围": "port_range",
         "接入省": "province",

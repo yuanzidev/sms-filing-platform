@@ -91,7 +91,7 @@ export function PortInfoDetailDialog({
               <Section title='基础信息'>
                 <FieldRow label='运营商' value={d.carrier} />
                 <FieldRow label='主端口号' value={d.main_port_number} />
-                <FieldRow label='企业名称' value={d.enterprise_name} />
+                <FieldRow label='主端口备案公司' value={d.enterprise_name} />
                 <FieldRow label='子端口号' value={d.sub_port_number} />
                 <FieldRow label='端口范围' value={d.port_range} />
                 <FieldRow label='端口类型' value={d.port_type} />

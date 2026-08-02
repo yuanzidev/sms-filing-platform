@@ -40,7 +40,7 @@ def test_import_port_info_with_empty_operation_and_group(
     wb = Workbook()
     ws = wb.active
     headers = [
-        "运营商", "主端口号", "企业名称", "端口类型",
+        "运营商", "主端口号", "主端口备案公司", "端口类型",
         "运营商接入机房及设备", "企业接入机房及设备", "授权书",
     ]
     for col_idx, h in enumerate(headers, 1):

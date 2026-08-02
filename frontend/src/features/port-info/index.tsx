@@ -343,7 +343,7 @@ export function PortInfoPage() {
           <div className='flex flex-col gap-1'>
             <label className='text-muted-foreground text-sm'>关键词</label>
             <Input
-              placeholder='搜索端口号/企业名称'
+              placeholder='搜索端口号/主端口备案公司'
               value={keyword}
               onChange={(e) => {
                 setKeyword(e.target.value)

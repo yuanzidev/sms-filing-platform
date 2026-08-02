@@ -31,7 +31,7 @@ import type { PortInfo } from '@/lib/api/types'
 const formSchema = z.object({
   carrier: z.string().min(1, '运营商不能为空'),
   main_port_number: z.string().min(1, '主端口号不能为空'),
-  enterprise_name: z.string().min(1, '企业名称不能为空'),
+  enterprise_name: z.string().min(1, '主端口备案公司不能为空'),
   sub_port_number: z.string().optional(),
   port_range: z.string().optional(),
   province: z.string().optional(),
@@ -190,9 +190,9 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 name="enterprise_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>企业名称 *</FormLabel>
+                    <FormLabel>主端口备案公司 *</FormLabel>
                     <FormControl>
-                      <Input placeholder="企业名称" {...field} />
+                      <Input placeholder="主端口备案公司" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
