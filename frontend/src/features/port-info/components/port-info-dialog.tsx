@@ -37,7 +37,7 @@ const formSchema = z.object({
   province: z.string().optional(),
   city: z.string().optional(),
   port_type: z.string().min(1, '端口类型不能为空'),
-  operation_type: z.string().min(1, '操作类型不能为空'),
+  operation_type: z.string().optional(),
   port_activation_date: z.string().optional(),
   allow_self_extension: z.boolean().optional(),
   carrier_room: z.string().min(1, '运营商接入机房及设备不能为空'),
@@ -46,7 +46,7 @@ const formSchema = z.object({
   authorization_letter: z.string().min(1, '授权书不能为空'),
   auth_start_date: z.string().optional(),
   auth_end_date: z.string().optional(),
-  group_code: z.string().min(1, '集团编码不能为空'),
+  group_code: z.string().optional(),
   region: z.string().optional(),
   other_room_description: z.string().optional(),
   is_green_channel: z.boolean().optional(),
@@ -203,7 +203,7 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 name="operation_type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>操作类型 *</FormLabel>
+                    <FormLabel>操作类型</FormLabel>
                     <FormControl>
                       <Input placeholder="操作类型" {...field} />
                     </FormControl>
@@ -271,7 +271,7 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 name="group_code"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>集团编码 *</FormLabel>
+                    <FormLabel>集团编码</FormLabel>
                     <FormControl>
                       <Input placeholder="集团编码" {...field} value={field.value || ''} />
                     </FormControl>

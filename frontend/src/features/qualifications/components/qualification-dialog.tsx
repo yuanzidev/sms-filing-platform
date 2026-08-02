@@ -78,9 +78,9 @@ const formSchema = z.object({
   cert_number: z.string().optional(),
   app_platform_name: z.string().optional(),
   legal_representative_name: z.string().optional(),
-  legal_representative_cert_type: z.string().min(1, '法人证件类型不能为空'),
-  legal_representative_cert_number: z.string().min(1, '法人证件号码不能为空'),
-  legal_representative_cert_address: z.string().min(1, '法人证件地址不能为空'),
+  legal_representative_cert_type: z.string().optional(),
+  legal_representative_cert_number: z.string().optional(),
+  legal_representative_cert_address: z.string().optional(),
   responsible_name: z.string().optional(),
   responsible_cert_type: z.string().optional(),
   responsible_cert_number: z.string().optional(),
@@ -495,7 +495,7 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
                   name="legal_representative_cert_type"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>法人证件类型 *</FormLabel>
+                      <FormLabel>法人证件类型</FormLabel>
                       <FormControl>
                         <Input placeholder="如: 身份证" {...field} />
                       </FormControl>
@@ -508,7 +508,7 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
                   name="legal_representative_cert_number"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>法人证件号码 *</FormLabel>
+                      <FormLabel>法人证件号码</FormLabel>
                       <FormControl>
                         <Input placeholder="法人证件号码" {...field} />
                       </FormControl>
@@ -521,7 +521,7 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
                   name="legal_representative_cert_address"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>法人证件地址 *</FormLabel>
+                      <FormLabel>法人证件地址</FormLabel>
                       <FormControl>
                         <Input placeholder="法人证件地址" {...field} />
                       </FormControl>
