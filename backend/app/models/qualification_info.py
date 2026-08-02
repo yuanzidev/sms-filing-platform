@@ -16,9 +16,9 @@ class QualificationInfoBase(SQLModel):
 
     # 法人
     legal_representative_name: str | None = Field(default=None, max_length=100)
-    legal_representative_cert_type: str = Field(max_length=50)
-    legal_representative_cert_number: str = Field(max_length=100)
-    legal_representative_cert_address: str = Field(max_length=500)
+    legal_representative_cert_type: str | None = Field(default=None, max_length=50)
+    legal_representative_cert_number: str | None = Field(default=None, max_length=100)
+    legal_representative_cert_address: str | None = Field(default=None, max_length=500)
 
     # 责任人
     responsible_name: str | None = Field(default=None, max_length=100)
