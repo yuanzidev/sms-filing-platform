@@ -112,6 +112,7 @@ def download_port_info_template() -> Any:
         "5. 也可将图片直接拖入到图片列的单元格中",
         "6. 系统会自动提取每行单元格内嵌的图片，并与对应字段关联",
         "7. 支持的图片格式：PNG、JPEG、GIF、BMP、WEBP，单张不超过 10MB",
+        "8. 操作类型、集团编码：选填",
     ]
     for i, note in enumerate(notes, 2):
         instructions.cell(row=i, column=1, value=note)
@@ -188,7 +189,7 @@ def import_port_infos(
         if h in header_to_field:
             col_map[header_to_field[h]] = col_idx
 
-    required_fields = ["carrier", "main_port_number", "enterprise_name", "port_type", "operation_type", "carrier_room", "enterprise_room", "authorization_letter", "group_code"]
+    required_fields = ["carrier", "main_port_number", "enterprise_name", "port_type", "carrier_room", "enterprise_room", "authorization_letter"]
     missing = [h for h, f in header_to_field.items() if f in required_fields and f not in col_map]
     if missing:
         raise HTTPException(
@@ -259,10 +260,6 @@ def import_port_infos(
         if not port_type:
             raise HTTPException(status_code=400, detail=f"第{row_idx}行: 端口类型不能为空")
 
-        operation_type = cell("operation_type")
-        if not operation_type:
-            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 操作类型不能为空")
-
         carrier_room = cell("carrier_room")
         if not carrier_room:
             raise HTTPException(status_code=400, detail=f"第{row_idx}行: 运营商接入机房及设备不能为空")
@@ -275,10 +272,6 @@ def import_port_infos(
         if not authorization_letter:
             raise HTTPException(status_code=400, detail=f"第{row_idx}行: 授权书不能为空")
 
-        group_code = cell("group_code")
-        if not group_code:
-            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 集团编码不能为空")
-
         objects.append(PortInfo(
             carrier=carrier,
             main_port_number=main_port_number,
@@ -288,7 +281,7 @@ def import_port_infos(
             province=cell("province"),
             city=cell("city"),
             port_type=port_type,
-            operation_type=operation_type,
+            operation_type=cell("operation_type"),
             port_activation_date=parse_date("port_activation_date"),
             allow_self_extension=parse_bool("allow_self_extension"),
             carrier_room=carrier_room,
@@ -297,7 +290,7 @@ def import_port_infos(
             authorization_letter=authorization_letter,
             auth_start_date=parse_date("auth_start_date"),
             auth_end_date=parse_date("auth_end_date"),
-            group_code=group_code,
+            group_code=cell("group_code"),
             region=cell("region"),
             other_room_description=cell("other_room_description"),
             is_green_channel=parse_bool("is_green_channel"),
