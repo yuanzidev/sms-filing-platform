@@ -205,3 +205,20 @@ def test_qualification_template_notes_mention_optional_legal(
     assert "法人证件类型" in all_text
     assert "选填" in all_text
 
+
+def test_template_signature_example_has_no_brackets(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    from io import BytesIO
+    from openpyxl import load_workbook
+
+    r = client.get(
+        f"{settings.API_V1_STR}/qualifications/template",
+        headers=superuser_token_headers,
+    )
+    wb = load_workbook(BytesIO(r.content))
+    ws = wb.active
+    sig_cell = ws.cell(row=2, column=10).value  # 短信签名列
+    assert "【" not in str(sig_cell)
+    assert "】" not in str(sig_cell)
+
