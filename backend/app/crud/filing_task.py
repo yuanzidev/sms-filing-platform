@@ -2,9 +2,12 @@
 import uuid
 from datetime import date, datetime
 
+from sqlalchemy import or_
 from sqlmodel import Session, func, select
 
+from app.models.export_group import ExportGroup
 from app.models.filing_task import FilingTask, FilingTaskCreate
+from app.models.user import User
 
 
 def _task_name_sequence(session: Session) -> int:
@@ -54,7 +57,11 @@ def list_filing_tasks(
     end_date: date | None = None,
     keyword: str | None = None,
 ) -> tuple[list[FilingTask], int]:
-    query = select(FilingTask)
+    query = (
+        select(FilingTask)
+        .join(User, FilingTask.operator_id == User.id)
+        .join(ExportGroup, FilingTask.export_group_id == ExportGroup.id)
+    )
 
     if start_date:
         start_dt = datetime.combine(start_date, datetime.min.time())
@@ -63,7 +70,14 @@ def list_filing_tasks(
         end_dt = datetime.combine(end_date, datetime.max.time())
         query = query.where(FilingTask.created_at <= end_dt)
     if keyword:
-        query = query.where(FilingTask.task_name.contains(keyword))
+        query = query.where(
+            or_(
+                FilingTask.task_name.contains(keyword),
+                User.full_name.contains(keyword),
+                User.username.contains(keyword),
+                ExportGroup.name.contains(keyword),
+            )
+        )
 
     count = session.exec(select(func.count()).select_from(query.subquery())).one()
     results = session.exec(

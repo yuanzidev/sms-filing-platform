@@ -77,6 +77,21 @@ def _create_export_group_all_fields(client, headers, name):
     return r.json()["id"]
 
 
+def _create_export_group(client, headers, name):
+    r = client.post(
+        f"{settings.API_V1_STR}/export-groups",
+        headers=headers,
+        json={
+            "name": name,
+            "fields": [
+                {"field_name": "main_port_number", "field_label": "主端口号", "sort_order": 1},
+            ],
+        },
+    )
+    assert r.status_code == 200, r.text
+    return r.json()["id"]
+
+
 def test_export_includes_all_registry_fields(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
@@ -413,3 +428,53 @@ def test_sub_port_availability(
     assert info["used"] == 2
     assert info["available"] == 8
     assert info["available"] + info["used"] == info["total"]
+
+
+def test_search_filing_tasks_by_operator_name(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """关键词应匹配操作人姓名"""
+    qual_id = _create_qualification(client, superuser_token_headers, "搜索企业")
+    port_id = _create_port(client, superuser_token_headers, "10698SCH")
+    group_id = _create_export_group(client, superuser_token_headers, "搜索字段组")
+
+    r = client.post(
+        f"{settings.API_V1_STR}/filing-tasks",
+        headers=superuser_token_headers,
+        json={
+            "qualification_ids": [qual_id],
+            "port_ids": [port_id],
+            "export_group_id": group_id,
+        },
+    )
+    assert r.status_code == 200
+
+    # 用操作人（admin用户）的部分名称搜索
+    r = client.get(
+        f"{settings.API_V1_STR}/filing-tasks",
+        headers=superuser_token_headers,
+        params={"keyword": "admin"},
+    )
+    assert r.status_code == 200
+    assert r.json()["total"] >= 1
+
+
+def test_create_filing_task_with_custom_name(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    qual_id = _create_qualification(client, superuser_token_headers, "自定义名企业")
+    port_id = _create_port(client, superuser_token_headers, "10698CSTM")
+    group_id = _create_export_group(client, superuser_token_headers, "自定义名组")
+
+    r = client.post(
+        f"{settings.API_V1_STR}/filing-tasks",
+        headers=superuser_token_headers,
+        json={
+            "qualification_ids": [qual_id],
+            "port_ids": [port_id],
+            "export_group_id": group_id,
+            "task_name": "我的自定义任务名",
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["task_name"] == "我的自定义任务名"
