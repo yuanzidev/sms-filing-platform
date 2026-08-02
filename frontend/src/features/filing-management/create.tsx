@@ -23,13 +23,14 @@ import {
 import { getQualifications } from '@/lib/api/qualifications'
 import { getExportGroups } from '@/lib/api/export-groups'
 import { getPortInfos } from '@/lib/api/port-info'
+import { getSubPortAvailability } from '@/lib/api/filing-sub-port-availability'
 import { useCreateFilingTask } from '@/hooks/use-filing-tasks'
 import type { QualificationInfo, ExportGroup, PortInfo } from '@/lib/api/types'
 import { toast } from 'sonner'
 import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Loader2, Upload } from 'lucide-react'
 import { SignatureImportDialog } from './components/signature-import-dialog'
 
-type Step = 1 | 2 | 3 | 4
+type Step = 1 | 2 | 3 | 4 | 5
 
 const FIELD_LABEL_MAP: Record<string, string> = {
   carrier: '运营商',
@@ -90,7 +91,11 @@ export function FilingCreatePage() {
   const [selectedPortIds, setSelectedPortIds] = useState<Record<string, boolean>>({})
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
 
-  // Step 3 state (configure export)
+  // Step 3 state (configure sub-port range)
+  const [subPortRangeStart, setSubPortRangeStart] = useState('100001')
+  const [subPortRangeEnd, setSubPortRangeEnd] = useState('199999')
+
+  // Step 4 state (configure export)
   const [exportGroupId, setExportGroupId] = useState<string>('')
   const [groupByField, setGroupByField] = useState<string>('__none__')
 
@@ -163,10 +168,16 @@ export function FilingCreatePage() {
     { accessorKey: 'handler_name', header: '经办人', cell: ({ getValue }) => getValue() || '-' },
   ], [])
 
-  // Group ports by main_port_number
+  // Step 2 only selects main ports (sub_port_number is null)
+  const portsForSelection = useMemo(
+    () => allPorts.filter((p) => !p.sub_port_number),
+    [allPorts]
+  )
+
+  // Group main ports by main_port_number
   const portGroups = useMemo(() => {
     const groups: Record<string, PortInfo[]> = {}
-    for (const p of allPorts) {
+    for (const p of portsForSelection) {
       const key = p.main_port_number
       if (!groups[key]) groups[key] = []
       groups[key].push(p)
@@ -182,13 +193,13 @@ export function FilingCreatePage() {
       })
     }
     return groups
-  }, [allPorts])
+  }, [portsForSelection])
 
   const carrierOptions = useMemo(() => {
     const set = new Set<string>()
-    for (const p of allPorts) set.add(p.carrier)
+    for (const p of portsForSelection) set.add(p.carrier)
     return Array.from(set).sort()
-  }, [allPorts])
+  }, [portsForSelection])
 
   const filteredGroups = useMemo(() => {
     const result: Record<string, PortInfo[]> = {}
@@ -278,6 +289,9 @@ export function FilingCreatePage() {
         port_ids: selectedPortIdList,
         export_group_id: exportGroupId,
         group_by_field: groupByField === '__none__' ? undefined : (groupByField || undefined),
+        auto_allocate_sub_ports: true,
+        sub_port_range_start: Number(subPortRangeStart),
+        sub_port_range_end: Number(subPortRangeEnd),
       },
       {
         onSuccess: (task) => {
@@ -325,7 +339,7 @@ export function FilingCreatePage() {
         <div className="space-y-6">
           {/* Step indicator */}
           <div className="flex items-center gap-2">
-            {([1, 2, 3, 4] as Step[]).map((s, i) => (
+            {([1, 2, 3, 4, 5] as Step[]).map((s, i) => (
               <div key={s} className="flex items-center gap-2">
                 <div
                   className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
@@ -335,9 +349,9 @@ export function FilingCreatePage() {
                   {step > s ? '✓' : s}
                 </div>
                 <span className={`text-sm ${step >= s ? 'font-medium' : 'text-muted-foreground'}`}>
-                  {s === 1 ? '选择资质' : s === 2 ? '选择端口' : s === 3 ? '配置导出' : '确认生成'}
+                  {s === 1 ? '选择资质' : s === 2 ? '选择主端口' : s === 3 ? '子端口范围' : s === 4 ? '配置导出' : '确认生成'}
                 </span>
-                {i < 3 && <div className="mx-2 h-px w-8 bg-border" />}
+                {i < 4 && <div className="mx-2 h-px w-8 bg-border" />}
               </div>
             ))}
           </div>
@@ -392,11 +406,11 @@ export function FilingCreatePage() {
         </Card>
       )}
 
-      {/* Step 2: Select ports */}
+      {/* Step 2: Select main ports */}
       {step === 2 && (
         <Card>
           <CardHeader>
-            <CardTitle>选择端口</CardTitle>
+            <CardTitle>选择主端口</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
@@ -509,8 +523,70 @@ export function FilingCreatePage() {
         </Card>
       )}
 
-      {/* Step 3: Configure export */}
+      {/* Step 3: Configure sub-port range */}
       {step === 3 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>配置子端口范围</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-end gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm text-muted-foreground">起始号码</label>
+                <Input
+                  value={subPortRangeStart}
+                  onChange={(e) => setSubPortRangeStart(e.target.value)}
+                  className="w-40"
+                  placeholder="100001"
+                />
+              </div>
+              <span className="pb-2 text-muted-foreground">-</span>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm text-muted-foreground">结束号码</label>
+                <Input
+                  value={subPortRangeEnd}
+                  onChange={(e) => setSubPortRangeEnd(e.target.value)}
+                  className="w-40"
+                  placeholder="199999"
+                />
+              </div>
+            </div>
+
+            <RangeAvailability
+              mainPortNumbers={selectedPortIdList
+                .map((id) => allPorts.find((p) => p.id === id)?.main_port_number)
+                .filter(Boolean) as string[]}
+              rangeStart={Number(subPortRangeStart) || 0}
+              rangeEnd={Number(subPortRangeEnd) || 0}
+              needCount={selectedIds.length}
+            />
+
+            <div className="rounded bg-muted/50 p-3 text-sm">
+              预计生成 {selectedIds.length * selectedGroupCount} 个子端口
+              （资质 {selectedIds.length} × 主端口 {selectedGroupCount}）
+            </div>
+
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => setStep(2)}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> 上一步
+              </Button>
+              <Button
+                onClick={() => setStep(4)}
+                disabled={
+                  !/^\d+$/.test(subPortRangeStart) ||
+                  !/^\d+$/.test(subPortRangeEnd) ||
+                  Number(subPortRangeStart) > Number(subPortRangeEnd)
+                }
+              >
+                下一步 <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 4: Configure export */}
+      {step === 4 && (
         <Card>
           <CardHeader>
             <CardTitle>配置导出</CardTitle>
@@ -556,10 +632,10 @@ export function FilingCreatePage() {
             </div>
 
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(2)}>
+              <Button variant="outline" onClick={() => setStep(3)}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> 上一步
               </Button>
-              <Button onClick={() => setStep(4)} disabled={!exportGroupId}>
+              <Button onClick={() => setStep(5)} disabled={!exportGroupId}>
                 下一步 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -567,8 +643,8 @@ export function FilingCreatePage() {
         </Card>
       )}
 
-      {/* Step 4: Confirm */}
-      {step === 4 && (
+      {/* Step 5: Confirm */}
+      {step === 5 && (
         <Card>
           <CardHeader>
             <CardTitle>确认生成</CardTitle>
@@ -598,7 +674,7 @@ export function FilingCreatePage() {
             </div>
 
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(3)}>
+              <Button variant="outline" onClick={() => setStep(4)}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> 上一步
               </Button>
               <Button onClick={handleCreate} disabled={createMutation.isPending}>
@@ -617,5 +693,37 @@ export function FilingCreatePage() {
         />
       </Main>
     </>
+  )
+}
+
+function RangeAvailability({
+  mainPortNumbers, rangeStart, rangeEnd, needCount,
+}: {
+  mainPortNumbers: string[]
+  rangeStart: number
+  rangeEnd: number
+  needCount: number
+}) {
+  const { data } = useQuery({
+    queryKey: ['sub-port-availability', mainPortNumbers, rangeStart, rangeEnd],
+    queryFn: () => getSubPortAvailability(mainPortNumbers, rangeStart, rangeEnd),
+    enabled: mainPortNumbers.length > 0 && rangeStart > 0 && rangeEnd > rangeStart,
+  })
+
+  if (!data) return null
+  return (
+    <div className="space-y-1 rounded border p-3 text-sm">
+      {mainPortNumbers.map((mpn) => {
+        const info = data[mpn]
+        if (!info) return null
+        const insufficient = info.available < needCount
+        return (
+          <div key={mpn} className={insufficient ? 'text-destructive' : ''}>
+            主端口 {mpn}: 可用 {info.available} / {info.total}
+            {insufficient && ` (不足，需要 ${needCount})`}
+          </div>
+        )
+      })}
+    </div>
   )
 }
