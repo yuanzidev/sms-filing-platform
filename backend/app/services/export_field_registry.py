@@ -88,6 +88,10 @@ REGISTRY: list[ExportField] = [
     ExportField("handler_id_front", "法人身份证正面", "image_qualification", "图片材料"),
     ExportField("handler_id_back", "法人身份证反面", "image_qualification", "图片材料"),
     ExportField("auth_image", "授权书图片", "image_port", "图片材料"),
+    ExportField("signature_proof", "签名举证附件", "image_qualification", "图片材料"),
+    ExportField("diversion_number_proof", "引流号码举证附件", "image_qualification", "图片材料"),
+    ExportField("diversion_link_proof", "引流链接举证", "image_qualification", "图片材料"),
+    ExportField("handler_scene_photo", "经办人现场照片", "image_qualification", "图片材料"),
 ]
 
 

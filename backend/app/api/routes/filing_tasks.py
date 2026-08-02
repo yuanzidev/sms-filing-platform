@@ -340,6 +340,10 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
         "法人身份证正面": "handler_id_front",
         "法人身份证反面": "handler_id_back",
         "授权书图片": "auth_image",
+        "签名举证附件": "signature_proof",
+        "引流号码举证附件": "diversion_number_proof",
+        "引流链接举证": "diversion_link_proof",
+        "经办人现场照片": "handler_scene_photo",
     }
     qual_images: dict[uuid.UUID, dict[str, bytes]] = {}
     try:
