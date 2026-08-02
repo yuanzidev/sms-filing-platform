@@ -1,5 +1,6 @@
 """Export group API routes."""
 import uuid
+from dataclasses import asdict
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,8 +20,14 @@ from app.models import (
     ExportGroupUpdate,
     Message,
 )
+from app.services.export_field_registry import all_fields
 
 router = APIRouter(prefix="/export-groups", tags=["export-groups"], dependencies=[Depends(get_current_active_superuser)])
+
+
+@router.get("/registry", response_model=list[dict])
+def read_field_registry() -> Any:
+    return [{**asdict(f), "id": f.name} for f in all_fields()]
 
 
 @router.get("", response_model=ExportGroupsPublic)
