@@ -342,11 +342,17 @@ def read_port_infos(
     page_size: int = Query(20, ge=1, le=500),
     carrier: str | None = None,
     province: str | None = None,
+    keyword: str | None = None,
+    city: str | None = None,
+    port_type: str | None = None,
+    main_port_number: str | None = None,
 ) -> Any:
     skip = (page - 1) * page_size
     items, total = list_port_infos(
         session=session, skip=skip, limit=page_size,
         carrier=carrier, province=province,
+        keyword=keyword, city=city, port_type=port_type,
+        main_port_number=main_port_number,
     )
     return PortInfosPublic(data=items, total=total, page=page, page_size=page_size)
 

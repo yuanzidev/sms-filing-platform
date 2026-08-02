@@ -1,6 +1,7 @@
 """CRUD operations for PortInfo."""
 import uuid
 
+from sqlalchemy import or_
 from sqlmodel import Session, func, select
 
 from app.models import (
@@ -21,6 +22,10 @@ def list_port_infos(
     limit: int = 20,
     carrier: str | None = None,
     province: str | None = None,
+    keyword: str | None = None,
+    city: str | None = None,
+    port_type: str | None = None,
+    main_port_number: str | None = None,
 ) -> tuple[list[PortInfo], int]:
     query = select(PortInfo)
 
@@ -28,6 +33,20 @@ def list_port_infos(
         query = query.where(PortInfo.carrier == carrier)
     if province:
         query = query.where(PortInfo.province == province)
+    if keyword:
+        query = query.where(
+            or_(
+                PortInfo.main_port_number.contains(keyword),
+                PortInfo.sub_port_number.contains(keyword),
+                PortInfo.enterprise_name.contains(keyword),
+            )
+        )
+    if city:
+        query = query.where(PortInfo.city == city)
+    if port_type:
+        query = query.where(PortInfo.port_type == port_type)
+    if main_port_number:
+        query = query.where(PortInfo.main_port_number.contains(main_port_number))
 
     count = session.exec(select(func.count()).select_from(query.subquery())).one()
     results = session.exec(

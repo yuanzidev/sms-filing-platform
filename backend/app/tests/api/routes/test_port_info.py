@@ -1,4 +1,6 @@
-"""Tests for port-info API: page_size upper bound."""
+"""Tests for port-info API: page_size upper bound, keyword/city/port_type/main_port_number filters."""
+import uuid
+
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
@@ -63,3 +65,98 @@ def test_import_port_info_with_empty_operation_and_group(
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["count"] >= 1
+
+
+def test_filter_port_infos_by_keyword(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex
+    sub_port = f"9999{marker[:4]}"
+    # 创建一条数据
+    client.post(
+        f"{settings.API_V1_STR}/port-info",
+        headers=superuser_token_headers,
+        json={
+            "carrier": "中国移动",
+            "main_port_number": f"1069{marker[:6]}",
+            "enterprise_name": f"测试备案公司{marker}",
+            "port_type": "短信",
+            "carrier_room": "X机房",
+            "enterprise_room": "Y机房",
+            "authorization_letter": "授字001",
+            "sub_port_number": sub_port,
+        },
+    )
+    # keyword 命中子端口号
+    r = client.get(
+        f"{settings.API_V1_STR}/port-info",
+        headers=superuser_token_headers,
+        params={"keyword": sub_port},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total"] >= 1
+
+    # keyword 命中企业名称
+    r2 = client.get(
+        f"{settings.API_V1_STR}/port-info",
+        headers=superuser_token_headers,
+        params={"keyword": marker},
+    )
+    assert r2.json()["total"] >= 1
+
+    # keyword 无命中时返回 0(验证 keyword 过滤真实生效)
+    r3 = client.get(
+        f"{settings.API_V1_STR}/port-info",
+        headers=superuser_token_headers,
+        params={"keyword": f"nomatch{marker}"},
+    )
+    assert r3.status_code == 200
+    assert r3.json()["total"] == 0
+
+    # main_port_number 参数过滤
+    r4 = client.get(
+        f"{settings.API_V1_STR}/port-info",
+        headers=superuser_token_headers,
+        params={"main_port_number": f"1069{marker[:6]}"},
+    )
+    assert r4.status_code == 200
+    assert r4.json()["total"] >= 1
+
+
+def test_filter_port_infos_by_city_and_type(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex
+    city = f"城市{marker[:4]}"
+    client.post(
+        f"{settings.API_V1_STR}/port-info",
+        headers=superuser_token_headers,
+        json={
+            "carrier": "中国联通",
+            "main_port_number": f"1069{marker[:6]}",
+            "enterprise_name": f"城市测试公司{marker}",
+            "port_type": "语音",
+            "city": city,
+            "carrier_room": "A机房",
+            "enterprise_room": "B机房",
+            "authorization_letter": "授字002",
+        },
+    )
+    r = client.get(
+        f"{settings.API_V1_STR}/port-info",
+        headers=superuser_token_headers,
+        params={"city": city, "port_type": "语音"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total"] >= 1
+
+    # city 无命中时返回 0(验证 city 过滤真实生效)
+    r2 = client.get(
+        f"{settings.API_V1_STR}/port-info",
+        headers=superuser_token_headers,
+        params={"city": f"不存在{marker}"},
+    )
+    assert r2.status_code == 200
+    assert r2.json()["total"] == 0
