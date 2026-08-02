@@ -157,3 +157,51 @@ def test_import_accepts_renamed_link_address_header(
     assert item["link_address"] == "https://example.com"
     assert item["sms_signature"] == "【测试签名】"
 
+
+def test_import_qualifications_with_empty_legal_fields(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """法人证件类型/号码/地址为空可导入"""
+    from io import BytesIO
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    headers = ["企业名称", "法人证件类型", "法人证件号码", "法人证件地址", "短信签名"]
+    for col_idx, h in enumerate(headers, 1):
+        ws.cell(row=1, column=col_idx, value=h)
+    # 法人字段留空
+    ws.cell(row=2, column=1, value="测试企业")
+    ws.cell(row=2, column=5, value="测试签名")
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/import",
+        headers=superuser_token_headers,
+        files={"file": ("test.xlsx", buf, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["count"] >= 1
+
+
+def test_qualification_template_notes_mention_optional_legal(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    from io import BytesIO
+    from openpyxl import load_workbook
+
+    r = client.get(
+        f"{settings.API_V1_STR}/qualifications/template",
+        headers=superuser_token_headers,
+    )
+    assert r.status_code == 200
+    wb = load_workbook(BytesIO(r.content))
+    notes_ws = wb["填写说明"]
+    all_text = "\n".join(str(c.value) for row in notes_ws.iter_rows() for c in row if c.value)
+    assert "法人证件类型" in all_text
+    assert "选填" in all_text
+

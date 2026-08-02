@@ -162,6 +162,7 @@ def download_qualification_template() -> Any:
         "5. 也可将图片直接拖入到图片列的单元格中",
         "6. 系统会自动提取每行单元格内嵌的图片，并与对应字段关联",
         "7. 支持的图片格式：PNG、JPEG、GIF、BMP、WEBP，单张不超过 10MB",
+        "8. 法人证件类型/号码/地址：选填；运营商报备强依赖时再填",
     ]
     for i, note in enumerate(notes, 2):
         instructions.cell(row=i, column=1, value=note)
@@ -287,16 +288,8 @@ def import_qualifications(
             raise HTTPException(status_code=400, detail=f"第{row_idx}行: 企业名称不能为空")
 
         legal_rep_cert_type = cell("legal_representative_cert_type")
-        if not legal_rep_cert_type:
-            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 法人证件类型不能为空")
-
         legal_rep_cert_number = cell("legal_representative_cert_number")
-        if not legal_rep_cert_number:
-            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 法人证件号码不能为空")
-
         legal_rep_cert_address = cell("legal_representative_cert_address")
-        if not legal_rep_cert_address:
-            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 法人证件地址不能为空")
 
         objects.append(QualificationInfo(
             enterprise_name=enterprise_name,
