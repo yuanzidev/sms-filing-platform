@@ -1,0 +1,186 @@
+"""Tests for sub port allocator."""
+import uuid
+from typing import Generator
+
+import pytest
+from sqlmodel import Session, delete
+
+from app.core.db import engine
+from app.core.security import get_password_hash
+from app.models import (
+    FilingSubPortUsage,
+    QualificationInfo,
+    User,
+)
+from app.services.sub_port_allocator import (
+    SubPortConflict,
+    SubPortRangeExhausted,
+    allocate_sub_ports,
+)
+
+
+@pytest.fixture(autouse=True)
+def _cleanup() -> Generator[None, None, None]:
+    yield
+    with Session(engine) as session:
+        session.execute(delete(FilingSubPortUsage))
+        session.execute(delete(QualificationInfo))
+        session.execute(delete(User))
+        session.commit()
+
+
+def _make_qual(name: str) -> QualificationInfo:
+    return QualificationInfo(
+        enterprise_name=name,
+        legal_representative_cert_type=None,
+        legal_representative_cert_number=None,
+        legal_representative_cert_address=None,
+    )
+
+
+def _make_user(session: Session) -> User:
+    user = User(
+        email=f"alloc-test-{uuid.uuid4()}@example.com",
+        username=f"alloc-test-{uuid.uuid4()}",
+        hashed_password=get_password_hash("test-password-not-used"),
+        is_active=True,
+        is_superuser=False,
+    )
+    session.add(user)
+    session.flush()
+    return user
+
+
+def test_allocate_basic():
+    """3 主端口 × 2 资质 → 6 个号码，每主端口下不重复"""
+    quals = [_make_qual("企业A"), _make_qual("企业B")]
+    with Session(engine) as session:
+        for q in quals:
+            session.add(q)
+        user = _make_user(session)
+        session.commit()
+        for q in quals:
+            session.refresh(q)
+
+        result = allocate_sub_ports(
+            session=session,
+            main_port_numbers=["10698A", "10698B", "10698C"],
+            range_start=100001,
+            range_end=199999,
+            qualifications=quals,
+            operator_id=user.id,
+            filing_task_id=None,
+        )
+        assert len(result) == 3
+        for mpn, pairs in result.items():
+            assert len(pairs) == 2
+            numbers = [num for _, num in pairs]
+            assert len(numbers) == len(set(numbers)), f"{mpn} 下分配重复"
+
+
+def test_allocate_excludes_history():
+    """已占用的号码不再分配"""
+    quals = [_make_qual("企业A")]
+    with Session(engine) as session:
+        session.add(quals[0])
+        user = _make_user(session)
+        session.commit()
+        session.refresh(quals[0])
+
+        # 预占用 (10698X, 某号码)
+        first = allocate_sub_ports(
+            session=session,
+            main_port_numbers=["10698X"],
+            range_start=100001,
+            range_end=100002,
+            qualifications=quals,
+            operator_id=user.id,
+            filing_task_id=None,
+        )
+        first_number = first["10698X"][0][1]
+
+        # 再分配一个，应该不是 first_number（只剩另一个）
+        result = allocate_sub_ports(
+            session=session,
+            main_port_numbers=["10698X"],
+            range_start=100001,
+            range_end=100002,
+            qualifications=quals,
+            operator_id=user.id,
+            filing_task_id=None,
+        )
+        second_number = result["10698X"][0][1]
+        assert second_number != first_number, (
+            f"已占用号码 {first_number} 又被分配: {second_number}"
+        )
+        assert second_number in {"100001", "100002"}
+
+
+def test_allocate_range_exhausted():
+    """范围耗尽抛 409"""
+    quals = [_make_qual("企业A"), _make_qual("企业B"), _make_qual("企业C")]
+    with Session(engine) as session:
+        for q in quals:
+            session.add(q)
+        user = _make_user(session)
+        session.commit()
+        for q in quals:
+            session.refresh(q)
+
+        with pytest.raises(SubPortRangeExhausted) as exc_info:
+            allocate_sub_ports(
+                session=session,
+                main_port_numbers=["10698Y"],
+                range_start=100001,
+                range_end=100002,  # 只 2 个，需要 3 个
+                qualifications=quals,
+                operator_id=user.id,
+                filing_task_id=None,
+            )
+        assert exc_info.value.status_code == 409
+        assert "10698Y" in exc_info.value.detail
+
+
+def test_allocate_concurrent_safety():
+    """并发分配：5 线程同一主端口，结果不重复"""
+    import threading
+
+    quals = [_make_qual("并发企业")]
+    with Session(engine) as setup_session:
+        setup_session.add(quals[0])
+        user = _make_user(setup_session)
+        setup_session.commit()
+        setup_session.refresh(quals[0])
+        qual_id = quals[0].id
+        user_id = user.id
+
+
+    results: list[str] = []
+    lock = threading.Lock()
+
+    def worker():
+        with Session(engine) as session:
+            qual = session.get(QualificationInfo, qual_id)
+            try:
+                result = allocate_sub_ports(
+                    session=session,
+                    main_port_numbers=["10698CON"],
+                    range_start=200001,
+                    range_end=200100,
+                    qualifications=[qual],
+                    operator_id=user_id,
+                    filing_task_id=None,
+                )
+                with lock:
+                    results.append(result["10698CON"][0][1])
+            except SubPortConflict:
+                pass  # 重试耗尽视为可接受
+
+    threads = [threading.Thread(target=worker) for _ in range(5)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # 5 个线程并发，results 收集成功分配的号码
+    assert len(results) == len(set(results)), f"并发分配重复: {results}"
