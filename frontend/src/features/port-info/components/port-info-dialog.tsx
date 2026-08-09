@@ -22,11 +22,67 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from 'sonner'
 import { createPortInfo, updatePortInfo } from '@/lib/api/port-info'
 import { ProvinceCityFields } from '@/components/shared/province-city-fields'
 import { DatePicker } from '@/components/ui/date-picker-single'
 import type { PortInfo } from '@/lib/api/types'
+
+const EMPTY_SELECT_VALUE = '__empty__'
+const CARRIER_OPTIONS = ['中国移动', '中国联通', '中国电信', '中国广电']
+const PORT_TYPE_OPTIONS = ['短信', '语音', '物联网', '其他']
+const CUSTOMER_TYPE_OPTIONS = ['企业客户', '个人客户', '政企客户', '代理商', '其他']
+
+function PresetInput({
+  value,
+  onChange,
+  options,
+  inputPlaceholder,
+  selectPlaceholder,
+  allowEmpty = false,
+}: {
+  value: string
+  onChange: (value: string) => void
+  options: string[]
+  inputPlaceholder: string
+  selectPlaceholder: string
+  allowEmpty?: boolean
+}) {
+  return (
+    <div className="space-y-2">
+      <Select
+        value={options.includes(value) ? value : ''}
+        onValueChange={(selected) => {
+          onChange(selected === EMPTY_SELECT_VALUE ? '' : selected)
+        }}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder={selectPlaceholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {allowEmpty && <SelectItem value={EMPTY_SELECT_VALUE}>未指定</SelectItem>}
+          {options.map((option) => (
+            <SelectItem key={option} value={option}>{option}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <FormControl>
+        <Input
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={inputPlaceholder}
+        />
+      </FormControl>
+    </div>
+  )
+}
 
 const formSchema = z.object({
   carrier: z.string().min(1, '运营商不能为空'),
@@ -165,9 +221,13 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>运营商 *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="移动/联通/电信" {...field} />
-                    </FormControl>
+                    <PresetInput
+                      value={field.value || ''}
+                      onChange={field.onChange}
+                      options={CARRIER_OPTIONS}
+                      selectPlaceholder="选择运营商"
+                      inputPlaceholder="也可手动输入运营商"
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -178,9 +238,13 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>端口类型 *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="主端口/子端口" {...field} />
-                    </FormControl>
+                    <PresetInput
+                      value={field.value || ''}
+                      onChange={field.onChange}
+                      options={PORT_TYPE_OPTIONS}
+                      selectPlaceholder="选择端口类型"
+                      inputPlaceholder="也可手动输入端口类型"
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -441,9 +505,14 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>客户类型</FormLabel>
-                    <FormControl>
-                      <Input placeholder="企业/个人" {...field} value={field.value || ''} />
-                    </FormControl>
+                    <PresetInput
+                      value={field.value || ''}
+                      onChange={field.onChange}
+                      options={CUSTOMER_TYPE_OPTIONS}
+                      selectPlaceholder="选择客户类型"
+                      inputPlaceholder="也可手动输入客户类型"
+                      allowEmpty
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
