@@ -182,10 +182,16 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
   })
 
   const onSubmit = (data: FormData) => {
+    const cleaned = {
+      ...data,
+      port_activation_date: data.port_activation_date || undefined,
+      auth_start_date: data.auth_start_date || undefined,
+      auth_end_date: data.auth_end_date || undefined,
+    }
     if (portInfo) {
-      updateMutation.mutate({ id: portInfo.id, data })
+      updateMutation.mutate({ id: portInfo.id, data: cleaned })
     } else {
-      createMutation.mutate(data)
+      createMutation.mutate(cleaned)
     }
   }
 
