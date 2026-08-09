@@ -12,11 +12,11 @@ class PortInfoBase(SQLModel):
     main_port_number: str = Field(max_length=100, index=True)
     enterprise_name: str = Field(max_length=200)
     group_code: str | None = Field(default=None, max_length=100)
-    carrier_room: str
-    enterprise_room: str
+    carrier_room: str | None = Field(default=None)
+    enterprise_room: str | None = Field(default=None)
     port_type: str = Field(max_length=50)
     operation_type: str | None = Field(default=None, max_length=100)
-    authorization_letter: str = Field(max_length=500)
+    authorization_letter: str | None = Field(default=None, max_length=500)
     sub_port_number: str | None = Field(default=None, max_length=100)
     port_range: str | None = Field(default=None, max_length=100)
     province: str | None = Field(default=None, max_length=50, index=True)

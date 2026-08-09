@@ -190,7 +190,7 @@ def import_port_infos(
         if h in header_to_field:
             col_map[header_to_field[h]] = col_idx
 
-    required_fields = ["carrier", "main_port_number", "enterprise_name", "port_type", "carrier_room", "enterprise_room", "authorization_letter"]
+    required_fields = ["carrier", "main_port_number", "enterprise_name", "port_type"]
     missing = [h for h, f in header_to_field.items() if f in required_fields and f not in col_map]
     if missing:
         raise HTTPException(
@@ -261,18 +261,6 @@ def import_port_infos(
         if not port_type:
             raise HTTPException(status_code=400, detail=f"第{row_idx}行: 端口类型不能为空")
 
-        carrier_room = cell("carrier_room")
-        if not carrier_room:
-            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 运营商接入机房及设备不能为空")
-
-        enterprise_room = cell("enterprise_room")
-        if not enterprise_room:
-            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 企业接入机房及设备不能为空")
-
-        authorization_letter = cell("authorization_letter")
-        if not authorization_letter:
-            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 授权书不能为空")
-
         objects.append(PortInfo(
             carrier=carrier,
             main_port_number=main_port_number,
@@ -285,10 +273,10 @@ def import_port_infos(
             operation_type=cell("operation_type"),
             port_activation_date=parse_date("port_activation_date"),
             allow_self_extension=parse_bool("allow_self_extension"),
-            carrier_room=carrier_room,
-            enterprise_room=enterprise_room,
+            carrier_room=cell("carrier_room"),
+            enterprise_room=cell("enterprise_room"),
             has_authorization=parse_bool("has_authorization"),
-            authorization_letter=authorization_letter,
+            authorization_letter=cell("authorization_letter"),
             auth_start_date=parse_date("auth_start_date"),
             auth_end_date=parse_date("auth_end_date"),
             group_code=cell("group_code"),
@@ -360,7 +348,19 @@ def read_port_infos(
 @router.post("", response_model=PortInfoPublic)
 @router.post("/", include_in_schema=False, response_model=PortInfoPublic)
 def create_port_info_endpoint(*, session: SessionDep, create: PortInfoCreate, current_user: CurrentUser, request: Request) -> Any:
-    result = create_port_info(session=session, create=create)
+    try:
+        result = create_port_info(session=session, create=create)
+    except Exception as e:
+        error_str = str(e)
+        if "unique" in error_str.lower() or "duplicate" in error_str.lower():
+            raise HTTPException(
+                status_code=409,
+                detail={"field": "main_port_number", "reason": "主端口号已存在", "suggestion": "请使用不同的主端口号，或先查询已有端口信息"},
+            )
+        raise HTTPException(
+            status_code=500,
+            detail={"field": "", "reason": error_str, "suggestion": "请联系管理员"},
+        )
     log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="port_info", action="create", target=f"{result.main_port_number or result.sub_port_number or result.id}")
     return result
 

@@ -96,10 +96,10 @@ const formSchema = z.object({
   operation_type: z.string().optional(),
   port_activation_date: z.string().optional(),
   allow_self_extension: z.boolean().optional(),
-  carrier_room: z.string().min(1, '运营商接入机房及设备不能为空'),
-  enterprise_room: z.string().min(1, '企业接入机房及设备不能为空'),
+  carrier_room: z.string().optional(),
+  enterprise_room: z.string().optional(),
   has_authorization: z.boolean().optional(),
-  authorization_letter: z.string().min(1, '授权书不能为空'),
+  authorization_letter: z.string().optional(),
   auth_start_date: z.string().optional(),
   auth_end_date: z.string().optional(),
   group_code: z.string().optional(),
@@ -112,6 +112,28 @@ const formSchema = z.object({
 })
 
 type FormData = z.infer<typeof formSchema>
+
+interface ApiErrorDetail {
+  field: string
+  reason: string
+  suggestion?: string
+}
+
+function extractApiErrorDetail(err: unknown): ApiErrorDetail | string | undefined {
+  const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+  if (typeof detail === 'string') return detail
+  if (typeof detail === 'object' && detail !== null) {
+    const obj = detail as Record<string, unknown>
+    if (typeof obj.field === 'string' && typeof obj.reason === 'string') {
+      return {
+        field: obj.field,
+        reason: obj.reason,
+        suggestion: typeof obj.suggestion === 'string' ? obj.suggestion : undefined,
+      }
+    }
+  }
+  return undefined
+}
 
 interface Props {
   open: boolean
@@ -160,7 +182,17 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
       onSuccess()
       onOpenChange(false)
     },
-    onError: () => toast.error('端口信息创建失败'),
+    onError: (err: unknown) => {
+      const detail = extractApiErrorDetail(err)
+      if (typeof detail === 'object') {
+        form.setError(detail.field as keyof FormData, { message: `${detail.reason}。${detail.suggestion || ''}` })
+        toast.error(detail.reason)
+      } else if (typeof detail === 'string') {
+        toast.error(detail)
+      } else {
+        toast.error('端口信息创建失败')
+      }
+    },
   })
 
   const updateMutation = useMutation({
@@ -171,7 +203,17 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
       onSuccess()
       onOpenChange(false)
     },
-    onError: () => toast.error('端口信息更新失败'),
+    onError: (err: unknown) => {
+      const detail = extractApiErrorDetail(err)
+      if (typeof detail === 'object') {
+        form.setError(detail.field as keyof FormData, { message: `${detail.reason}。${detail.suggestion || ''}` })
+        toast.error(detail.reason)
+      } else if (typeof detail === 'string') {
+        toast.error(detail)
+      } else {
+        toast.error('端口信息更新失败')
+      }
+    },
   })
 
   const defaultValues = toDefaultValues(portInfo)
@@ -367,7 +409,7 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 name="carrier_room"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>运营商接入机房及设备 *</FormLabel>
+                    <FormLabel>运营商接入机房及设备</FormLabel>
                     <FormControl>
                       <Input placeholder="运营商接入机房及设备" {...field} value={field.value || ''} />
                     </FormControl>
@@ -380,7 +422,7 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 name="enterprise_room"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>企业接入机房及设备 *</FormLabel>
+                    <FormLabel>企业接入机房及设备</FormLabel>
                     <FormControl>
                       <Input placeholder="企业接入机房及设备" {...field} value={field.value || ''} />
                     </FormControl>
@@ -419,7 +461,7 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 name="authorization_letter"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>授权书 *</FormLabel>
+                    <FormLabel>授权书</FormLabel>
                     <FormControl>
                       <Input placeholder="授权书编号或名称" {...field} />
                     </FormControl>
