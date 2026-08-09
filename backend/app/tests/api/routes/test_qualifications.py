@@ -68,6 +68,7 @@ def _build_xlsx(headers: list[str], rows: list[list]) -> bytes:
 def test_import_rejects_missing_enterprise_name(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
+    """缺少「企业名称」列视为模板不匹配，直接 400"""
     headers = ["法人证件类型", "法人证件号码"]
     rows = [["身份证", "110101199001011234"]]
     data = _build_xlsx(headers, rows)
@@ -97,7 +98,7 @@ def test_import_succeeds_without_legal_rep_columns(
         files=files,
     )
     assert r.status_code == 200
-    assert r.json()["count"] == 1
+    assert r.json()["success_count"] == 1
 
 
 def test_import_success_with_required_fields(
@@ -116,7 +117,7 @@ def test_import_success_with_required_fields(
         files=files,
     )
     assert r.status_code == 200
-    assert r.json()["count"] == 1
+    assert r.json()["success_count"] == 1
 
 
 def test_template_column_order_matches_new_spec(
@@ -166,7 +167,7 @@ def test_import_accepts_renamed_link_address_header(
         files=files,
     )
     assert r.status_code == 200
-    assert r.json()["count"] == 1
+    assert r.json()["success_count"] == 1
     # 验证值确实落到 link_address 和 sms_signature 字段
     list_r = client.get(
         f"{settings.API_V1_STR}/qualifications",
@@ -206,7 +207,7 @@ def test_import_qualifications_with_empty_legal_fields(
     )
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["count"] >= 1
+    assert body["success_count"] >= 1
 
 
 def test_qualification_template_notes_mention_optional_legal(
@@ -242,4 +243,65 @@ def test_template_signature_example_has_no_brackets(
     sig_cell = ws.cell(row=2, column=24).value  # 短信签名列
     assert "【" not in str(sig_cell)
     assert "】" not in str(sig_cell)
+
+
+def test_import_collects_all_errors_and_writes_valid_rows(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """混合文件：错误行收集所有错误，有效行批量写入"""
+    headers = ["企业名称", "是否签名校验", "短信签名"]
+    rows = [
+        ["", "是", "签名A"],            # 行2：企业名称为空
+        ["测试企业错误行", "也许", "签名B"],  # 行3：布尔字段值无效
+        ["测试企业有效行", "是", "签名C"],    # 行4：有效
+        ["", "", ""],                   # 行5：空行跳过
+    ]
+    data = _build_xlsx(headers, rows)
+
+    files = {"file": ("test.xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/import",
+        headers=superuser_token_headers,
+        files=files,
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["success_count"] == 1
+    assert body["error_count"] == 2
+    assert body["total"] == 3
+    err_fields = {e["field"] for e in body["errors"]}
+    assert err_fields == {"企业名称", "是否签名校验"}
+    # 有效行确实写入
+    list_r = client.get(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        params={"enterprise_name": "测试企业有效行"},
+    )
+    assert list_r.status_code == 200
+    assert list_r.json()["total"] >= 1
+
+
+def test_import_returns_error_report_xlsx(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    from io import BytesIO
+    from openpyxl import load_workbook
+
+    errors = [
+        {"row": 2, "field": "企业名称", "value": "", "reason": "企业名称不能为空", "suggestion": "请填写企业名称"},
+        {"row": 3, "field": "是否签名校验", "value": "也许", "reason": "布尔字段值无效", "suggestion": "请填写「是」或「否」"},
+    ]
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/import/error-report",
+        headers=superuser_token_headers,
+        json={"errors": errors},
+    )
+    assert r.status_code == 200
+    assert "spreadsheetml" in r.headers["content-type"]
+    wb = load_workbook(BytesIO(r.content))
+    ws = wb.active
+    assert ws.title == "导入错误报告"
+    assert ws.cell(row=1, column=1).value == "行号"
+    assert ws.cell(row=2, column=2).value == "企业名称"
+    assert ws.cell(row=3, column=5).value == "请填写「是」或「否」"
 

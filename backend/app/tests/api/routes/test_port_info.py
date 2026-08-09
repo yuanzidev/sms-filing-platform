@@ -64,7 +64,74 @@ def test_import_port_info_with_empty_operation_and_group(
     )
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["count"] >= 1
+    assert body["success_count"] >= 1
+
+
+def test_import_port_infos_collects_errors_and_writes_valid_rows(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """混合文件：错误行收集所有错误（必填缺失+日期无效），有效行批量写入"""
+    from io import BytesIO
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    headers = ["运营商", "主端口号", "主端口备案公司", "端口类型", "端口入网时间"]
+    for col_idx, h in enumerate(headers, 1):
+        ws.cell(row=1, column=col_idx, value=h)
+    # 行2：运营商为空
+    ws.cell(row=2, column=2, value="10690001")
+    ws.cell(row=2, column=3, value="错误企业A")
+    ws.cell(row=2, column=4, value="短信")
+    # 行3：日期格式无效
+    ws.cell(row=3, column=1, value="中国移动")
+    ws.cell(row=3, column=2, value="10690002")
+    ws.cell(row=3, column=3, value="错误企业B")
+    ws.cell(row=3, column=4, value="短信")
+    ws.cell(row=3, column=5, value="2024-13-99")
+    # 行4：有效
+    ws.cell(row=4, column=1, value="中国移动")
+    ws.cell(row=4, column=2, value="10690003")
+    ws.cell(row=4, column=3, value="有效企业C")
+    ws.cell(row=4, column=4, value="短信")
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    r = client.post(
+        f"{settings.API_V1_STR}/port-info/import",
+        headers=superuser_token_headers,
+        files={"file": ("test.xlsx", buf, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["success_count"] == 1
+    assert body["error_count"] == 2
+    err_fields = {e["field"] for e in body["errors"]}
+    assert err_fields == {"运营商", "端口入网时间"}
+
+
+def test_port_info_import_error_report_xlsx(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    from io import BytesIO
+    from openpyxl import load_workbook
+
+    errors = [
+        {"row": 2, "field": "运营商", "value": "", "reason": "运营商不能为空", "suggestion": "请填写运营商"},
+    ]
+    r = client.post(
+        f"{settings.API_V1_STR}/port-info/import/error-report",
+        headers=superuser_token_headers,
+        json={"errors": errors},
+    )
+    assert r.status_code == 200
+    assert "spreadsheetml" in r.headers["content-type"]
+    wb = load_workbook(BytesIO(r.content))
+    ws = wb.active
+    assert ws.title == "导入错误报告"
+    assert ws.cell(row=2, column=2).value == "运营商"
 
 
 def test_filter_port_infos_by_keyword(

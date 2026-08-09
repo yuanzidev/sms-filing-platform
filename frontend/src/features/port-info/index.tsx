@@ -8,6 +8,7 @@ import {
   getPortInfos,
   deletePortInfo,
   downloadPortInfoTemplate,
+  downloadPortInfoImportErrorReport,
   importPortInfos,
 } from '@/lib/api/port-info'
 import type { PortInfo } from '@/lib/api/types'
@@ -468,6 +469,7 @@ export function PortInfoPage() {
         title='导入端口信息'
         onDownloadTemplate={downloadPortInfoTemplate}
         onImport={importPortInfos}
+        onDownloadErrorReport={downloadPortInfoImportErrorReport}
         onSuccess={() =>
           queryClient.invalidateQueries({ queryKey: ['port-info'] })
         }

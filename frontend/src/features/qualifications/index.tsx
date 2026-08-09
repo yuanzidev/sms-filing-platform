@@ -15,6 +15,7 @@ import {
   getQualifications,
   deleteQualification,
   downloadQualificationTemplate,
+  downloadQualificationImportErrorReport,
   importQualifications,
 } from '@/lib/api/qualifications'
 import type { QualificationInfo } from '@/lib/api/types'
@@ -345,6 +346,7 @@ export function QualificationsPage() {
         title='资质信息'
         onDownloadTemplate={downloadQualificationTemplate}
         onImport={importQualifications}
+        onDownloadErrorReport={downloadQualificationImportErrorReport}
         onSuccess={() =>
           queryClient.invalidateQueries({ queryKey: ['qualifications'] })
         }

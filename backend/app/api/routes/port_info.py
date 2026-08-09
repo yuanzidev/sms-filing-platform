@@ -7,6 +7,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
+from pydantic import BaseModel
 
 from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
 from app.crud.port_info import (
@@ -200,7 +201,11 @@ def import_port_infos(
             detail=f"模板不匹配：缺少必填列「{'」「'.join(missing)}」。请确认使用了正确的端口信息导入模板（首页 → 端口管理 → 下载模板）",
         )
 
+    # Phase 1: Validate all rows, collect errors
     objects: list[PortInfo] = []
+    errors: list[dict] = []
+    data_row_indices: list[int] = []
+
     for row_idx, row in enumerate(rows[1:], start=2):
         if all(c is None or str(c).strip() == "" for c in row):
             continue
@@ -222,7 +227,9 @@ def import_port_infos(
                 return None
             return v in ("是", "true", "True", "1", "TRUE")
 
-        def parse_date(col_name: str):
+        row_errors: list[dict] = []
+
+        def parse_date(col_name: str, cn_name: str):
             if col_name not in col_map:
                 return None
             idx = col_map[col_name]
@@ -242,58 +249,103 @@ def import_port_infos(
             try:
                 return date.fromisoformat(s)
             except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"第{row_idx}行: 日期格式无效，请使用 YYYY-MM-DD 格式",
-                )
+                row_errors.append({
+                    "row": row_idx, "field": cn_name, "value": s,
+                    "reason": "日期格式无效", "suggestion": "请使用 YYYY-MM-DD 格式",
+                })
+                return None
 
         carrier = cell("carrier")
         if not carrier:
-            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 运营商不能为空")
+            row_errors.append({
+                "row": row_idx, "field": "运营商", "value": "",
+                "reason": "运营商不能为空", "suggestion": "请填写运营商",
+            })
 
         main_port_number = cell("main_port_number")
         if not main_port_number:
-            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 主端口号不能为空")
+            row_errors.append({
+                "row": row_idx, "field": "主端口号", "value": "",
+                "reason": "主端口号不能为空", "suggestion": "请填写主端口号",
+            })
 
         enterprise_name = cell("enterprise_name")
         if not enterprise_name:
-            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 企业名称不能为空")
+            row_errors.append({
+                "row": row_idx, "field": "主端口备案公司", "value": "",
+                "reason": "企业名称不能为空", "suggestion": "请填写主端口备案公司",
+            })
 
         port_type = cell("port_type")
         if not port_type:
-            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 端口类型不能为空")
+            row_errors.append({
+                "row": row_idx, "field": "端口类型", "value": "",
+                "reason": "端口类型不能为空", "suggestion": "请填写端口类型",
+            })
 
-        objects.append(PortInfo(
-            carrier=carrier,
-            main_port_number=main_port_number,
-            enterprise_name=enterprise_name,
-            sub_port_number=cell("sub_port_number"),
-            port_range=cell("port_range"),
-            province=cell("province"),
-            city=cell("city"),
-            port_type=port_type,
-            operation_type=cell("operation_type"),
-            port_activation_date=parse_date("port_activation_date"),
-            allow_self_extension=parse_bool("allow_self_extension"),
-            carrier_room=cell("carrier_room"),
-            enterprise_room=cell("enterprise_room"),
-            has_authorization=parse_bool("has_authorization"),
-            authorization_letter=cell("authorization_letter"),
-            auth_start_date=parse_date("auth_start_date"),
-            auth_end_date=parse_date("auth_end_date"),
-            group_code=cell("group_code"),
-            region=cell("region"),
-            other_room_description=cell("other_room_description"),
-            is_green_channel=parse_bool("is_green_channel"),
-            blacklist_whitelist_type=cell("blacklist_whitelist_type"),
-            audit_form=cell("audit_form"),
-            customer_type=cell("customer_type"),
-            basic_telecom_enterprise_id=cell("basic_telecom_enterprise_id"),
-        ))
+        # Validate booleans
+        for bool_field, cn_name in [
+            ("allow_self_extension", "是否允许自行扩展"),
+            ("has_authorization", "是否具有授权书"),
+            ("is_green_channel", "是否绿色通道"),
+        ]:
+            v = cell(bool_field)
+            if v and v not in ("是", "否", "true", "True", "1", "TRUE", "false", "False", "0", "FALSE"):
+                row_errors.append({
+                    "row": row_idx, "field": cn_name, "value": v,
+                    "reason": "布尔字段值无效", "suggestion": "请填写「是」或「否」",
+                })
+
+        # Validate dates (collects errors into row_errors)
+        parse_date("port_activation_date", "端口入网时间")
+        parse_date("auth_start_date", "授权开始日期")
+        parse_date("auth_end_date", "授权结束日期")
+
+        if row_errors:
+            errors.extend(row_errors)
+        else:
+            objects.append(PortInfo(
+                carrier=carrier,
+                main_port_number=main_port_number,
+                enterprise_name=enterprise_name,
+                sub_port_number=cell("sub_port_number"),
+                port_range=cell("port_range"),
+                province=cell("province"),
+                city=cell("city"),
+                port_type=port_type,
+                operation_type=cell("operation_type"),
+                port_activation_date=parse_date("port_activation_date", "端口入网时间"),
+                allow_self_extension=parse_bool("allow_self_extension"),
+                carrier_room=cell("carrier_room"),
+                enterprise_room=cell("enterprise_room"),
+                has_authorization=parse_bool("has_authorization"),
+                authorization_letter=cell("authorization_letter"),
+                auth_start_date=parse_date("auth_start_date", "授权开始日期"),
+                auth_end_date=parse_date("auth_end_date", "授权结束日期"),
+                group_code=cell("group_code"),
+                region=cell("region"),
+                other_room_description=cell("other_room_description"),
+                is_green_channel=parse_bool("is_green_channel"),
+                blacklist_whitelist_type=cell("blacklist_whitelist_type"),
+                audit_form=cell("audit_form"),
+                customer_type=cell("customer_type"),
+                basic_telecom_enterprise_id=cell("basic_telecom_enterprise_id"),
+            ))
+            data_row_indices.append(row_idx)
+
+    # Phase 2: If no valid rows, return all errors
+    if not objects and errors:
+        return {
+            "total": len(objects) + len({e["row"] for e in errors}),
+            "success_count": 0,
+            "error_count": len(errors),
+            "errors": errors,
+        }
 
     if not objects:
         raise HTTPException(status_code=400, detail="文件中没有有效数据")
 
+    # Phase 3: Write valid rows + extract images with fixed indices
     session.add_all(objects)
     session.flush()
 
@@ -301,13 +353,15 @@ def import_port_infos(
     if file.filename.endswith(".xlsx"):
         all_images: list = []
         try:
-            all_images.extend(extract_cell_images_from_xlsx(content, headers=header_row))
-        except Exception:
-            pass
+            all_images.extend(extract_cell_images_from_xlsx(
+                content, headers=header_row, data_row_indices=data_row_indices,
+            ))
+        except Exception as e:
+            warnings.append(f"单元格图片提取失败: {e}")
         try:
-            all_images.extend(extract_images_from_xlsx(content))
-        except Exception:
-            pass
+            all_images.extend(extract_images_from_xlsx(content, data_row_indices=data_row_indices))
+        except Exception as e:
+            warnings.append(f"浮动图片提取失败: {e}")
         if all_images:
             _, img_warnings = upload_import_images(
                 images=all_images,
@@ -319,10 +373,51 @@ def import_port_infos(
 
     session.commit()
 
-    msg = f"成功导入 {len(objects)} 条端口信息"
-    if warnings:
-        msg += "。" + "；".join(warnings)
-    return {"count": len(objects), "message": msg}
+    return {
+        "total": len(objects) + len({e["row"] for e in errors}),
+        "success_count": len(objects),
+        "error_count": len(errors),
+        "errors": errors,
+        "warnings": warnings,
+    }
+
+
+class ImportErrorReport(BaseModel):
+    errors: list[dict]
+
+
+@router.post("/import/error-report")
+def download_import_error_report(body: ImportErrorReport) -> Any:
+    """Generate an Excel file highlighting import errors."""
+    from openpyxl.styles import Font, PatternFill
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "导入错误报告"
+
+    headers = ["行号", "字段", "原值", "失败原因", "修复建议"]
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = Font(bold=True)
+
+    red_fill = PatternFill(start_color="FFD7D7", end_color="FFD7D7", fill_type="solid")
+    for i, err in enumerate(body.errors, 2):
+        ws.cell(row=i, column=1, value=err.get("row"))
+        ws.cell(row=i, column=2, value=err.get("field"))
+        ws.cell(row=i, column=3, value=err.get("value"))
+        ws.cell(row=i, column=4, value=err.get("reason"))
+        ws.cell(row=i, column=5, value=err.get("suggestion"))
+        for col in range(1, 6):
+            ws.cell(row=i, column=col).fill = red_fill
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote('导入错误报告.xlsx')}"},
+    )
 
 
 @router.get("", response_model=PortInfosPublic)

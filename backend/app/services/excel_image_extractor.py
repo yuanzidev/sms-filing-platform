@@ -51,7 +51,10 @@ def _cell_ref_to_rc(ref: str) -> tuple[int, int]:
 
 
 def extract_cell_images_from_xlsx(
-    content: bytes, headers: list[str] | None = None, header_row_count: int = 1
+    content: bytes,
+    headers: list[str] | None = None,
+    header_row_count: int = 1,
+    data_row_indices: list[int] | None = None,
 ) -> list[ExtractedImage]:
     """Extract images embedded in cells via DISPIMG() (Place in Cell feature)."""
     zf = zipfile.ZipFile(BytesIO(content))
@@ -166,10 +169,27 @@ def extract_cell_images_from_xlsx(
             ))
 
     zf.close()
+
+    # Remap Excel row numbers to data list indices (empty rows are skipped in the data list)
+    if data_row_indices:
+        excel_row_to_data_idx = {
+            excel_row: data_idx for data_idx, excel_row in enumerate(data_row_indices)
+        }
+        for img in extracted:
+            # img.row_index 是 0-based 数据行号，先还原为 Excel 行号（1-based）再查映射
+            excel_row = img.row_index + header_row_count + 1
+            if excel_row in excel_row_to_data_idx:
+                img.row_index = excel_row_to_data_idx[excel_row]
+            else:
+                img.row_index = -1  # mark for removal
+        extracted = [img for img in extracted if img.row_index >= 0]
+
     return extracted
 
 
-def extract_images_from_xlsx(content: bytes, header_row_count: int = 1) -> list[ExtractedImage]:
+def extract_images_from_xlsx(
+    content: bytes, header_row_count: int = 1, data_row_indices: list[int] | None = None
+) -> list[ExtractedImage]:
     """Extract floating images anchored to cells (legacy compatibility)."""
     wb = load_workbook(BytesIO(content), read_only=False)
     ws = wb.active
@@ -199,6 +219,21 @@ def extract_images_from_xlsx(content: bytes, header_row_count: int = 1) -> list[
             continue
 
     wb.close()
+
+    # Remap Excel row numbers to data list indices (empty rows are skipped in the data list)
+    if data_row_indices:
+        excel_row_to_data_idx = {
+            excel_row: data_idx for data_idx, excel_row in enumerate(data_row_indices)
+        }
+        for img in extracted:
+            # img.row_index 是 0-based 数据行号，先还原为 Excel 行号（1-based）再查映射
+            excel_row = img.row_index + header_row_count + 1
+            if excel_row in excel_row_to_data_idx:
+                img.row_index = excel_row_to_data_idx[excel_row]
+            else:
+                img.row_index = -1  # mark for removal
+        extracted = [img for img in extracted if img.row_index >= 0]
+
     return extracted
 
 

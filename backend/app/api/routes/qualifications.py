@@ -7,6 +7,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
+from pydantic import BaseModel
 
 from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
 from app.crud.qualification import (
@@ -261,7 +262,11 @@ def import_qualifications(
             detail=f"模板不匹配：缺少必填列「{'」「'.join(missing)}」。请确认使用了正确的资质导入模板（首页 → 资质管理 → 下载模板）",
         )
 
+    # Phase 1: Validate all rows, collect errors
     objects: list[QualificationInfo] = []
+    errors: list[dict] = []
+    data_row_indices: list[int] = []
+
     for row_idx, row in enumerate(rows[1:], start=2):
         # Skip completely empty rows
         if all(c is None or str(c).strip() == "" for c in row):
@@ -284,56 +289,87 @@ def import_qualifications(
                 return None
             return v in ("是", "true", "True", "1", "TRUE")
 
+        row_errors: list[dict] = []
         enterprise_name = cell("enterprise_name")
         if not enterprise_name:
-            raise HTTPException(status_code=400, detail=f"第{row_idx}行: 企业名称不能为空")
+            row_errors.append({
+                "row": row_idx, "field": "企业名称", "value": "",
+                "reason": "企业名称不能为空", "suggestion": "请填写企业名称",
+            })
 
-        legal_rep_cert_type = cell("legal_representative_cert_type")
-        legal_rep_cert_number = cell("legal_representative_cert_number")
-        legal_rep_cert_address = cell("legal_representative_cert_address")
+        # Validate booleans
+        for bool_field, cn_name in [
+            ("signature_verified", "是否签名校验"),
+            ("is_gateway_signature", "是否网关签名"),
+            ("template_has_variable", "模板是否包含变量"),
+        ]:
+            v = cell(bool_field)
+            if v and v not in ("是", "否", "true", "True", "1", "TRUE", "false", "False", "0", "FALSE"):
+                row_errors.append({
+                    "row": row_idx, "field": cn_name, "value": v,
+                    "reason": "布尔字段值无效", "suggestion": "请填写「是」或「否」",
+                })
 
-        objects.append(QualificationInfo(
-            enterprise_name=enterprise_name,
-            cert_type=cell("cert_type"),
-            cert_number=cell("cert_number"),
-            app_platform_name=cell("app_platform_name"),
-            legal_representative_name=cell("legal_representative_name"),
-            legal_representative_cert_type=legal_rep_cert_type,
-            legal_representative_cert_number=legal_rep_cert_number,
-            legal_representative_cert_address=legal_rep_cert_address,
-            responsible_name=cell("responsible_name"),
-            responsible_cert_type=cell("responsible_cert_type"),
-            responsible_cert_number=cell("responsible_cert_number"),
-            responsible_address=cell("responsible_address"),
-            responsible_phone=cell("responsible_phone"),
-            handler_name=cell("handler_name"),
-            handler_cert_type=cell("handler_cert_type"),
-            handler_cert_number=cell("handler_cert_number"),
-            handler_address=cell("handler_address"),
-            handler_phone=cell("handler_phone"),
-            sms_signature=cell("sms_signature"),
-            signature_type=cell("signature_type"),
-            signature_verified=parse_bool("signature_verified"),
-            is_gateway_signature=parse_bool("is_gateway_signature"),
-            sms_template_content=cell("sms_template_content"),
-            template_has_variable=parse_bool("template_has_variable"),
-            template_param_type=cell("template_param_type"),
-            template_param_length=cell("template_param_length"),
-            business_attribute=cell("business_attribute"),
-            business_type=cell("business_type"),
-            business_subtype=cell("business_subtype"),
-            specific_usage=cell("specific_usage"),
-            diversion_number=cell("diversion_number"),
-            diversion_number_type=cell("diversion_number_type"),
-            diversion_number_usage=cell("diversion_number_usage"),
-            diversion_content=cell("diversion_content"),
-            link_address=cell("link_address"),
-            link_type=cell("link_type"),
-        ))
+        if row_errors:
+            errors.extend(row_errors)
+        else:
+            legal_rep_cert_type = cell("legal_representative_cert_type")
+            legal_rep_cert_number = cell("legal_representative_cert_number")
+            legal_rep_cert_address = cell("legal_representative_cert_address")
+
+            objects.append(QualificationInfo(
+                enterprise_name=enterprise_name,
+                cert_type=cell("cert_type"),
+                cert_number=cell("cert_number"),
+                app_platform_name=cell("app_platform_name"),
+                legal_representative_name=cell("legal_representative_name"),
+                legal_representative_cert_type=legal_rep_cert_type,
+                legal_representative_cert_number=legal_rep_cert_number,
+                legal_representative_cert_address=legal_rep_cert_address,
+                responsible_name=cell("responsible_name"),
+                responsible_cert_type=cell("responsible_cert_type"),
+                responsible_cert_number=cell("responsible_cert_number"),
+                responsible_address=cell("responsible_address"),
+                responsible_phone=cell("responsible_phone"),
+                handler_name=cell("handler_name"),
+                handler_cert_type=cell("handler_cert_type"),
+                handler_cert_number=cell("handler_cert_number"),
+                handler_address=cell("handler_address"),
+                handler_phone=cell("handler_phone"),
+                sms_signature=cell("sms_signature"),
+                signature_type=cell("signature_type"),
+                signature_verified=parse_bool("signature_verified"),
+                is_gateway_signature=parse_bool("is_gateway_signature"),
+                sms_template_content=cell("sms_template_content"),
+                template_has_variable=parse_bool("template_has_variable"),
+                template_param_type=cell("template_param_type"),
+                template_param_length=cell("template_param_length"),
+                business_attribute=cell("business_attribute"),
+                business_type=cell("business_type"),
+                business_subtype=cell("business_subtype"),
+                specific_usage=cell("specific_usage"),
+                diversion_number=cell("diversion_number"),
+                diversion_number_type=cell("diversion_number_type"),
+                diversion_number_usage=cell("diversion_number_usage"),
+                diversion_content=cell("diversion_content"),
+                link_address=cell("link_address"),
+                link_type=cell("link_type"),
+            ))
+            data_row_indices.append(row_idx)
+
+    # Phase 2: If no valid rows, return all errors
+    if not objects and errors:
+        return {
+            "total": len(objects) + len({e["row"] for e in errors}),
+            "success_count": 0,
+            "error_count": len(errors),
+            "errors": errors,
+        }
 
     if not objects:
         raise HTTPException(status_code=400, detail="文件中没有有效数据")
 
+    # Phase 3: Write valid rows + extract images with fixed indices
     session.add_all(objects)
     session.flush()
 
@@ -341,13 +377,15 @@ def import_qualifications(
     if file.filename.endswith(".xlsx"):
         all_images: list = []
         try:
-            all_images.extend(extract_cell_images_from_xlsx(content, headers=header_row))
-        except Exception:
-            pass
+            all_images.extend(extract_cell_images_from_xlsx(
+                content, headers=header_row, data_row_indices=data_row_indices,
+            ))
+        except Exception as e:
+            warnings.append(f"单元格图片提取失败: {e}")
         try:
-            all_images.extend(extract_images_from_xlsx(content))
-        except Exception:
-            pass
+            all_images.extend(extract_images_from_xlsx(content, data_row_indices=data_row_indices))
+        except Exception as e:
+            warnings.append(f"浮动图片提取失败: {e}")
         if all_images:
             _, img_warnings = upload_import_images(
                 images=all_images,
@@ -359,10 +397,51 @@ def import_qualifications(
 
     session.commit()
 
-    msg = f"成功导入 {len(objects)} 条资质信息"
-    if warnings:
-        msg += "。" + "；".join(warnings)
-    return {"count": len(objects), "message": msg}
+    return {
+        "total": len(objects) + len({e["row"] for e in errors}),
+        "success_count": len(objects),
+        "error_count": len(errors),
+        "errors": errors,
+        "warnings": warnings,
+    }
+
+
+class ImportErrorReport(BaseModel):
+    errors: list[dict]
+
+
+@router.post("/import/error-report")
+def download_import_error_report(body: ImportErrorReport) -> Any:
+    """Generate an Excel file highlighting import errors."""
+    from openpyxl.styles import Font, PatternFill
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "导入错误报告"
+
+    headers = ["行号", "字段", "原值", "失败原因", "修复建议"]
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = Font(bold=True)
+
+    red_fill = PatternFill(start_color="FFD7D7", end_color="FFD7D7", fill_type="solid")
+    for i, err in enumerate(body.errors, 2):
+        ws.cell(row=i, column=1, value=err.get("row"))
+        ws.cell(row=i, column=2, value=err.get("field"))
+        ws.cell(row=i, column=3, value=err.get("value"))
+        ws.cell(row=i, column=4, value=err.get("reason"))
+        ws.cell(row=i, column=5, value=err.get("suggestion"))
+        for col in range(1, 6):
+            ws.cell(row=i, column=col).fill = red_fill
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote('导入错误报告.xlsx')}"},
+    )
 
 
 @router.post("/batch-by-signatures", response_model=BatchSignatureResponse)

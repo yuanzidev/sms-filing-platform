@@ -12,9 +12,21 @@ import {
 import { Upload, Download } from 'lucide-react'
 import { toast } from 'sonner'
 
-interface ImportResult {
-  count: number
-  message: string
+export interface ImportErrorItem {
+  row: number
+  field: string
+  value: string
+  reason: string
+  suggestion: string
+}
+
+export interface ImportResult {
+  total: number
+  success_count: number
+  error_count: number
+  errors: ImportErrorItem[]
+  message?: string
+  warnings?: string[]
 }
 
 interface ImportDialogProps {
@@ -24,6 +36,7 @@ interface ImportDialogProps {
   onDownloadTemplate: () => void
   onImport: (file: File) => Promise<ImportResult>
   onSuccess: () => void
+  onDownloadErrorReport?: (errors: ImportErrorItem[]) => Promise<void>
 }
 
 export function ImportDialog({
@@ -33,16 +46,19 @@ export function ImportDialog({
   onDownloadTemplate,
   onImport,
   onSuccess,
+  onDownloadErrorReport,
 }: ImportDialogProps) {
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [importErrors, setImportErrors] = useState<ImportErrorItem[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) {
       setFile(null)
       setError(null)
+      setImportErrors([])
     }
   }, [open])
 
@@ -50,12 +66,18 @@ export function ImportDialog({
     if (!file) return
     setLoading(true)
     setError(null)
+    setImportErrors([])
     try {
       const result = await onImport(file)
-      toast.success(result.message)
-      onOpenChange(false)
-      setFile(null)
-      onSuccess()
+      if (result.errors && result.errors.length > 0) {
+        setImportErrors(result.errors)
+        toast.error(`导入完成：成功 ${result.success_count} 条，失败 ${result.error_count} 条`)
+      } else {
+        toast.success(result.message || '导入成功')
+        onOpenChange(false)
+        setFile(null)
+        onSuccess()
+      }
     } catch (err: any) {
       let detail = err?.response?.data?.detail
       if (!detail) {
@@ -77,6 +99,16 @@ export function ImportDialog({
     if (f) {
       setFile(f)
       setError(null)
+      setImportErrors([])
+    }
+  }
+
+  const handleDownloadErrorReport = async () => {
+    if (!onDownloadErrorReport || importErrors.length === 0) return
+    try {
+      await onDownloadErrorReport(importErrors)
+    } catch {
+      toast.error('错误报告下载失败')
     }
   }
 
@@ -129,6 +161,43 @@ export function ImportDialog({
           {error && (
             <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
               {error}
+            </div>
+          )}
+
+          {importErrors.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium">导入错误详情</h4>
+                {onDownloadErrorReport && (
+                  <Button variant="outline" size="sm" onClick={handleDownloadErrorReport}>
+                    下载错误报告
+                  </Button>
+                )}
+              </div>
+              <div className="max-h-48 overflow-auto rounded border">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-muted">
+                      <th className="p-1 text-left">行号</th>
+                      <th className="p-1 text-left">字段</th>
+                      <th className="p-1 text-left">值</th>
+                      <th className="p-1 text-left">原因</th>
+                      <th className="p-1 text-left">建议</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importErrors.map((err, i) => (
+                      <tr key={i} className="border-t">
+                        <td className="p-1">{err.row}</td>
+                        <td className="p-1">{err.field}</td>
+                        <td className="max-w-[100px] truncate p-1">{err.value}</td>
+                        <td className="p-1 text-red-600">{err.reason}</td>
+                        <td className="p-1">{err.suggestion}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
