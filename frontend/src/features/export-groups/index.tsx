@@ -7,7 +7,12 @@ import {
   createExportGroup,
   updateExportGroup,
   deleteExportGroup,
+  exportExportGroup,
+  importExportGroup,
+  downloadRegistryTemplate,
+  type ExportGroupImportResult,
 } from '@/lib/api/export-groups'
+import { ImportDialog, type ImportResult } from '@/components/shared/import-dialog'
 import type { ExportGroup } from '@/lib/api/types'
 import {
   AlertDialog,
@@ -36,6 +41,7 @@ export function ExportGroupsPage() {
   const [selected, setSelected] = useState<ExportGroup | undefined>()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [toDelete, setToDelete] = useState<ExportGroup | undefined>()
+  const [importOpen, setImportOpen] = useState(false)
   const queryClient = useQueryClient()
 
   const { data, isLoading, isError } = useQuery({
@@ -76,6 +82,37 @@ export function ExportGroupsPage() {
     queryClient.invalidateQueries({ queryKey: ['export-groups'] })
   }
 
+  const handleExport = async (id: string) => {
+    try {
+      await exportExportGroup(id)
+      toast.success('字段组导出成功')
+    } catch {
+      toast.error('字段组导出失败')
+    }
+  }
+
+  const handleDownloadTemplate = async () => {
+    try {
+      await downloadRegistryTemplate()
+    } catch {
+      toast.error('下载字段编码表失败')
+    }
+  }
+
+  const handleImportFile = async (file: File): Promise<ImportResult> => {
+    const data: ExportGroupImportResult = await importExportGroup(file)
+    return {
+      total: data.success_count + data.error_count,
+      success_count: data.success_count,
+      error_count: data.error_count,
+      errors: data.errors ?? [],
+      message:
+        data.success_count > 0
+          ? `导入成功：字段组「${data.group_name}」，共 ${data.field_count} 个字段`
+          : undefined,
+    }
+  }
+
   return (
     <>
       <Header fixed>
@@ -94,6 +131,12 @@ export function ExportGroupsPage() {
             </p>
           </div>
           <div className='flex space-x-2'>
+            <Button variant='outline' onClick={() => setImportOpen(true)}>
+              导入字段组
+            </Button>
+            <Button variant='outline' onClick={handleDownloadTemplate}>
+              下载字段编码表
+            </Button>
             <Button
               onClick={() => {
                 setSelected(undefined)
@@ -153,6 +196,12 @@ export function ExportGroupsPage() {
                     <CardTitle className='text-base'>{group.name}</CardTitle>
                     <div className='flex gap-1'>
                       <ActionIconButton
+                        label='导出'
+                        icon='download'
+                        tone='download'
+                        onClick={() => handleExport(group.id)}
+                      />
+                      <ActionIconButton
                         label='编辑'
                         icon='edit'
                         tone='edit'
@@ -200,6 +249,17 @@ export function ExportGroupsPage() {
         onOpenChange={setDialogOpen}
         group={selected}
         onSubmit={selected ? handleUpdate : handleCreate}
+      />
+
+      <ImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title='字段组'
+        onDownloadTemplate={handleDownloadTemplate}
+        onImport={handleImportFile}
+        onSuccess={() =>
+          queryClient.invalidateQueries({ queryKey: ['export-groups'] })
+        }
       />
 
       <AlertDialog
