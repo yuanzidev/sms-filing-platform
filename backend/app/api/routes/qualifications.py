@@ -43,35 +43,30 @@ router = APIRouter(
 _QUALIFICATION_HEADERS = [
     "企业名称",
     "单位证件号码",
-    "法人姓名",
-    "法人证件类型",
-    "法人证件号码",
+    "单位证件类型",
+    "单位证件图片",
     "责任人姓名",
     "责任人证件类型",
     "责任人证件号码",
     "责任人手机号",
-    "短信签名",
-    "签名类型/来源",
-    "短信模板内容",
-    "引流号码",
-    "引流链接",
-    "签名举证附件",
-    "引流号码举证附件",
-    "引流链接举证",
-    "单位证件图片",
+    "责任人证件地址",
     "责任人身份证正面",
     "责任人身份证反面",
-    "法人身份证正面",
-    "法人身份证反面",
-    "单位证件类型",
-    "APP/平台名称",
-    "法人证件地址",
-    "责任人证件地址",
     "经办人姓名",
     "经办人证件类型",
     "经办人证件号码",
-    "经办人证件地址",
     "经办人手机号",
+    "经办人证件地址",
+    "经办人现场照片",
+    "法人姓名",
+    "法人证件类型",
+    "法人证件号码",
+    "法人证件地址",
+    "法人身份证正面",
+    "法人身份证反面",
+    "短信签名",
+    "签名类型/来源",
+    "短信模板内容",
     "是否签名校验",
     "是否网关签名",
     "模板是否包含变量",
@@ -81,11 +76,16 @@ _QUALIFICATION_HEADERS = [
     "业务类型",
     "业务细类",
     "具体用途",
+    "引流号码",
+    "引流链接",
     "引流号码类型",
     "引流号码用途",
     "引流内容",
     "链接类型",
-    "经办人现场照片",
+    "签名举证附件",
+    "引流号码举证附件",
+    "引流链接举证",
+    "APP/平台名称",
 ]
 
 
@@ -105,35 +105,30 @@ def download_qualification_template() -> Any:
     example_data = [
         "示例企业有限公司",
         "91110108MA01XXXXX",          # 单位证件号码
-        "张三",                        # 法人姓名
-        "身份证",                      # 法人证件类型
-        "110101199001011234",          # 法人证件号码
+        "营业执照",                    # 单位证件类型
+        "",                            # 单位证件图片
         "李四",                        # 责任人姓名
         "身份证",                      # 责任人证件类型
         "110101199001011234",          # 责任人证件号码
         "13800138000",                 # 责任人手机号
-        "示例平台",                    # 短信签名
-        "自营签名",                    # 签名类型/来源
-        "您的验证码是{code}，请在5分钟内完成验证",  # 短信模板内容
-        "13800000000",                 # 引流号码
-        "https://example.com",         # 引流链接
-        "",                            # 签名举证附件（图片占位）
-        "",                            # 引流号码举证附件
-        "",                            # 引流链接举证
-        "",                            # 单位证件图片
+        "北京市朝阳区XX路1号",         # 责任人证件地址
         "",                            # 责任人身份证正面
         "",                            # 责任人身份证反面
-        "",                            # 法人身份证正面
-        "",                            # 法人身份证反面
-        "营业执照",                    # 单位证件类型
-        "示例平台",                    # APP/平台名称
-        "北京市朝阳区XX路1号",         # 法人证件地址
-        "北京市朝阳区XX路1号",         # 责任人证件地址
         "王五",                        # 经办人姓名
         "身份证",                      # 经办人证件类型
         "110101199501011234",          # 经办人证件号码
-        "北京市海淀区XX路2号",         # 经办人证件地址
         "13900139000",                 # 经办人手机号
+        "北京市海淀区XX路2号",         # 经办人证件地址
+        "",                            # 经办人现场照片
+        "张三",                        # 法人姓名
+        "身份证",                      # 法人证件类型
+        "110101199001011234",          # 法人证件号码
+        "北京市朝阳区XX路1号",         # 法人证件地址
+        "",                            # 法人身份证正面
+        "",                            # 法人身份证反面
+        "示例平台",                    # 短信签名
+        "自营签名",                    # 签名类型/来源
+        "您的验证码是{code}，请在5分钟内完成验证",  # 短信模板内容
         "是",                          # 是否签名校验
         "否",                          # 是否网关签名
         "是",                          # 模板是否包含变量
@@ -143,11 +138,16 @@ def download_qualification_template() -> Any:
         "验证码",                      # 业务类型
         "登录验证",                    # 业务细类
         "用户登录验证",                # 具体用途
+        "13800000000",                 # 引流号码
+        "https://example.com",         # 引流链接
         "手机号",                      # 引流号码类型
         "业务联系",                    # 引流号码用途
         "欢迎使用我们的服务",          # 引流内容
         "H5",                          # 链接类型
-        "",                            # 经办人现场照片
+        "",                            # 签名举证附件
+        "",                            # 引流号码举证附件
+        "",                            # 引流链接举证
+        "示例平台",                    # APP/平台名称
     ]
     for col_idx, val in enumerate(example_data, 1):
         ws.cell(row=2, column=col_idx, value=val)
@@ -179,8 +179,8 @@ def download_qualification_template() -> Any:
     img_buf = io.BytesIO()
     sample_img.save(img_buf, format="PNG")
 
-    # First image column is column 15 (1-based) = "O2" (签名举证附件)
-    cell_images = {"O2": img_buf.getvalue()}
+    # 签名举证附件 is column 42 (1-based) = "AP2"
+    cell_images = {"AP2": img_buf.getvalue()}
     xlsx_bytes = inject_cell_images(xlsx_bytes, cell_images)
 
     return StreamingResponse(
@@ -254,7 +254,7 @@ def import_qualifications(
         if h in header_to_field:
             col_map[header_to_field[h]] = col_idx
 
-    missing = [h for h, f in header_to_field.items() if f in ("enterprise_name", "legal_representative_cert_type", "legal_representative_cert_number", "legal_representative_cert_address") and f not in col_map]
+    missing = [h for h, f in header_to_field.items() if f == "enterprise_name" and f not in col_map]
     if missing:
         raise HTTPException(
             status_code=400,

@@ -65,11 +65,11 @@ def _build_xlsx(headers: list[str], rows: list[list]) -> bytes:
     return buf.getvalue()
 
 
-def test_import_rejects_missing_required_fields(
+def test_import_rejects_missing_enterprise_name(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
-    headers = ["企业名称", "法人证件类型", "法人证件号码"]
-    rows = [["测试企业A", "", ""]]
+    headers = ["法人证件类型", "法人证件号码"]
+    rows = [["身份证", "110101199001011234"]]
     data = _build_xlsx(headers, rows)
 
     files = {"file": ("test.xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
@@ -79,7 +79,25 @@ def test_import_rejects_missing_required_fields(
         files=files,
     )
     assert r.status_code == 400
-    assert "法人证件" in r.json()["detail"]
+    assert "企业名称" in r.json()["detail"]
+
+
+def test_import_succeeds_without_legal_rep_columns(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """法人证件列完全缺失时仍可导入（法人字段选填）"""
+    headers = ["企业名称", "短信签名"]
+    rows = [["测试企业C", "测试签名"]]
+    data = _build_xlsx(headers, rows)
+
+    files = {"file": ("test.xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/import",
+        headers=superuser_token_headers,
+        files=files,
+    )
+    assert r.status_code == 200
+    assert r.json()["count"] == 1
 
 
 def test_import_success_with_required_fields(
@@ -114,12 +132,15 @@ def test_template_column_order_matches_new_spec(
     wb = load_workbook(BytesIO(r.content))
     ws = wb.active
     headers = [c.value for c in ws[1]]
-    # 新模板 45 列关键位置断言
-    assert headers[13] == "引流链接", f"col14 应为「引流链接」，实际：{headers[13]}"
-    assert headers[15] == "引流号码举证附件", f"col16 应为「引流号码举证附件」，实际：{headers[15]}"
-    assert headers[16] == "引流链接举证", f"col17 应为「引流链接举证」，实际：{headers[16]}"
-    assert headers[20] == "法人身份证正面", f"col21 应为「法人身份证正面」，实际：{headers[20]}"
-    assert headers[21] == "法人身份证反面", f"col22 应为「法人身份证反面」，实际：{headers[21]}"
+    # 新模板 45 列关键位置断言（经办人字段前置、法人字段跟随）
+    assert headers[11] == "经办人姓名", f"col12 应为「经办人姓名」，实际：{headers[11]}"
+    assert headers[17] == "法人姓名", f"col18 应为「法人姓名」，实际：{headers[17]}"
+    assert headers[21] == "法人身份证正面", f"col22 应为「法人身份证正面」，实际：{headers[21]}"
+    assert headers[22] == "法人身份证反面", f"col23 应为「法人身份证反面」，实际：{headers[22]}"
+    assert headers[36] == "引流链接", f"col37 应为「引流链接」，实际：{headers[36]}"
+    assert headers[41] == "签名举证附件", f"col42 应为「签名举证附件」，实际：{headers[41]}"
+    assert headers[42] == "引流号码举证附件", f"col43 应为「引流号码举证附件」，实际：{headers[42]}"
+    assert headers[43] == "引流链接举证", f"col44 应为「引流链接举证」，实际：{headers[43]}"
     # 旧名不应存在
     assert "链接地址" not in headers
     assert "经办人身份证正面" not in headers
@@ -218,7 +239,7 @@ def test_template_signature_example_has_no_brackets(
     )
     wb = load_workbook(BytesIO(r.content))
     ws = wb.active
-    sig_cell = ws.cell(row=2, column=10).value  # 短信签名列
+    sig_cell = ws.cell(row=2, column=24).value  # 短信签名列
     assert "【" not in str(sig_cell)
     assert "】" not in str(sig_cell)
 
