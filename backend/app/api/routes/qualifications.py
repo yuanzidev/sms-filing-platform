@@ -387,13 +387,14 @@ def import_qualifications(
         except Exception as e:
             warnings.append(f"浮动图片提取失败: {e}")
         if all_images:
-            _, img_warnings = upload_import_images(
+            _, img_warnings, img_errors = upload_import_images(
                 images=all_images,
                 objects=objects,
                 entity_type="qualification_info",
                 session=session,
             )
             warnings.extend(img_warnings)
+            errors.extend(img_errors)
 
     session.commit()
 

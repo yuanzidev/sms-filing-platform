@@ -10,8 +10,10 @@ from datetime import date
 from io import BytesIO
 
 from openpyxl import load_workbook
+from PIL import Image as PILImage
 
 from app.core.storage import get_storage
+from app.models import FileAttachment
 
 _MIME_MAP = {
     "png": "image/png", "jpeg": "image/jpeg", "jpg": "image/jpeg",
@@ -237,21 +239,59 @@ def extract_images_from_xlsx(
     return extracted
 
 
+ALLOWED_FORMATS = {"PNG", "JPEG", "JPG", "GIF", "BMP", "WEBP"}
+MAX_SIZE = 10 * 1024 * 1024  # 10MB
+
+
 def upload_import_images(
     images: list[ExtractedImage],
     objects: list,
     entity_type: str,
     session,
-) -> tuple[int, list[str]]:
-    from app.models import FileAttachment
+) -> tuple[list[FileAttachment], list[str], list[dict]]:
+    """Returns (attachments, warnings, image_errors).
 
+    image_errors: [{row, column, reason, suggestion?}]
+    """
     storage = get_storage()
-    uploaded = 0
+    attachments: list[FileAttachment] = []
     warnings: list[str] = []
+    image_errors: list[dict] = []
 
     for img in images:
-        if img.row_index >= len(objects):
-            warnings.append(f"第{img.row_index+1}行的图片无法匹配到数据记录，已跳过")
+        if img.row_index < 0 or img.row_index >= len(objects):
+            image_errors.append({
+                "row": img.row_index,
+                "column": img.field_name or "未知",
+                "reason": f"行索引 {img.row_index} 超出数据范围",
+            })
+            continue
+
+        # Validate format
+        try:
+            pil_img = PILImage.open(io.BytesIO(img.data))
+            if pil_img.format and pil_img.format.upper() not in ALLOWED_FORMATS:
+                image_errors.append({
+                    "row": img.row_index + 2, "column": img.field_name or "",
+                    "reason": f"不支持的图片格式: {pil_img.format}",
+                    "suggestion": f"支持的格式: {', '.join(ALLOWED_FORMATS)}",
+                })
+                continue
+        except Exception:
+            image_errors.append({
+                "row": img.row_index + 2, "column": img.field_name or "",
+                "reason": "图片文件损坏或无法解析",
+            })
+            continue
+
+        # Validate size
+        if len(img.data) > MAX_SIZE:
+            size_mb = len(img.data) / (1024 * 1024)
+            image_errors.append({
+                "row": img.row_index + 2, "column": img.field_name or "",
+                "reason": f"图片过大({size_mb:.1f}MB)",
+                "suggestion": "请压缩到 10MB 以内",
+            })
             continue
 
         entity_id = objects[img.row_index].id
@@ -274,9 +314,9 @@ def upload_import_images(
             field_name=img.field_name,
         )
         session.add(fa)
-        uploaded += 1
+        attachments.append(fa)
 
-    return uploaded, warnings
+    return attachments, warnings, image_errors
 
 
 def inject_cell_images(xlsx_bytes: bytes, cell_images: dict[str, bytes]) -> bytes:
