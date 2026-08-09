@@ -41,6 +41,45 @@ router = APIRouter(
     dependencies=[Depends(get_current_active_superuser)],
 )
 
+_QUALIFICATION_HEADER_TO_FIELD = {
+    "企业名称": "enterprise_name",
+    "单位证件类型": "cert_type",
+    "单位证件号码": "cert_number",
+    "APP/平台名称": "app_platform_name",
+    "法人姓名": "legal_representative_name",
+    "法人证件类型": "legal_representative_cert_type",
+    "法人证件号码": "legal_representative_cert_number",
+    "法人证件地址": "legal_representative_cert_address",
+    "责任人姓名": "responsible_name",
+    "责任人证件类型": "responsible_cert_type",
+    "责任人证件号码": "responsible_cert_number",
+    "责任人证件地址": "responsible_address",
+    "责任人手机号": "responsible_phone",
+    "经办人姓名": "handler_name",
+    "经办人证件类型": "handler_cert_type",
+    "经办人证件号码": "handler_cert_number",
+    "经办人证件地址": "handler_address",
+    "经办人手机号": "handler_phone",
+    "短信签名": "sms_signature",
+    "签名类型/来源": "signature_type",
+    "是否签名校验": "signature_verified",
+    "是否网关签名": "is_gateway_signature",
+    "短信模板内容": "sms_template_content",
+    "模板是否包含变量": "template_has_variable",
+    "模板参数类型": "template_param_type",
+    "模板参数长度": "template_param_length",
+    "业务属性": "business_attribute",
+    "业务类型": "business_type",
+    "业务细类": "business_subtype",
+    "具体用途": "specific_usage",
+    "引流号码": "diversion_number",
+    "引流号码类型": "diversion_number_type",
+    "引流号码用途": "diversion_number_usage",
+    "引流内容": "diversion_content",
+    "引流链接": "link_address",
+    "链接类型": "link_type",
+}
+
 _QUALIFICATION_HEADERS = [
     "企业名称",
     "单位证件号码",
@@ -187,8 +226,50 @@ def download_qualification_template() -> Any:
     return StreamingResponse(
         io.BytesIO(xlsx_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote('资质导入模板.xlsx')}"},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote('资质导入模板_v2.xlsx')}"},
     )
+
+
+@router.post("/import/preview")
+def preview_qualifications_import(file: UploadFile = File(...)) -> Any:
+    """解析 Excel 前 5 行数据并返回预览，供导入前核对表头与数据。"""
+    if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
+    content = file.file.read()
+    try:
+        wb = load_workbook(io.BytesIO(content))
+    except Exception:
+        raise HTTPException(status_code=400, detail="无法解析 Excel 文件")
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    if len(rows) < 1:
+        raise HTTPException(status_code=400, detail="文件为空")
+
+    header_to_field = _QUALIFICATION_HEADER_TO_FIELD
+    header_row = [str(c) if c else "" for c in rows[0]]
+    col_map: dict[str, int] = {}
+    for col_idx, h in enumerate(header_row):
+        if h in header_to_field:
+            col_map[header_to_field[h]] = col_idx
+
+    unrecognized = [h for h in header_row if h and h not in header_to_field and h not in ("", "None")]
+
+    preview_rows = []
+    for row in rows[1:6]:  # first 5 data rows
+        if all(c is None or str(c).strip() == "" for c in row):
+            continue
+        row_data = {}
+        for field_name, col_idx in col_map.items():
+            v = row[col_idx] if col_idx < len(row) else None
+            row_data[field_name] = str(v).strip() if v is not None and str(v).strip() else None
+        preview_rows.append(row_data)
+
+    return {
+        "headers": header_row,
+        "rows": preview_rows,
+        "unrecognized_headers": unrecognized,
+        "total_data_rows": len([r for r in rows[1:] if not all(c is None or str(c).strip() == "" for c in r)]),
+    }
 
 
 @router.post("/import")
@@ -209,51 +290,15 @@ def import_qualifications(
     if len(rows) < 1:
         raise HTTPException(status_code=400, detail="文件为空，请导入有效的 Excel 文件")
 
-    # Map model field names to column index by matching Chinese headers
-    header_to_field = {
-        "企业名称": "enterprise_name",
-        "单位证件类型": "cert_type",
-        "单位证件号码": "cert_number",
-        "APP/平台名称": "app_platform_name",
-        "法人姓名": "legal_representative_name",
-        "法人证件类型": "legal_representative_cert_type",
-        "法人证件号码": "legal_representative_cert_number",
-        "法人证件地址": "legal_representative_cert_address",
-        "责任人姓名": "responsible_name",
-        "责任人证件类型": "responsible_cert_type",
-        "责任人证件号码": "responsible_cert_number",
-        "责任人证件地址": "responsible_address",
-        "责任人手机号": "responsible_phone",
-        "经办人姓名": "handler_name",
-        "经办人证件类型": "handler_cert_type",
-        "经办人证件号码": "handler_cert_number",
-        "经办人证件地址": "handler_address",
-        "经办人手机号": "handler_phone",
-        "短信签名": "sms_signature",
-        "签名类型/来源": "signature_type",
-        "是否签名校验": "signature_verified",
-        "是否网关签名": "is_gateway_signature",
-        "短信模板内容": "sms_template_content",
-        "模板是否包含变量": "template_has_variable",
-        "模板参数类型": "template_param_type",
-        "模板参数长度": "template_param_length",
-        "业务属性": "business_attribute",
-        "业务类型": "business_type",
-        "业务细类": "business_subtype",
-        "具体用途": "specific_usage",
-        "引流号码": "diversion_number",
-        "引流号码类型": "diversion_number_type",
-        "引流号码用途": "diversion_number_usage",
-        "引流内容": "diversion_content",
-        "引流链接": "link_address",
-        "链接类型": "link_type",
-    }
+    header_to_field = _QUALIFICATION_HEADER_TO_FIELD
 
     header_row = [str(c) if c else "" for c in rows[0]]
     col_map: dict[str, int] = {}
     for col_idx, h in enumerate(header_row):
         if h in header_to_field:
             col_map[header_to_field[h]] = col_idx
+
+    unrecognized_headers = [h for h in header_row if h and h not in header_to_field and h not in ("", "None")]
 
     missing = [h for h, f in header_to_field.items() if f == "enterprise_name" and f not in col_map]
     if missing:
@@ -364,6 +409,7 @@ def import_qualifications(
             "success_count": 0,
             "error_count": len(errors),
             "errors": errors,
+            "unrecognized_headers": unrecognized_headers,
         }
 
     if not objects:
@@ -404,6 +450,7 @@ def import_qualifications(
         "error_count": len(errors),
         "errors": errors,
         "warnings": warnings,
+        "unrecognized_headers": unrecognized_headers,
     }
 
 

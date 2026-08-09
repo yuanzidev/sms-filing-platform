@@ -38,6 +38,34 @@ router = APIRouter(
     dependencies=[Depends(get_current_active_superuser)],
 )
 
+_PORT_HEADER_TO_FIELD = {
+    "运营商": "carrier",
+    "主端口号": "main_port_number",
+    "主端口备案公司": "enterprise_name",
+    "子端口号": "sub_port_number",
+    "码号使用范围": "port_range",
+    "接入省": "province",
+    "接入地市": "city",
+    "端口类型": "port_type",
+    "操作类型": "operation_type",
+    "端口入网时间": "port_activation_date",
+    "是否允许自行扩展": "allow_self_extension",
+    "运营商接入机房及设备": "carrier_room",
+    "企业接入机房及设备": "enterprise_room",
+    "是否具有授权书": "has_authorization",
+    "授权书": "authorization_letter",
+    "授权开始日期": "auth_start_date",
+    "授权结束日期": "auth_end_date",
+    "集团编码": "group_code",
+    "所属地区": "region",
+    "其他接入机房说明": "other_room_description",
+    "是否绿色通道": "is_green_channel",
+    "黑白名单类型": "blacklist_whitelist_type",
+    "端口审核表": "audit_form",
+    "客户类型": "customer_type",
+    "基础电信企业ID": "basic_telecom_enterprise_id",
+}
+
 _PORT_HEADERS = [
     "运营商",
     "主端口号",
@@ -137,8 +165,50 @@ def download_port_info_template() -> Any:
     return StreamingResponse(
         io.BytesIO(xlsx_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote('端口信息导入模板.xlsx')}"},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote('端口信息导入模板_v2.xlsx')}"},
     )
+
+
+@router.post("/import/preview")
+def preview_port_info_import(file: UploadFile = File(...)) -> Any:
+    """解析 Excel 前 5 行数据并返回预览，供导入前核对表头与数据。"""
+    if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
+    content = file.file.read()
+    try:
+        wb = load_workbook(io.BytesIO(content))
+    except Exception:
+        raise HTTPException(status_code=400, detail="无法解析 Excel 文件")
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    if len(rows) < 1:
+        raise HTTPException(status_code=400, detail="文件为空")
+
+    header_to_field = _PORT_HEADER_TO_FIELD
+    header_row = [str(c) if c else "" for c in rows[0]]
+    col_map: dict[str, int] = {}
+    for col_idx, h in enumerate(header_row):
+        if h in header_to_field:
+            col_map[header_to_field[h]] = col_idx
+
+    unrecognized = [h for h in header_row if h and h not in header_to_field and h not in ("", "None")]
+
+    preview_rows = []
+    for row in rows[1:6]:  # first 5 data rows
+        if all(c is None or str(c).strip() == "" for c in row):
+            continue
+        row_data = {}
+        for field_name, col_idx in col_map.items():
+            v = row[col_idx] if col_idx < len(row) else None
+            row_data[field_name] = str(v).strip() if v is not None and str(v).strip() else None
+        preview_rows.append(row_data)
+
+    return {
+        "headers": header_row,
+        "rows": preview_rows,
+        "unrecognized_headers": unrecognized,
+        "total_data_rows": len([r for r in rows[1:] if not all(c is None or str(c).strip() == "" for c in r)]),
+    }
 
 
 @router.post("/import")
@@ -159,39 +229,15 @@ def import_port_infos(
     if len(rows) < 1:
         raise HTTPException(status_code=400, detail="文件为空，请导入有效的 Excel 文件")
 
-    header_to_field = {
-        "运营商": "carrier",
-        "主端口号": "main_port_number",
-        "主端口备案公司": "enterprise_name",
-        "子端口号": "sub_port_number",
-        "码号使用范围": "port_range",
-        "接入省": "province",
-        "接入地市": "city",
-        "端口类型": "port_type",
-        "操作类型": "operation_type",
-        "端口入网时间": "port_activation_date",
-        "是否允许自行扩展": "allow_self_extension",
-        "运营商接入机房及设备": "carrier_room",
-        "企业接入机房及设备": "enterprise_room",
-        "是否具有授权书": "has_authorization",
-        "授权书": "authorization_letter",
-        "授权开始日期": "auth_start_date",
-        "授权结束日期": "auth_end_date",
-        "集团编码": "group_code",
-        "所属地区": "region",
-        "其他接入机房说明": "other_room_description",
-        "是否绿色通道": "is_green_channel",
-        "黑白名单类型": "blacklist_whitelist_type",
-        "端口审核表": "audit_form",
-        "客户类型": "customer_type",
-        "基础电信企业ID": "basic_telecom_enterprise_id",
-    }
+    header_to_field = _PORT_HEADER_TO_FIELD
 
     header_row = [str(c) if c else "" for c in rows[0]]
     col_map: dict[str, int] = {}
     for col_idx, h in enumerate(header_row):
         if h in header_to_field:
             col_map[header_to_field[h]] = col_idx
+
+    unrecognized_headers = [h for h in header_row if h and h not in header_to_field and h not in ("", "None")]
 
     required_fields = ["carrier", "main_port_number", "enterprise_name", "port_type"]
     missing = [h for h, f in header_to_field.items() if f in required_fields and f not in col_map]
@@ -340,6 +386,7 @@ def import_port_infos(
             "success_count": 0,
             "error_count": len(errors),
             "errors": errors,
+            "unrecognized_headers": unrecognized_headers,
         }
 
     if not objects:
@@ -380,6 +427,7 @@ def import_port_infos(
         "error_count": len(errors),
         "errors": errors,
         "warnings": warnings,
+        "unrecognized_headers": unrecognized_headers,
     }
 
 

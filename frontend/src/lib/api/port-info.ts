@@ -63,12 +63,27 @@ export interface ImportResult {
   error_count: number
   errors: ImportErrorItem[]
   warnings?: string[]
+  unrecognized_headers?: string[]
+}
+
+export interface ImportPreviewResult {
+  headers: string[]
+  rows: Record<string, string | null>[]
+  unrecognized_headers: string[]
+  total_data_rows: number
 }
 
 export const importPortInfos = async (file: File): Promise<ImportResult> => {
   const formData = new FormData()
   formData.append('file', file)
   const response = await api.post('/api/v1/port-info/import', formData)
+  return response.data
+}
+
+export const previewPortInfosImport = async (file: File): Promise<ImportPreviewResult> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  const response = await api.post('/api/v1/port-info/import/preview', formData)
   return response.data
 }
 

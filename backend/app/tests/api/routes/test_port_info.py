@@ -227,3 +227,39 @@ def test_filter_port_infos_by_city_and_type(
     )
     assert r2.status_code == 200
     assert r2.json()["total"] == 0
+
+
+def test_preview_port_info_import(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """预览接口返回前 5 行数据与未识别表头"""
+    from io import BytesIO
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    headers = ["运营商", "主端口号", "主端口备案公司", "端口类型", "未知列"]
+    for col_idx, h in enumerate(headers, 1):
+        ws.cell(row=1, column=col_idx, value=h)
+    ws.cell(row=2, column=1, value="中国移动")
+    ws.cell(row=2, column=2, value="10690001")
+    ws.cell(row=2, column=3, value="测试企业")
+    ws.cell(row=2, column=4, value="短信")
+    ws.cell(row=2, column=5, value="忽略值")
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    r = client.post(
+        f"{settings.API_V1_STR}/port-info/import/preview",
+        headers=superuser_token_headers,
+        files={"file": ("test.xlsx", buf, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert "运营商" in body["headers"]
+    assert body["unrecognized_headers"] == ["未知列"]
+    assert body["total_data_rows"] == 1
+    assert body["rows"][0]["carrier"] == "中国移动"
+    assert body["rows"][0]["main_port_number"] == "10690001"

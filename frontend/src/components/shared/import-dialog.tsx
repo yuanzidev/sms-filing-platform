@@ -27,6 +27,14 @@ export interface ImportResult {
   errors: ImportErrorItem[]
   message?: string
   warnings?: string[]
+  unrecognized_headers?: string[]
+}
+
+export interface ImportPreviewResult {
+  headers: string[]
+  rows: Record<string, string | null>[]
+  unrecognized_headers: string[]
+  total_data_rows: number
 }
 
 interface ImportDialogProps {
@@ -35,6 +43,7 @@ interface ImportDialogProps {
   title: string
   onDownloadTemplate: () => void
   onImport: (file: File) => Promise<ImportResult>
+  onPreview?: (file: File) => Promise<ImportPreviewResult>
   onSuccess: () => void
   onDownloadErrorReport?: (errors: ImportErrorItem[]) => Promise<void>
 }
@@ -45,6 +54,7 @@ export function ImportDialog({
   title,
   onDownloadTemplate,
   onImport,
+  onPreview,
   onSuccess,
   onDownloadErrorReport,
 }: ImportDialogProps) {
@@ -52,6 +62,10 @@ export function ImportDialog({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [importErrors, setImportErrors] = useState<ImportErrorItem[]>([])
+  const [unrecognizedHeaders, setUnrecognizedHeaders] = useState<string[]>([])
+  const [previewData, setPreviewData] = useState<ImportPreviewResult | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -59,16 +73,45 @@ export function ImportDialog({
       setFile(null)
       setError(null)
       setImportErrors([])
+      setUnrecognizedHeaders([])
+      setPreviewData(null)
+      setPreviewError(null)
     }
   }, [open])
+
+  const handlePreview = async () => {
+    if (!file || !onPreview) return
+    setPreviewLoading(true)
+    setPreviewError(null)
+    setPreviewData(null)
+    try {
+      const result = await onPreview(file)
+      setPreviewData(result)
+      setUnrecognizedHeaders(result.unrecognized_headers ?? [])
+    } catch (err: any) {
+      let detail = err?.response?.data?.detail
+      if (!detail) {
+        detail = '预览失败，请检查文件格式'
+      } else if (Array.isArray(detail)) {
+        detail = detail.map((d: any) => d.msg || JSON.stringify(d)).join('；')
+      } else if (typeof detail === 'object') {
+        detail = detail.msg || detail.message || JSON.stringify(detail)
+      }
+      setPreviewError(String(detail))
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
 
   const handleImport = async () => {
     if (!file) return
     setLoading(true)
     setError(null)
     setImportErrors([])
+    setUnrecognizedHeaders([])
     try {
       const result = await onImport(file)
+      setUnrecognizedHeaders(result.unrecognized_headers ?? [])
       if (result.errors && result.errors.length > 0) {
         setImportErrors(result.errors)
         toast.error(`导入完成：成功 ${result.success_count} 条，失败 ${result.error_count} 条`)
@@ -100,8 +143,22 @@ export function ImportDialog({
       setFile(f)
       setError(null)
       setImportErrors([])
+      setUnrecognizedHeaders([])
+      setPreviewData(null)
+      setPreviewError(null)
     }
   }
+
+  // 预览行按表头顺序排列：后端返回 rows 的字段顺序与文件列顺序一致，
+  // 取未识别表头之外的列标题与行值一一对应
+  const previewColumns = previewData
+    ? (previewData.headers ?? []).filter(
+        (h) => h && !(previewData.unrecognized_headers ?? []).includes(h),
+      )
+    : []
+  const previewRowValues = previewData
+    ? (previewData.rows ?? []).map((row) => Object.values(row))
+    : []
 
   const handleDownloadErrorReport = async () => {
     if (!onDownloadErrorReport || importErrors.length === 0) return
@@ -164,6 +221,68 @@ export function ImportDialog({
             </div>
           )}
 
+          {previewError && (
+            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              {previewError}
+            </div>
+          )}
+
+          {unrecognizedHeaders.length > 0 && (
+            <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-700">
+              以下表头未被识别，导入时将被忽略：
+              <span className="font-medium"> {unrecognizedHeaders.join('、')}</span>
+            </div>
+          )}
+
+          {previewData && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium">
+                  数据预览（共 {previewData.total_data_rows} 行，显示前{' '}
+                  {previewRowValues.length} 行）
+                </h4>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => {
+                    setPreviewData(null)
+                    setPreviewError(null)
+                  }}
+                >
+                  收起预览
+                </Button>
+              </div>
+              <div className='max-h-48 overflow-auto rounded border'>
+                <table className='w-full text-xs'>
+                  <thead>
+                    <tr className='bg-muted'>
+                      {previewColumns.map((h, i) => (
+                        <th key={i} className='whitespace-nowrap p-1 text-left'>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewRowValues.map((values, rowIdx) => (
+                      <tr key={rowIdx} className='border-t'>
+                        {previewColumns.map((_, colIdx) => (
+                          <td
+                            key={colIdx}
+                            className='max-w-[140px] truncate p-1'
+                            title={values[colIdx] ?? ''}
+                          >
+                            {values[colIdx] || ''}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {importErrors.length > 0 && (
             <div className="mt-4 space-y-2">
               <div className="flex items-center justify-between">
@@ -206,6 +325,11 @@ export function ImportDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             取消
           </Button>
+          {onPreview && (
+            <Button variant="outline" onClick={handlePreview} disabled={!file || loading}>
+              {previewLoading ? '预览中...' : '预览数据'}
+            </Button>
+          )}
           <Button onClick={handleImport} disabled={!file || loading}>
             {loading ? '导入中...' : '确认导入'}
           </Button>

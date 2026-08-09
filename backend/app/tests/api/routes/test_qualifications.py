@@ -305,3 +305,39 @@ def test_import_returns_error_report_xlsx(
     assert ws.cell(row=2, column=2).value == "企业名称"
     assert ws.cell(row=3, column=5).value == "请填写「是」或「否」"
 
+
+
+def test_preview_qualifications_import(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """预览接口返回前 5 行数据与未识别表头"""
+    headers = ["企业名称", "短信签名", "未识别列X"]
+    rows = [["测试企业A", "签名A", "忽略值A"]]
+    data = _build_xlsx(headers, rows)
+
+    files = {"file": ("test.xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/import/preview",
+        headers=superuser_token_headers,
+        files=files,
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert "企业名称" in body["headers"]
+    assert body["unrecognized_headers"] == ["未识别列X"]
+    assert body["total_data_rows"] == 1
+    assert body["rows"][0]["enterprise_name"] == "测试企业A"
+    assert body["rows"][0]["sms_signature"] == "签名A"
+
+
+def test_preview_qualifications_import_rejects_bad_extension(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """非 Excel 文件返回 400"""
+    files = {"file": ("test.txt", b"not excel", "text/plain")}
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/import/preview",
+        headers=superuser_token_headers,
+        files=files,
+    )
+    assert r.status_code == 400

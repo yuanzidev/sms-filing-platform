@@ -17,6 +17,7 @@ import {
   downloadQualificationTemplate,
   downloadQualificationImportErrorReport,
   importQualifications,
+  previewQualificationsImport,
 } from '@/lib/api/qualifications'
 import type { QualificationInfo } from '@/lib/api/types'
 import { formatCN } from '@/lib/time'
@@ -346,6 +347,7 @@ export function QualificationsPage() {
         title='资质信息'
         onDownloadTemplate={downloadQualificationTemplate}
         onImport={importQualifications}
+        onPreview={previewQualificationsImport}
         onDownloadErrorReport={downloadQualificationImportErrorReport}
         onSuccess={() =>
           queryClient.invalidateQueries({ queryKey: ['qualifications'] })
