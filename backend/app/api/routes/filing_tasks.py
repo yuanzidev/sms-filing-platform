@@ -488,12 +488,17 @@ def download_task(*, session: SessionDep, id: uuid.UUID) -> Any:
     try:
         storage = get_storage()
         content = storage.download(task.file_path)
+        from urllib.parse import quote
+        from pathlib import Path
         from fastapi.responses import Response
+
+        ext = Path(task.file_path).suffix
+        encoded_name = quote(f"{task.task_name}{ext}")
         return Response(
             content=content,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={
-                "Content-Disposition": f"attachment; filename*=UTF-8''{task.task_name}.xlsx",
+                "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_name}",
             },
         )
     except Exception as e:

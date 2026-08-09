@@ -1,6 +1,6 @@
 ---
-name: work-log
-description: Use when the user types /work-log to generate or update a work log from git changes in the current session. Appends to same-day file if it exists.
+name: work-log-feixinyun
+description: Use when the user types /work-log-feixinyun to generate or update a work log for the SMS filing platform project. Appends to same-day file if it exists. Outputs to 飞信云/短信报备平台 directory.
 ---
 
 # Work Log Generator
