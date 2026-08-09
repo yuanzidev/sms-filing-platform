@@ -601,6 +601,22 @@ export function FilingCreatePage() {
               （资质 {selectedIds.length} × 主端口 {selectedGroupCount}）
             </div>
 
+            {/* 子端口号预览 */}
+            <div className="mt-4 rounded border p-3 text-sm">
+              <h4 className="font-medium mb-2">子端口号预览</h4>
+              {selectedPortIdList.map((id) => {
+                const p = allPorts.find((x) => x.id === id)
+                if (!p) return null
+                return (
+                  <div key={p.id} className="flex gap-4 text-muted-foreground">
+                    <span>主端口号: {p.main_port_number}</span>
+                    <span>子端口扩展码: {p.sub_port_number || '(自动生成)'}</span>
+                    <span>短信子端口号: {p.main_port_number}{p.sub_port_number || 'XXXXXX'}</span>
+                  </div>
+                )
+              })}
+            </div>
+
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(2)}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> 上一步

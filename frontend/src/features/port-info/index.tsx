@@ -154,9 +154,14 @@ export function PortInfoPage() {
   const columns = useMemo<ColumnDef<PortInfo>[]>(
     () => [
       {
-        id: 'port_number',
-        header: '端口号',
-        accessorFn: (row) => row.main_port_number || row.sub_port_number || '-',
+        accessorKey: 'main_port_number',
+        header: '主端口号',
+        cell: ({ getValue }) => getValue() || '-',
+      },
+      {
+        accessorKey: 'sub_port_number',
+        header: '子端口扩展码',
+        cell: ({ getValue }) => getValue() || '-',
       },
       {
         accessorKey: 'carrier',

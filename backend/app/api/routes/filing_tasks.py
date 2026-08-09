@@ -52,6 +52,20 @@ def get_field_value(
     """Get field value via registry source dispatch."""
     if field_name == "sub_port_number" and allocated_sub_port is not None:
         return allocated_sub_port
+    if field_name == "port_main_number":
+        return getattr(port, "main_port_number", "") or ""
+    if field_name == "port_sub_extension":
+        if allocated_sub_port is not None:
+            return allocated_sub_port
+        return getattr(port, "sub_port_number", "") or ""
+    if field_name == "port_full_number":
+        mpn = getattr(port, "main_port_number", "") or ""
+        sub = (
+            allocated_sub_port
+            if allocated_sub_port is not None
+            else getattr(port, "sub_port_number", "") or ""
+        )
+        return mpn + sub if mpn and sub else mpn or sub or ""
     source = field_source(field_name)
     if source is None:
         return ""

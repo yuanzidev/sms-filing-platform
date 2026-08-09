@@ -9,6 +9,7 @@ class ExportField:
     source: str  # "qualification" | "port" | "image_qualification" | "image_port"
     group: str
     description: str = ""
+    deprecated: bool = False  # 已废弃字段保留用于向后兼容
 
 
 REGISTRY: list[ExportField] = [
@@ -16,7 +17,10 @@ REGISTRY: list[ExportField] = [
     ExportField("carrier", "运营商", "port", "端口信息"),
     ExportField("operation_type", "操作类型", "port", "端口信息"),
     ExportField("main_port_number", "主端口号", "port", "端口信息"),
-    ExportField("sub_port_number", "子端口号", "port", "端口信息"),
+    ExportField("port_main_number", "主端口号", "port", "端口信息", "主端口号码"),
+    ExportField("port_sub_extension", "子端口扩展码", "port", "端口信息", "子端口扩展码（分配或输入）"),
+    ExportField("port_full_number", "短信子端口号", "port", "端口信息", "完整短信子端口号 = 主端口号 + 子端口扩展码"),
+    ExportField("sub_port_number", "子端口号", "port", "端口信息", deprecated=True),
     ExportField("port_range", "码号使用范围", "port", "端口信息"),
     ExportField("province", "接入省", "port", "端口信息"),
     ExportField("city", "接入地市", "port", "端口信息"),
