@@ -33,6 +33,7 @@ class PortInfoBase(SQLModel):
     blacklist_whitelist_type: str | None = Field(default=None, max_length=50)
     audit_form: str | None = Field(default=None, max_length=500)
     customer_type: str | None = Field(default=None, max_length=50)
+    basic_telecom_enterprise_id: str | None = Field(default=None, max_length=100)
 
 
 class PortInfo(PortInfoBase, table=True):
@@ -71,6 +72,7 @@ class PortInfoUpdate(SQLModel):
     blacklist_whitelist_type: str | None = None
     audit_form: str | None = None
     customer_type: str | None = None
+    basic_telecom_enterprise_id: str | None = None
 
 
 class PortInfoPublic(PortInfoBase):

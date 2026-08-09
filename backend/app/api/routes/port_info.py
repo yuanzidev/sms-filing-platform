@@ -62,6 +62,7 @@ _PORT_HEADERS = [
     "黑白名单类型",
     "端口审核表",
     "客户类型",
+    "基础电信企业ID",
     "授权书图片",
 ]
 
@@ -128,8 +129,8 @@ def download_port_info_template() -> Any:
     img_buf = io.BytesIO()
     sample_img.save(img_buf, format="PNG")
 
-    # Authorization image column = column 25 (1-based) = "Y2"
-    cell_images = {"Y2": img_buf.getvalue()}
+    # Authorization image column = column 26 (1-based) = "Z2"
+    cell_images = {"Z2": img_buf.getvalue()}
     xlsx_bytes = inject_cell_images(xlsx_bytes, cell_images)
 
     return StreamingResponse(
@@ -182,6 +183,7 @@ def import_port_infos(
         "黑白名单类型": "blacklist_whitelist_type",
         "端口审核表": "audit_form",
         "客户类型": "customer_type",
+        "基础电信企业ID": "basic_telecom_enterprise_id",
     }
 
     header_row = [str(c) if c else "" for c in rows[0]]
@@ -286,6 +288,7 @@ def import_port_infos(
             blacklist_whitelist_type=cell("blacklist_whitelist_type"),
             audit_form=cell("audit_form"),
             customer_type=cell("customer_type"),
+            basic_telecom_enterprise_id=cell("basic_telecom_enterprise_id"),
         ))
 
     if not objects:

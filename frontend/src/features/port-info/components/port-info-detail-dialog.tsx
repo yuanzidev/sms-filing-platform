@@ -97,6 +97,7 @@ export function PortInfoDetailDialog({
                 <FieldRow label='端口类型' value={d.port_type} />
                 <FieldRow label='操作类型' value={d.operation_type} />
                 <FieldRow label='客户类型' value={d.customer_type} />
+                <FieldRow label='基础电信企业ID' value={d.basic_telecom_enterprise_id} />
                 <FieldRow label='端口开通日期' value={d.port_activation_date} />
               </Section>
 

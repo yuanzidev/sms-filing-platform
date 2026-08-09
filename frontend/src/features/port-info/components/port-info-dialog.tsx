@@ -109,6 +109,7 @@ const formSchema = z.object({
   blacklist_whitelist_type: z.string().optional(),
   audit_form: z.string().optional(),
   customer_type: z.string().optional(),
+  basic_telecom_enterprise_id: z.string().optional(),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -168,6 +169,7 @@ function toDefaultValues(p?: PortInfo): FormData {
     blacklist_whitelist_type: p?.blacklist_whitelist_type || '',
     audit_form: p?.audit_form || '',
     customer_type: p?.customer_type || '',
+    basic_telecom_enterprise_id: p?.basic_telecom_enterprise_id || '',
   }
 }
 
@@ -561,6 +563,19 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                       inputPlaceholder="也可手动输入客户类型"
                       allowEmpty
                     />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="basic_telecom_enterprise_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>基础电信企业ID</FormLabel>
+                    <FormControl>
+                      <Input placeholder="基础电信企业ID" {...field} value={field.value || ''} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

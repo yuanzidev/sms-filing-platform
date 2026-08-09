@@ -188,6 +188,11 @@ export function PortInfoPage() {
         cell: ({ getValue }) => getValue() || '-',
       },
       {
+        accessorKey: 'basic_telecom_enterprise_id',
+        header: '基础电信企业ID',
+        cell: ({ getValue }) => getValue() || '-',
+      },
+      {
         accessorKey: 'created_at',
         header: '创建时间',
         cell: ({ getValue }) => formatCN(getValue() as string),

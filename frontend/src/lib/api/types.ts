@@ -103,6 +103,7 @@ export interface PortInfo {
   blacklist_whitelist_type: string | null
   audit_form: string | null
   customer_type: string | null
+  basic_telecom_enterprise_id: string | null
   created_at: string
   updated_at: string
 }
