@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
@@ -8,6 +8,7 @@ import {
   getFilingTasks,
   deleteFilingTask,
   downloadFilingTaskFile,
+  regenerateFilingTask,
 } from '@/lib/api/filing-tasks'
 import type { FilingTask } from '@/lib/api/types'
 import { formatCN } from '@/lib/time'
@@ -48,6 +49,34 @@ function formatFileSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+interface DownloadErrorDetail {
+  reason?: string
+  can_retry?: boolean
+}
+
+/**
+ * 解析下载接口错误响应中的 detail。
+ * 下载请求以 blob 接收，错误响应体也是 Blob，需先解析 JSON 再取 detail。
+ */
+async function parseDownloadErrorDetail(
+  err: unknown
+): Promise<DownloadErrorDetail | undefined> {
+  const data = (err as { response?: { data?: unknown } })?.response?.data
+  let detail: unknown
+  if (data instanceof Blob) {
+    try {
+      detail = (JSON.parse(await data.text()) as { detail?: unknown }).detail
+    } catch {
+      return undefined
+    }
+  } else if (data && typeof data === 'object') {
+    detail = (data as { detail?: unknown }).detail
+  }
+  return typeof detail === 'object' && detail !== null
+    ? (detail as DownloadErrorDetail)
+    : undefined
+}
+
 export function FilingManagementPage() {
   const [page, setPage] = useState(1)
   const [keyword, setKeyword] = useState('')
@@ -55,6 +84,7 @@ export function FilingManagementPage() {
   const [endDate, setEndDate] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [regenerating, setRegenerating] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
   const filters = {
@@ -69,6 +99,9 @@ export function FilingManagementPage() {
     queryKey: ['filing-tasks', filters],
     queryFn: () => getFilingTasks(filters),
   })
+
+  const tasks = useMemo(() => data?.data ?? [], [data])
+  const total = data?.total ?? 0
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteFilingTask(id),
@@ -87,14 +120,38 @@ export function FilingManagementPage() {
     enabled: !!detailId,
   })
 
-  const handleDownload = async (id: string) => {
+  const handleRegenerate = useCallback(async (id: string) => {
+    setRegenerating(id)
     try {
-      const task = tasks.find((t: { id: string }) => t.id === id)
-      await downloadFilingTaskFile(id, `${task?.task_name || 'export'}.xlsx`)
+      await regenerateFilingTask(id)
+      toast.success('文件已重新生成，可以下载了')
+      queryClient.invalidateQueries({ queryKey: ['filing-tasks'] })
     } catch {
-      toast.error('文件下载失败')
+      toast.error('重新生成失败')
+    } finally {
+      setRegenerating(null)
     }
-  }
+  }, [queryClient])
+
+  const handleDownload = useCallback(
+    async (id: string) => {
+      try {
+        const task = tasks.find((t) => t.id === id)
+        await downloadFilingTaskFile(id, `${task?.task_name || 'export'}.xlsx`)
+      } catch (err) {
+        const detail = await parseDownloadErrorDetail(err)
+        const reason = detail?.reason || '文件下载失败'
+        if (detail?.can_retry) {
+          toast.error(reason, {
+            action: { label: '重新生成', onClick: () => handleRegenerate(id) },
+          })
+        } else {
+          toast.error(reason)
+        }
+      }
+    },
+    [tasks, handleRegenerate]
+  )
 
   const handleSearch = () => {
     setPage(1)
@@ -108,9 +165,6 @@ export function FilingManagementPage() {
     setEndDate('')
     setPage(1)
   }
-
-  const tasks = data?.data ?? []
-  const total = data?.total ?? 0
 
   const columns = useMemo<ColumnDef<FilingTask>[]>(
     () => [
@@ -152,6 +206,7 @@ export function FilingManagementPage() {
               label='下载'
               icon='download'
               tone='download'
+              disabled={regenerating === row.original.id}
               onClick={() => handleDownload(row.original.id)}
             />
             <ActionIconButton
@@ -164,7 +219,8 @@ export function FilingManagementPage() {
         ),
       },
     ],
-    []
+    // handleDownload 依赖 tasks，随列表刷新重新生成闭包，避免下载时拿不到最新任务数据
+    [handleDownload, regenerating]
   )
 
   return (

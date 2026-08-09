@@ -45,6 +45,13 @@ export const deleteFilingTask = async (id: string): Promise<{ message: string }>
 }
 
 /**
+ * 重新生成报备任务文件（文件过期或删除后可重新生成）
+ */
+export async function regenerateFilingTask(id: string): Promise<void> {
+  await api.post(`/api/v1/filing-tasks/${id}/regenerate`)
+}
+
+/**
  * 下载报备任务文件（blob，后端代理 MinIO）
  */
 export const downloadFilingTaskFile = async (id: string, filename: string): Promise<void> => {

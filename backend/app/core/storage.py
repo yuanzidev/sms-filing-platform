@@ -24,6 +24,11 @@ class StorageBackend(ABC):
         ...
 
     @abstractmethod
+    def exists(self, key: str) -> bool:
+        """Check whether a file exists by key."""
+        ...
+
+    @abstractmethod
     def get_url(self, key: str, expires: int = 3600) -> str:
         """Get a presigned download URL."""
         ...
@@ -55,6 +60,9 @@ class LocalFileStorage(StorageBackend):
         if not path.exists():
             raise FileNotFoundError(f"File not found: {key}")
         return path.read_bytes()
+
+    def exists(self, key: str) -> bool:
+        return (self.base_dir / key).exists()
 
     def get_url(self, key: str, expires: int = 3600) -> str:
         return f"/api/v1/files/{key}/download"
@@ -98,6 +106,13 @@ class MinioStorage(StorageBackend):
     def download(self, key: str) -> bytes:
         resp = self.client.get_object(Bucket=self.bucket, Key=key)
         return resp["Body"].read()
+
+    def exists(self, key: str) -> bool:
+        try:
+            self.client.head_object(Bucket=self.bucket, Key=key)
+            return True
+        except ClientError:
+            return False
 
     def get_url(self, key: str, expires: int = 3600) -> str:
         return self.client.generate_presigned_url(

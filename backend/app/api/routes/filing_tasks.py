@@ -3,8 +3,10 @@ import io
 import uuid
 from datetime import date, datetime
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from sqlmodel import select
@@ -12,7 +14,10 @@ from sqlmodel import select
 from app.api.deps import CurrentUser, SessionDep
 from app.core.storage import get_storage
 from app.crud.export_group import get_export_group
-from app.crud.filing_sub_port_usage import delete_usages_by_task
+from app.crud.filing_sub_port_usage import (
+    delete_usages_by_task,
+    list_usages_by_task,
+)
 from app.crud.filing_task import (
     create_filing_task as crud_create_filing_task,
 )
@@ -217,6 +222,50 @@ def generate_excel(
     return output
 
 
+# 中文字段名 → 逻辑字段名（导出图片列）映射
+_CN_TO_LOGICAL_IMG = {
+    "单位证件图片": "cert_image",
+    "责任人身份证正面": "responsible_id_front",
+    "责任人身份证反面": "responsible_id_back",
+    "法人身份证正面": "handler_id_front",
+    "法人身份证反面": "handler_id_back",
+    "授权书图片": "auth_image",
+    "签名举证附件": "signature_proof",
+    "引流号码举证附件": "diversion_number_proof",
+    "引流链接举证": "diversion_link_proof",
+    "经办人现场照片": "handler_scene_photo",
+}
+
+
+def _load_qualification_images(
+    session, qualifications: list[QualificationInfo]
+) -> dict[uuid.UUID, dict[str, bytes]]:
+    """Load image attachments for selected qualifications (failures do not block export)."""
+    from app.crud.file_attachment import get_file_attachments_by_entity
+
+    qual_images: dict[uuid.UUID, dict[str, bytes]] = {}
+    try:
+        storage = get_storage()
+        for q in qualifications:
+            attachments = get_file_attachments_by_entity(
+                session=session, entity_type="qualification_info", entity_id=q.id
+            )
+            img_map: dict[str, bytes] = {}
+            for att in attachments:
+                logical = _CN_TO_LOGICAL_IMG.get(att.field_name or "")
+                if logical and att.stored_path:
+                    try:
+                        raw = storage.download(att.stored_path)
+                        img_map[logical] = raw
+                    except Exception:
+                        pass
+            if img_map:
+                qual_images[q.id] = img_map
+    except Exception:
+        pass  # Image loading failure should not block export
+    return qual_images
+
+
 def _get_operator_name(session, operator_id: uuid.UUID) -> str:
     user = session.get(User, operator_id)
     return user.full_name or user.username if user else "未知"
@@ -365,40 +414,7 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
     )
 
     # 5. Load image attachments for selected qualifications
-    # Map Chinese field_name → logical field name for export
-    _CN_TO_LOGICAL_IMG = {
-        "单位证件图片": "cert_image",
-        "责任人身份证正面": "responsible_id_front",
-        "责任人身份证反面": "responsible_id_back",
-        "法人身份证正面": "handler_id_front",
-        "法人身份证反面": "handler_id_back",
-        "授权书图片": "auth_image",
-        "签名举证附件": "signature_proof",
-        "引流号码举证附件": "diversion_number_proof",
-        "引流链接举证": "diversion_link_proof",
-        "经办人现场照片": "handler_scene_photo",
-    }
-    qual_images: dict[uuid.UUID, dict[str, bytes]] = {}
-    try:
-        from app.crud.file_attachment import get_file_attachments_by_entity
-        storage = get_storage()
-        for q in qualifications:
-            attachments = get_file_attachments_by_entity(
-                session=session, entity_type="qualification_info", entity_id=q.id
-            )
-            img_map: dict[str, bytes] = {}
-            for att in attachments:
-                logical = _CN_TO_LOGICAL_IMG.get(att.field_name or "")
-                if logical and att.stored_path:
-                    try:
-                        raw = storage.download(att.stored_path)
-                        img_map[logical] = raw
-                    except Exception:
-                        pass
-            if img_map:
-                qual_images[q.id] = img_map
-    except Exception:
-        pass  # Image loading failure should not block export
+    qual_images = _load_qualification_images(session, qualifications)
 
     # 5.5 自动分配子端口号（可选）
     allocated_sub_ports: dict[tuple[uuid.UUID, str], str] = {}
@@ -518,28 +534,89 @@ def delete_task(*, session: SessionDep, id: uuid.UUID, current_user: CurrentUser
 
 
 @router.get("/{id}/download")
-def download_task(*, session: SessionDep, id: uuid.UUID) -> Any:
+def download_filing_task(*, session: SessionDep, id: uuid.UUID) -> Any:
     task = get_filing_task(session=session, id=id)
     if not task:
         raise HTTPException(status_code=404, detail="报备任务不存在")
     if not task.file_path:
-        raise HTTPException(status_code=404, detail="文件不存在")
-
+        raise HTTPException(
+            status_code=404,
+            detail={"reason": "文件尚未生成", "can_retry": True}
+        )
     try:
         storage = get_storage()
-        content = storage.download(task.file_path)
-        from urllib.parse import quote
-        from pathlib import Path
-        from fastapi.responses import Response
-
-        ext = Path(task.file_path).suffix
-        encoded_name = quote(f"{task.task_name}{ext}")
-        return Response(
-            content=content,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={
-                "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_name}",
-            },
-        )
+        if not storage.exists(task.file_path):
+            raise HTTPException(
+                status_code=404,
+                detail={"reason": "文件已过期或已被删除", "can_retry": True}
+            )
+        data = storage.download(task.file_path)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"文件下载失败: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail={"reason": f"存储服务异常: {e}", "can_retry": True}
+        )
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(task.task_name or 'export')}.xlsx"},
+    )
+
+
+@router.post("/{id}/regenerate")
+def regenerate_filing_task(*, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request) -> Any:
+    task = get_filing_task(session=session, id=id)
+    if not task:
+        raise HTTPException(status_code=404, detail="报备任务不存在")
+
+    # Re-run generate_excel with the same task parameters
+    qualifications = list(
+        session.exec(
+            select(QualificationInfo).where(QualificationInfo.id.in_([uuid.UUID(x) for x in task.qualification_ids]))  # type: ignore
+        ).all()
+    )
+    ports = list(
+        session.exec(
+            select(PortInfo).where(PortInfo.id.in_([uuid.UUID(x) for x in task.port_ids]))  # type: ignore
+        ).all()
+    )
+    export_group = get_export_group(session=session, id=task.export_group_id)
+    if not export_group:
+        raise HTTPException(status_code=400, detail="导出字段组已被删除，无法重新生成")
+
+    # 还原子端口自动分配结果（存在占用记录即原任务使用了自动分配）
+    usages = list_usages_by_task(session=session, filing_task_id=task.id)
+    allocated_sub_ports: dict[tuple[uuid.UUID, str], str] = {}
+    for usage in usages:
+        if usage.qualification_id:
+            allocated_sub_ports[(usage.qualification_id, usage.main_port_number)] = usage.port_number
+
+    qual_images = _load_qualification_images(session, qualifications)
+
+    output = generate_excel(
+        qualifications,
+        ports,
+        export_group,
+        group_by_field=task.group_by_field,
+        qual_images=qual_images,
+        allocated_sub_ports=allocated_sub_ports,
+        auto_allocate_sub_ports=bool(usages),
+    )
+    file_data = output.read()
+    storage = get_storage()
+    file_path = f"filing-exports/{task.id}.xlsx"
+    storage.upload(
+        key=file_path,
+        data=file_data,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+    task.file_path = file_path
+    task.file_size = len(file_data)
+    session.add(task)
+    session.commit()
+
+    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="filing_tasks", action="regenerate", target=task.task_name)
+    return {"message": "文件已重新生成", "task_id": str(task.id)}
