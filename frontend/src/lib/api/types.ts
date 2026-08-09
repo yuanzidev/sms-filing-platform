@@ -339,6 +339,8 @@ export interface CreateFilingTaskRequest {
   auto_allocate_sub_ports?: boolean
   sub_port_range_start?: number
   sub_port_range_end?: number
+  allocation_mode?: 'random' | 'sequential' | 'fixed_suffix'
+  fixed_suffix?: string
 }
 
 // ─── ExportGroup ─────────────────────────────────────────────

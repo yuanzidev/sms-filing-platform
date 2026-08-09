@@ -34,7 +34,11 @@ from app.models import (
 )
 from app.services.export_field_registry import REGISTRY, field_map, field_source
 from app.services.operation_log import log_operation
-from app.services.sub_port_allocator import MAX_RANGE_SIZE, allocate_sub_ports
+from app.services.sub_port_allocator import (
+    MAX_RANGE_SIZE,
+    AllocationMode,
+    allocate_sub_ports,
+)
 
 router = APIRouter(prefix="/filing-tasks", tags=["filing-tasks"])
 
@@ -251,20 +255,30 @@ def check_sub_port_availability(
     main_port_numbers: str = Query(...),
     range_start: int = Query(...),
     range_end: int = Query(...),
+    mode: str = Query("random"),
 ) -> dict:
     from app.crud.filing_sub_port_usage import count_used_in_range
-    total = range_end - range_start + 1
     result = {}
     for mpn in main_port_numbers.split(","):
         mpn = mpn.strip()
         if not mpn:
             continue
-        used = count_used_in_range(session, mpn, range_start, range_end)
-        result[mpn] = {
-            "used": used,
-            "total": total,
-            "available": max(0, total - used),
-        }
+        if mode == "fixed_suffix":
+            # 固定后缀模式不依赖范围：prefix 从 0 起递增，按 0-999999 统计已占用
+            used = count_used_in_range(session, mpn, 0, 999999)
+            result[mpn] = {
+                "used": used,
+                "total": 1_000_000,
+                "available": max(0, 1_000_000 - used),
+            }
+        else:
+            total = range_end - range_start + 1
+            used = count_used_in_range(session, mpn, range_start, range_end)
+            result[mpn] = {
+                "used": used,
+                "total": total,
+                "available": max(0, total - used),
+            }
     return result
 
 
@@ -378,17 +392,27 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
 
     if auto_allocate:
         try:
+            try:
+                mode = AllocationMode(create.allocation_mode or "random")
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"不支持的分配模式: {create.allocation_mode}")
             range_start = create.sub_port_range_start
             range_end = create.sub_port_range_end
-            if not (range_start and range_end):
-                raise HTTPException(status_code=400, detail="自动分配子端口时必须提供范围")
-            if range_start > range_end:
-                raise HTTPException(status_code=400, detail="子端口范围起始必须 ≤ 结束")
-            if range_end - range_start + 1 > MAX_RANGE_SIZE:
-                raise HTTPException(status_code=400, detail="子端口范围过大（最多 100 万个号码）")
-            # 固定 6 位格式（与默认值 100001 及规范一致），防止不同位数范围产生重复号码
-            if not (100000 <= range_start <= 999999 and 100000 <= range_end <= 999999):
-                raise HTTPException(status_code=400, detail="子端口范围必须是6位数字（100000-999999）")
+            if mode == AllocationMode.fixed_suffix:
+                # 固定后缀模式不使用范围参数
+                range_start = range_start or 0
+                range_end = range_end or 0
+            else:
+                if not (range_start and range_end):
+                    raise HTTPException(status_code=400, detail="自动分配子端口时必须提供范围")
+                if range_start > range_end:
+                    raise HTTPException(status_code=400, detail="子端口范围起始必须 ≤ 结束")
+                if mode == AllocationMode.random:
+                    if range_end - range_start + 1 > MAX_RANGE_SIZE:
+                        raise HTTPException(status_code=400, detail="子端口范围过大（最多 100 万个号码）")
+                    # 固定 6 位格式（与默认值 100001 及规范一致），防止不同位数范围产生重复号码
+                    if not (100000 <= range_start <= 999999 and 100000 <= range_end <= 999999):
+                        raise HTTPException(status_code=400, detail="子端口范围必须是6位数字（100000-999999）")
 
             main_ports = [p for p in selected_ports if not p.sub_port_number]
             if not main_ports:
@@ -403,6 +427,8 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
                 qualifications=qualifications,
                 operator_id=current_user.id,
                 filing_task_id=task.id,
+                mode=mode,
+                fixed_suffix=create.fixed_suffix,
             )
             for mpn, pairs in allocation.items():
                 for qual, num in pairs:

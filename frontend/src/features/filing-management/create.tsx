@@ -10,6 +10,7 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DataTable } from '@/components/shared/data-table/data-table'
@@ -94,6 +95,8 @@ export function FilingCreatePage() {
   // Step 3 state (configure sub-port range)
   const [subPortRangeStart, setSubPortRangeStart] = useState('100001')
   const [subPortRangeEnd, setSubPortRangeEnd] = useState('199999')
+  const [allocationMode, setAllocationMode] = useState<'random' | 'sequential' | 'fixed_suffix'>('random')
+  const [fixedSuffix, setFixedSuffix] = useState('')
 
   // Step 4 state (configure export)
   const [exportGroupId, setExportGroupId] = useState<string>('')
@@ -294,6 +297,8 @@ export function FilingCreatePage() {
         auto_allocate_sub_ports: true,
         sub_port_range_start: Number(subPortRangeStart),
         sub_port_range_end: Number(subPortRangeEnd),
+        allocation_mode: allocationMode,
+        fixed_suffix: allocationMode === 'fixed_suffix' ? fixedSuffix.trim() || undefined : undefined,
       },
       {
         onSuccess: (task) => {
@@ -532,36 +537,64 @@ export function FilingCreatePage() {
             <CardTitle>配置子端口范围</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-end gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-sm text-muted-foreground">起始号码</label>
-                <Input
-                  value={subPortRangeStart}
-                  onChange={(e) => setSubPortRangeStart(e.target.value)}
-                  className="w-40"
-                  placeholder="100001"
-                />
-              </div>
-              <span className="pb-2 text-muted-foreground">-</span>
-              <div className="flex flex-col gap-1">
-                <label className="text-sm text-muted-foreground">结束号码</label>
-                <Input
-                  value={subPortRangeEnd}
-                  onChange={(e) => setSubPortRangeEnd(e.target.value)}
-                  className="w-40"
-                  placeholder="199999"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>生成模式</Label>
+              <Select value={allocationMode} onValueChange={(v) => setAllocationMode(v as 'random' | 'sequential' | 'fixed_suffix')}>
+                <SelectTrigger className="w-64">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="random">范围内随机生成</SelectItem>
+                  <SelectItem value="sequential">范围内顺序生成</SelectItem>
+                  <SelectItem value="fixed_suffix">固定后缀生成</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <RangeAvailability
-              mainPortNumbers={selectedPortIdList
-                .map((id) => allPorts.find((p) => p.id === id)?.main_port_number)
-                .filter(Boolean) as string[]}
-              rangeStart={Number(subPortRangeStart) || 0}
-              rangeEnd={Number(subPortRangeEnd) || 0}
-              needCount={selectedIds.length}
-            />
+            {allocationMode === 'fixed_suffix' ? (
+              <div className="space-y-2">
+                <Label>固定后缀</Label>
+                <Input
+                  value={fixedSuffix}
+                  onChange={(e) => setFixedSuffix(e.target.value)}
+                  className="w-40"
+                  placeholder="例如: 95598"
+                />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-end gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm text-muted-foreground">起始号码</label>
+                    <Input
+                      value={subPortRangeStart}
+                      onChange={(e) => setSubPortRangeStart(e.target.value)}
+                      className="w-40"
+                      placeholder="100001"
+                    />
+                  </div>
+                  <span className="pb-2 text-muted-foreground">-</span>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm text-muted-foreground">结束号码</label>
+                    <Input
+                      value={subPortRangeEnd}
+                      onChange={(e) => setSubPortRangeEnd(e.target.value)}
+                      className="w-40"
+                      placeholder="199999"
+                    />
+                  </div>
+                </div>
+
+                <RangeAvailability
+                  mainPortNumbers={selectedPortIdList
+                    .map((id) => allPorts.find((p) => p.id === id)?.main_port_number)
+                    .filter(Boolean) as string[]}
+                  rangeStart={Number(subPortRangeStart) || 0}
+                  rangeEnd={Number(subPortRangeEnd) || 0}
+                  needCount={selectedIds.length}
+                />
+              </>
+            )}
 
             <div className="rounded bg-muted/50 p-3 text-sm">
               预计生成 {selectedIds.length * selectedGroupCount} 个子端口
@@ -575,9 +608,11 @@ export function FilingCreatePage() {
               <Button
                 onClick={() => setStep(4)}
                 disabled={
-                  !/^\d+$/.test(subPortRangeStart) ||
-                  !/^\d+$/.test(subPortRangeEnd) ||
-                  Number(subPortRangeStart) > Number(subPortRangeEnd)
+                  allocationMode === 'fixed_suffix'
+                    ? !fixedSuffix.trim()
+                    : !/^\d+$/.test(subPortRangeStart) ||
+                      !/^\d+$/.test(subPortRangeEnd) ||
+                      Number(subPortRangeStart) > Number(subPortRangeEnd)
                 }
               >
                 下一步 <ArrowRight className="ml-2 h-4 w-4" />

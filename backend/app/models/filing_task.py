@@ -40,6 +40,8 @@ class FilingTaskCreate(SQLModel):
     auto_allocate_sub_ports: bool = False
     sub_port_range_start: int | None = None
     sub_port_range_end: int | None = None
+    allocation_mode: str | None = "random"
+    fixed_suffix: str | None = None
 
 
 class FilingTaskPublic(SQLModel):

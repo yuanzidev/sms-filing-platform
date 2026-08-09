@@ -15,6 +15,7 @@ from app.models import (
 )
 from app.services.sub_port_allocator import (
     MAX_RANGE_SIZE,
+    AllocationMode,
     SubPortConflict,
     SubPortRangeExhausted,
     allocate_sub_ports,
@@ -187,6 +188,115 @@ def test_allocate_six_digit_padding():
         )
         num = result["10698PAD"][0][1]
         assert num in {"000001", "000002"}
+
+
+def test_allocate_sequential():
+    """顺序模式从 range_start 依次分配"""
+    quals = [_make_qual("企业A"), _make_qual("企业B")]
+    with Session(engine) as session:
+        for q in quals:
+            session.add(q)
+        user = _make_user(session)
+        session.commit()
+        for q in quals:
+            session.refresh(q)
+
+        result = allocate_sub_ports(
+            session=session,
+            main_port_numbers=["10698SEQ"],
+            range_start=100001,
+            range_end=199999,
+            qualifications=quals,
+            operator_id=user.id,
+            filing_task_id=None,
+            mode=AllocationMode.sequential,
+        )
+        numbers = [num for _, num in result["10698SEQ"]]
+        assert numbers == ["100001", "100002"]
+
+
+def test_allocate_sequential_skips_used():
+    """顺序模式跳过已占用号码，从下一个空闲号继续"""
+    quals = [_make_qual("企业A")]
+    with Session(engine) as session:
+        session.add(quals[0])
+        user = _make_user(session)
+        session.commit()
+        session.refresh(quals[0])
+
+        first = allocate_sub_ports(
+            session=session,
+            main_port_numbers=["10698SEQ2"],
+            range_start=100001,
+            range_end=199999,
+            qualifications=quals,
+            operator_id=user.id,
+            filing_task_id=None,
+            mode=AllocationMode.sequential,
+        )
+        assert first["10698SEQ2"][0][1] == "100001"
+
+        second = allocate_sub_ports(
+            session=session,
+            main_port_numbers=["10698SEQ2"],
+            range_start=100001,
+            range_end=199999,
+            qualifications=quals,
+            operator_id=user.id,
+            filing_task_id=None,
+            mode=AllocationMode.sequential,
+        )
+        assert second["10698SEQ2"][0][1] == "100002"
+
+
+def test_allocate_fixed_suffix():
+    """固定后缀模式按 prefix + suffix 格式生成，prefix 从 0 递增"""
+    quals = [_make_qual("企业A"), _make_qual("企业B")]
+    with Session(engine) as session:
+        for q in quals:
+            session.add(q)
+        user = _make_user(session)
+        session.commit()
+        for q in quals:
+            session.refresh(q)
+
+        result = allocate_sub_ports(
+            session=session,
+            main_port_numbers=["10698SFX"],
+            range_start=100001,
+            range_end=199999,
+            qualifications=quals,
+            operator_id=user.id,
+            filing_task_id=None,
+            mode=AllocationMode.fixed_suffix,
+            fixed_suffix="95598",
+        )
+        numbers = [num for _, num in result["10698SFX"]]
+        assert numbers == ["095598", "195598"]
+
+
+def test_allocate_fixed_suffix_requires_suffix():
+    """固定后缀模式缺少 fixed_suffix → 400"""
+    quals = [_make_qual("企业A")]
+    with Session(engine) as session:
+        session.add(quals[0])
+        user = _make_user(session)
+        session.commit()
+        session.refresh(quals[0])
+
+        with pytest.raises(HTTPException) as exc_info:
+            allocate_sub_ports(
+                session=session,
+                main_port_numbers=["10698SFX2"],
+                range_start=100001,
+                range_end=199999,
+                qualifications=quals,
+                operator_id=user.id,
+                filing_task_id=None,
+                mode=AllocationMode.fixed_suffix,
+            )
+        assert exc_info.value.status_code == 400
+        assert "fixed_suffix" in exc_info.value.detail
 
 
 def test_allocate_concurrent_safety():
