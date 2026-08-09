@@ -53,11 +53,19 @@ export async function regenerateFilingTask(id: string): Promise<void> {
 
 /**
  * 下载报备任务文件（blob，后端代理 MinIO）
+ * 文件名优先从后端 Content-Disposition 响应头提取，其次使用传入 name，兜底 export.xlsx
  */
-export const downloadFilingTaskFile = async (id: string, filename: string): Promise<void> => {
+export const downloadFilingTaskFile = async (id: string, name?: string): Promise<void> => {
   const response = await api.get(`/api/v1/filing-tasks/${id}/download`, {
     responseType: 'blob',
   })
+  // 从 Content-Disposition 响应头提取 filename
+  let filename = name || 'export.xlsx'
+  const disposition = (response.headers as Record<string, string>)['content-disposition'] || ''
+  const match = disposition.match(/filename\*?=(?:UTF-8'')?(.+?)(?:;|$)/i)
+  if (match) {
+    filename = decodeURIComponent(match[1].trim())
+  }
   const url = window.URL.createObjectURL(new Blob([response.data]))
   const link = document.createElement('a')
   link.href = url

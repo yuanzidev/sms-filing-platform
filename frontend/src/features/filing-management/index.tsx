@@ -136,8 +136,7 @@ export function FilingManagementPage() {
   const handleDownload = useCallback(
     async (id: string) => {
       try {
-        const task = tasks.find((t) => t.id === id)
-        await downloadFilingTaskFile(id, `${task?.task_name || 'export'}.xlsx`)
+        await downloadFilingTaskFile(id)
       } catch (err) {
         const detail = await parseDownloadErrorDetail(err)
         const reason = detail?.reason || '文件下载失败'
