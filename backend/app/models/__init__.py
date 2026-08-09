@@ -32,6 +32,7 @@ from .file_attachment import (
     FileAttachmentPublic,
     FileAttachmentsPublic,
 )
+from .filing_sub_port_usage import FilingSubPortUsage
 from .filing_task import (
     FilingTask,
     FilingTaskCreate,
@@ -39,7 +40,6 @@ from .filing_task import (
     FilingTaskPublic,
     FilingTasksPublic,
 )
-from .filing_sub_port_usage import FilingSubPortUsage
 from .login_log import (
     LoginLog,
     LoginLogBase,
@@ -90,6 +90,13 @@ from .sub_port import (
     SubPortPublic,
     SubPortsPublic,
     SubPortUpdate,
+)
+from .sub_port_generation_rule import (
+    SubPortGenerationRule,
+    SubPortGenerationRuleCreate,
+    SubPortGenerationRulePublic,
+    SubPortGenerationRulesPublic,
+    SubPortGenerationRuleUpdate,
 )
 from .user import (
     NewPassword,
@@ -166,6 +173,11 @@ __all__ = [
     "SubPortPublic",
     "SubPortsPublic",
     "SubPortUpdate",
+    "SubPortGenerationRule",
+    "SubPortGenerationRuleCreate",
+    "SubPortGenerationRulePublic",
+    "SubPortGenerationRulesPublic",
+    "SubPortGenerationRuleUpdate",
     "FileAttachment",
     "FileAttachmentCreate",
     "FileAttachmentPublic",

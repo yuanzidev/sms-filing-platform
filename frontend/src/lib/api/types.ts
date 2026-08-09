@@ -367,6 +367,24 @@ export interface ExportGroupsResponse {
   count: number
 }
 
+// ─── SubPortGenerationRule ──────────────────────────────────
+
+export interface SubPortGenerationRule {
+  id: string
+  name: string
+  mode: 'random' | 'sequential' | 'fixed_suffix'
+  config: Record<string, unknown>
+  carrier: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface SubPortGenerationRulesResponse {
+  data: SubPortGenerationRule[]
+  count: number
+}
+
 // ─── Generic ───────────────────────────────────────────────
 
 export interface MessageResponse {

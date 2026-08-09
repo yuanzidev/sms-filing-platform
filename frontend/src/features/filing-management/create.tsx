@@ -1,6 +1,6 @@
 import { Fragment, useState, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
@@ -13,6 +13,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import {
   Select,
@@ -25,8 +33,14 @@ import { getQualifications } from '@/lib/api/qualifications'
 import { getExportGroups } from '@/lib/api/export-groups'
 import { getPortInfos } from '@/lib/api/port-info'
 import { getSubPortAvailability } from '@/lib/api/filing-sub-port-availability'
+import { createSubPortRule, getSubPortRules } from '@/lib/api/sub-port-rules'
 import { useCreateFilingTask } from '@/hooks/use-filing-tasks'
-import type { QualificationInfo, ExportGroup, PortInfo } from '@/lib/api/types'
+import type {
+  QualificationInfo,
+  ExportGroup,
+  PortInfo,
+  SubPortGenerationRule,
+} from '@/lib/api/types'
 import { toast } from 'sonner'
 import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Loader2, Upload } from 'lucide-react'
 import { SignatureImportDialog } from './components/signature-import-dialog'
@@ -97,6 +111,10 @@ export function FilingCreatePage() {
   const [subPortRangeEnd, setSubPortRangeEnd] = useState('199999')
   const [allocationMode, setAllocationMode] = useState<'random' | 'sequential' | 'fixed_suffix'>('random')
   const [fixedSuffix, setFixedSuffix] = useState('')
+  const [selectedRuleId, setSelectedRuleId] = useState('')
+  const [saveRuleOpen, setSaveRuleOpen] = useState(false)
+  const [saveRuleName, setSaveRuleName] = useState('')
+  const [saveRuleCarrier, setSaveRuleCarrier] = useState('')
 
   // Step 4 state (configure export)
   const [exportGroupId, setExportGroupId] = useState<string>('')
@@ -115,6 +133,12 @@ export function FilingCreatePage() {
     queryFn: () => getExportGroups(),
   })
 
+  // Fetch saved sub-port generation rules
+  const { data: subPortRules } = useQuery({
+    queryKey: ['sub-port-rules'],
+    queryFn: getSubPortRules,
+  })
+
   // Fetch all ports for selection (small dataset, < 100 rows)
   const { data: portData } = useQuery({
     queryKey: ['port-info-all'],
@@ -123,7 +147,25 @@ export function FilingCreatePage() {
 
   const allPorts: PortInfo[] = portData?.data ?? []
 
+  const queryClient = useQueryClient()
   const createMutation = useCreateFilingTask()
+
+  const saveRuleMutation = useMutation({
+    mutationFn: (payload: {
+      name: string
+      mode: 'random' | 'sequential' | 'fixed_suffix'
+      config: Record<string, unknown>
+      carrier?: string
+    }) => createSubPortRule(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sub-port-rules'] })
+      toast.success('规则保存成功')
+      setSaveRuleOpen(false)
+      setSaveRuleName('')
+      setSaveRuleCarrier('')
+    },
+    onError: () => toast.error('规则保存失败'),
+  })
 
   // Get selected qualification IDs (from row indices + data)
   const qualifications = qualData?.data ?? []
@@ -279,6 +321,44 @@ export function FilingCreatePage() {
         }
       })
       return next
+    })
+  }
+
+  // 已选端口的公共运营商（用于保存规则时预填）
+  const commonCarrier = useMemo(() => {
+    const carriers = [...new Set(
+      selectedPortIdList
+        .map((id) => allPorts.find((p) => p.id === id)?.carrier)
+        .filter(Boolean),
+    )]
+    return carriers.length === 1 ? (carriers[0] as string) : ''
+  }, [selectedPortIdList, allPorts])
+
+  const handleSelectRule = (id: string) => {
+    setSelectedRuleId(id)
+    const rule = subPortRules?.find((r: SubPortGenerationRule) => r.id === id)
+    if (!rule) return
+    setAllocationMode(rule.mode)
+    if (rule.mode === 'fixed_suffix') {
+      setFixedSuffix(String(rule.config?.suffix ?? ''))
+    } else {
+      const start = rule.config?.range_start
+      const end = rule.config?.range_end
+      if (start !== undefined && start !== null) setSubPortRangeStart(String(start))
+      if (end !== undefined && end !== null) setSubPortRangeEnd(String(end))
+    }
+  }
+
+  const handleSaveRule = () => {
+    if (!saveRuleName.trim()) return
+    saveRuleMutation.mutate({
+      name: saveRuleName.trim(),
+      mode: allocationMode,
+      config:
+        allocationMode === 'fixed_suffix'
+          ? { suffix: fixedSuffix.trim() }
+          : { range_start: Number(subPortRangeStart), range_end: Number(subPortRangeEnd) },
+      carrier: saveRuleCarrier.trim() || undefined,
     })
   }
 
@@ -537,6 +617,34 @@ export function FilingCreatePage() {
             <CardTitle>配置子端口范围</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex items-end gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm text-muted-foreground">已保存规则</label>
+                <Select value={selectedRuleId} onValueChange={handleSelectRule}>
+                  <SelectTrigger className="w-64">
+                    <SelectValue placeholder="选择已有规则（可选）" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subPortRules?.map((r: SubPortGenerationRule) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.carrier ? `${r.name}（${r.carrier}）` : r.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSaveRuleCarrier(commonCarrier)
+                  setSaveRuleOpen(true)
+                }}
+              >
+                保存为规则
+              </Button>
+            </div>
+
             <div className="space-y-2">
               <Label>生成模式</Label>
               <Select value={allocationMode} onValueChange={(v) => setAllocationMode(v as 'random' | 'sequential' | 'fixed_suffix')}>
@@ -758,6 +866,63 @@ export function FilingCreatePage() {
           onOpenChange={setSignatureImportOpen}
           onConfirm={handleSignatureImport}
         />
+        <Dialog open={saveRuleOpen} onOpenChange={setSaveRuleOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>保存为规则</DialogTitle>
+              <DialogDescription>
+                将当前生成配置保存为可复用的子端口生成规则
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>规则名称 *</Label>
+                <Input
+                  value={saveRuleName}
+                  onChange={(e) => setSaveRuleName(e.target.value)}
+                  placeholder="例如: 移动固定后缀 95598"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>运营商（可选）</Label>
+                <Input
+                  value={saveRuleCarrier}
+                  onChange={(e) => setSaveRuleCarrier(e.target.value)}
+                  placeholder="例如: 移动"
+                />
+              </div>
+              <div className="space-y-1 rounded bg-muted/50 p-3 text-sm">
+                <div>
+                  模式:{' '}
+                  {allocationMode === 'random'
+                    ? '范围内随机生成'
+                    : allocationMode === 'sequential'
+                      ? '范围内顺序生成'
+                      : '固定后缀生成'}
+                </div>
+                {allocationMode === 'fixed_suffix' ? (
+                  <div>固定后缀: {fixedSuffix || '-'}</div>
+                ) : (
+                  <div>
+                    范围: {subPortRangeStart} - {subPortRangeEnd}
+                  </div>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSaveRuleOpen(false)}>
+                取消
+              </Button>
+              <Button
+                onClick={handleSaveRule}
+                disabled={!saveRuleName.trim() || saveRuleMutation.isPending}
+              >
+                {saveRuleMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                保存
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </Main>
     </>
   )
