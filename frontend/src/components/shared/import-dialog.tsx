@@ -48,6 +48,51 @@ interface ImportDialogProps {
   onDownloadErrorReport?: (errors: ImportErrorItem[]) => Promise<void>
 }
 
+type ImportRequestError = {
+  response?: {
+    status?: number
+    data?: {
+      detail?: unknown
+    }
+  }
+}
+
+function asImportRequestError(err: unknown): ImportRequestError {
+  if (typeof err === 'object' && err !== null && 'response' in err) {
+    return err as ImportRequestError
+  }
+  return {}
+}
+
+function getMessageFromDetail(detail: unknown) {
+  if (typeof detail === 'object' && detail !== null) {
+    const record = detail as Record<string, unknown>
+    const message = record.msg ?? record.message
+    if (typeof message === 'string') return message
+  }
+  return null
+}
+
+function getImportErrorDetail(err: unknown, fallback: string) {
+  const response = asImportRequestError(err).response
+  if (response?.status === 413) {
+    return '上传文件过大或被代理/网关限制，请压缩 Excel 内图片后重试，或联系管理员调整上传大小限制。'
+  }
+
+  const detail = response?.data?.detail
+  if (!detail) {
+    return fallback
+  }
+  if (Array.isArray(detail)) {
+    return detail.map((d) => getMessageFromDetail(d) || JSON.stringify(d)).join('；')
+  }
+  const message = getMessageFromDetail(detail)
+  if (message) {
+    return message
+  }
+  return String(detail)
+}
+
 export function ImportDialog({
   open,
   onOpenChange,
@@ -88,16 +133,8 @@ export function ImportDialog({
       const result = await onPreview(file)
       setPreviewData(result)
       setUnrecognizedHeaders(result.unrecognized_headers ?? [])
-    } catch (err: any) {
-      let detail = err?.response?.data?.detail
-      if (!detail) {
-        detail = '预览失败，请检查文件格式'
-      } else if (Array.isArray(detail)) {
-        detail = detail.map((d: any) => d.msg || JSON.stringify(d)).join('；')
-      } else if (typeof detail === 'object') {
-        detail = detail.msg || detail.message || JSON.stringify(detail)
-      }
-      setPreviewError(String(detail))
+    } catch (err) {
+      setPreviewError(getImportErrorDetail(err, '预览失败，请检查文件格式'))
     } finally {
       setPreviewLoading(false)
     }
@@ -121,17 +158,8 @@ export function ImportDialog({
         setFile(null)
         onSuccess()
       }
-    } catch (err: any) {
-      let detail = err?.response?.data?.detail
-      if (!detail) {
-        detail = '导入失败，请检查文件格式和数据'
-      } else if (Array.isArray(detail)) {
-        // FastAPI 422 validation errors: [{msg, loc}, ...]
-        detail = detail.map((d: any) => d.msg || JSON.stringify(d)).join('；')
-      } else if (typeof detail === 'object') {
-        detail = detail.msg || detail.message || JSON.stringify(detail)
-      }
-      setError(String(detail))
+    } catch (err) {
+      setError(getImportErrorDetail(err, '导入失败，请检查文件格式和数据'))
     } finally {
       setLoading(false)
     }
