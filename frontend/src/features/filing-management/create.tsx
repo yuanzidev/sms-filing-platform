@@ -42,7 +42,7 @@ import type {
   SubPortGenerationRule,
 } from '@/lib/api/types'
 import { toast } from 'sonner'
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Loader2, Upload } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Loader2, Upload, X } from 'lucide-react'
 import { SignatureImportDialog } from './components/signature-import-dialog'
 
 type Step = 1 | 2 | 3 | 4 | 5
@@ -354,6 +354,10 @@ export function FilingCreatePage() {
     }
   }
 
+  const handleClearRule = () => {
+    setSelectedRuleId('')
+  }
+
   const handleSaveRule = () => {
     if (!saveRuleName.trim()) return
     saveRuleMutation.mutate({
@@ -638,6 +642,15 @@ export function FilingCreatePage() {
                   </SelectContent>
                 </Select>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearRule}
+                disabled={!selectedRuleId}
+              >
+                <X className="mr-2 h-4 w-4" />
+                取消选择
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
