@@ -1,7 +1,9 @@
 """Export group API routes."""
+
 import io
 import uuid
 from dataclasses import asdict
+from pathlib import PurePath
 from typing import Any
 from urllib.parse import quote
 
@@ -28,7 +30,28 @@ from app.models import (
 )
 from app.services.export_field_registry import all_fields
 
-router = APIRouter(prefix="/export-groups", tags=["export-groups"], dependencies=[Depends(get_current_active_superuser)])
+router = APIRouter(
+    prefix="/export-groups",
+    tags=["export-groups"],
+    dependencies=[Depends(get_current_active_superuser)],
+)
+
+
+def _cell_text(value: Any) -> str:
+    return str(value).strip() if value is not None else ""
+
+
+def _filename_stem(filename: str | None) -> str:
+    if not filename:
+        return "导入字段组"
+    return PurePath(filename).stem.strip() or "导入字段组"
+
+
+def _find_header_index(headers: list[str], candidates: set[str]) -> int | None:
+    for idx, header in enumerate(headers):
+        if header in candidates:
+            return idx
+    return None
 
 
 @router.get("/registry", response_model=list[dict])
@@ -54,7 +77,9 @@ def download_registry_template() -> Any:
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote('字段编码对照表.xlsx')}"},
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote('字段编码对照表.xlsx')}"
+        },
     )
 
 
@@ -67,7 +92,9 @@ def read_export_groups(session: SessionDep) -> Any:
 
 @router.post("", response_model=ExportGroupPublic)
 @router.post("/", include_in_schema=False, response_model=ExportGroupPublic)
-def create_export_group_endpoint(*, session: SessionDep, create: ExportGroupCreate) -> Any:
+def create_export_group_endpoint(
+    *, session: SessionDep, create: ExportGroupCreate
+) -> Any:
     db_obj = create_export_group(session=session, create=create)
     return db_obj
 
@@ -81,7 +108,9 @@ def read_export_group(*, session: SessionDep, id: uuid.UUID) -> Any:
 
 
 @router.patch("/{id}", response_model=ExportGroupPublic)
-def update_export_group_endpoint(*, session: SessionDep, id: uuid.UUID, update: ExportGroupUpdate) -> Any:
+def update_export_group_endpoint(
+    *, session: SessionDep, id: uuid.UUID, update: ExportGroupUpdate
+) -> Any:
     db_obj = get_export_group(session=session, id=id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="导出分组不存在")
@@ -125,7 +154,9 @@ def export_export_group(*, session: SessionDep, id: uuid.UUID) -> Any:
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(f'{group.name}.xlsx')}"},
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(f'{group.name}.xlsx')}"
+        },
     )
 
 
@@ -140,27 +171,86 @@ def import_export_group(*, session: SessionDep, file: UploadFile = File(...)) ->
         raise HTTPException(status_code=400, detail="无法解析 Excel 文件")
     ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
-    if len(rows) < 2:
+    if not rows:
         raise HTTPException(status_code=400, detail="文件中没有数据")
 
     registry_map = {f.name: f for f in all_fields()}
     errors: list[dict] = []
 
-    group_name = str(rows[1][0]).strip() if rows[1][0] else ""
+    header = [_cell_text(value) for value in rows[0]]
+    group_col = _find_header_index(header, {"字段组名称", "分组名称", "字段组"})
+    code_col = _find_header_index(
+        header, {"字段编码", "字段代码", "字段code", "field_code", "field_name"}
+    )
+    label_col = _find_header_index(header, {"字段名称", "字段标签", "field_label"})
+    order_col = _find_header_index(header, {"字段顺序", "排序", "sort_order"})
+
+    if group_col is not None or code_col is not None:
+        data_rows = rows[1:]
+        code_col = code_col if code_col is not None else 1
+    elif len(rows[0]) == 1:
+        data_rows = rows
+        code_col = 0
+    elif len(rows[0]) > 1 and _cell_text(rows[0][1]) in registry_map:
+        data_rows = rows
+        group_col = 0
+        code_col = 1
+        label_col = 2
+        order_col = 3
+    else:
+        data_rows = rows[1:]
+        group_col = 0
+        code_col = 1
+        label_col = 2
+        order_col = 3
+
+    group_name = ""
+    if group_col is not None:
+        group_name = next(
+            (
+                _cell_text(row[group_col])
+                for row in data_rows
+                if len(row) > group_col and _cell_text(row[group_col])
+            ),
+            "",
+        )
+    if not group_name:
+        group_name = _filename_stem(file.filename)
     if not group_name:
         raise HTTPException(status_code=400, detail="字段组名称不能为空")
 
     fields = []
-    for row_idx, row in enumerate(rows[1:], start=2):
-        field_code = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+    row_offset = 2 if data_rows is not rows else 1
+    for row_idx, row in enumerate(data_rows, start=row_offset):
+        field_code = _cell_text(row[code_col]) if len(row) > code_col else ""
         if not field_code:
             continue
         if field_code not in registry_map:
-            errors.append({"row": row_idx, "field": "字段编码", "value": field_code, "reason": "字段编码不存在于注册表", "suggestion": "请下载字段编码对照表核对"})
+            errors.append(
+                {
+                    "row": row_idx,
+                    "field": "字段编码",
+                    "value": field_code,
+                    "reason": "字段编码不存在于注册表",
+                    "suggestion": "请下载字段编码对照表核对",
+                }
+            )
             continue
-        label = str(row[2]).strip() if len(row) > 2 and row[2] else registry_map[field_code].label
-        order = int(row[3]) if len(row) > 3 and row[3] else len(fields)
-        fields.append({"field_name": field_code, "field_label": label, "sort_order": order})
+        label = (
+            _cell_text(row[label_col])
+            if label_col is not None
+            and len(row) > label_col
+            and _cell_text(row[label_col])
+            else registry_map[field_code].label
+        )
+        order = (
+            int(row[order_col])
+            if order_col is not None and len(row) > order_col and row[order_col]
+            else len(fields)
+        )
+        fields.append(
+            {"field_name": field_code, "field_label": label, "sort_order": order}
+        )
 
     if errors:
         return {"success_count": 0, "error_count": len(errors), "errors": errors}
@@ -170,7 +260,13 @@ def import_export_group(*, session: SessionDep, file: UploadFile = File(...)) ->
 
     group = ExportGroup(name=group_name)
     for f in fields:
-        group.fields.append(ExportGroupField(field_name=f["field_name"], field_label=f["field_label"], sort_order=f["sort_order"]))
+        group.fields.append(
+            ExportGroupField(
+                field_name=f["field_name"],
+                field_label=f["field_label"],
+                sort_order=f["sort_order"],
+            )
+        )
     session.add(group)
     session.commit()
     session.refresh(group)

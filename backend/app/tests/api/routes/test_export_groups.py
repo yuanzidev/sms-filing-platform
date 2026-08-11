@@ -1,4 +1,5 @@
 """Tests for export groups API."""
+
 import io
 
 from fastapi.testclient import TestClient
@@ -47,7 +48,9 @@ def test_registry_template_download(
     assert "sms_signature" in codes
 
 
-def _create_group(client: TestClient, headers: dict[str, str], name: str = "测试导出组") -> str:
+def _create_group(
+    client: TestClient, headers: dict[str, str], name: str = "测试导出组"
+) -> str:
     r = client.post(
         f"{settings.API_V1_STR}/export-groups",
         headers=headers,
@@ -55,8 +58,16 @@ def _create_group(client: TestClient, headers: dict[str, str], name: str = "测�
             "name": name,
             "description": "测试用",
             "fields": [
-                {"field_name": "sms_signature", "field_label": "短信签名", "sort_order": 0},
-                {"field_name": "main_port_number", "field_label": "主端口号", "sort_order": 1},
+                {
+                    "field_name": "sms_signature",
+                    "field_label": "短信签名",
+                    "sort_order": 0,
+                },
+                {
+                    "field_name": "main_port_number",
+                    "field_label": "主端口号",
+                    "sort_order": 1,
+                },
             ],
         },
     )
@@ -118,7 +129,13 @@ def test_import_export_group_success(
     r = client.post(
         f"{settings.API_V1_STR}/export-groups/import",
         headers=superuser_token_headers,
-        files={"file": ("group.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        files={
+            "file": (
+                "group.xlsx",
+                content,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
     )
     assert r.status_code == 200
     data = r.json()
@@ -133,6 +150,67 @@ def test_import_export_group_success(
     assert len(g["fields"]) == 2
 
 
+def test_import_export_group_one_column_field_codes(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "字段编码对照表"
+    ws.append(["sms_signature"])
+    ws.append(["main_port_number"])
+    output = io.BytesIO()
+    wb.save(output)
+
+    r = client.post(
+        f"{settings.API_V1_STR}/export-groups/import",
+        headers=superuser_token_headers,
+        files={
+            "file": (
+                "字段编码对照表.xlsx",
+                output.getvalue(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["success_count"] == 1
+    assert data["group_name"] == "字段编码对照表"
+    assert data["field_count"] == 2
+
+
+def test_import_export_group_registry_table_format(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "字段编码对照表"
+    ws.append(["字段编码", "字段名称", "所属分组"])
+    ws.append(["sms_signature", "短信签名", "签名与模板"])
+    ws.append(["main_port_number", "主端口号", "端口信息"])
+    output = io.BytesIO()
+    wb.save(output)
+
+    r = client.post(
+        f"{settings.API_V1_STR}/export-groups/import",
+        headers=superuser_token_headers,
+        files={
+            "file": (
+                "字段编码对照表.xlsx",
+                output.getvalue(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["success_count"] == 1
+    assert data["group_name"] == "字段编码对照表"
+    assert data["field_count"] == 2
+
+
 def test_import_export_group_invalid_field_code(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
@@ -145,7 +223,13 @@ def test_import_export_group_invalid_field_code(
     r = client.post(
         f"{settings.API_V1_STR}/export-groups/import",
         headers=superuser_token_headers,
-        files={"file": ("group.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        files={
+            "file": (
+                "group.xlsx",
+                content,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
     )
     assert r.status_code == 200
     data = r.json()
