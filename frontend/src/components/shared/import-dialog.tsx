@@ -219,7 +219,7 @@ export function ImportDialog({
           <div className="rounded-lg border-2 border-dashed p-6 text-center">
             <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
             <p className="mt-2 text-sm text-muted-foreground">
-              选择 Excel 文件（.xlsx 或 .xls）
+              选择 Excel 文件（.xlsx 或 .xls），单文件不超过 500MB
             </p>
             <div className="mt-3">
               <Input
