@@ -1,4 +1,5 @@
 """Extract cell-embedded images from .xlsx files and upload to object storage."""
+
 import hashlib
 import io
 import re
@@ -16,15 +17,26 @@ from app.core.storage import get_storage
 from app.models import FileAttachment
 
 _MIME_MAP = {
-    "png": "image/png", "jpeg": "image/jpeg", "jpg": "image/jpeg",
-    "gif": "image/gif", "bmp": "image/bmp", "webp": "image/webp", "tiff": "image/tiff",
+    "png": "image/png",
+    "jpeg": "image/jpeg",
+    "jpg": "image/jpeg",
+    "gif": "image/gif",
+    "bmp": "image/bmp",
+    "webp": "image/webp",
+    "tiff": "image/tiff",
 }
 _EXT_MAP = {
-    "png": ".png", "jpeg": ".jpg", "jpg": ".jpg",
-    "gif": ".gif", "bmp": ".bmp", "webp": ".webp", "tiff": ".tiff",
+    "png": ".png",
+    "jpeg": ".jpg",
+    "jpg": ".jpg",
+    "gif": ".gif",
+    "bmp": ".bmp",
+    "webp": ".webp",
+    "tiff": ".tiff",
 }
 _DISPIMG_RE = re.compile(
-    r'(?:_xlfn\.)?DISPIMG\s*\(\s*(?:&quot;|["\'])([^"\'&]+)(?:&quot;|["\'])', re.IGNORECASE
+    r'(?:_xlfn\.)?DISPIMG\s*\(\s*(?:&quot;|["\'])([^"\'&]+)(?:&quot;|["\'])',
+    re.IGNORECASE,
 )
 
 
@@ -93,7 +105,7 @@ def extract_cell_images_from_xlsx(
             rel_ns = ""
             rt = tree.getroot().tag
             if rt.startswith("{"):
-                rel_ns = rt[:rt.index("}")+1]
+                rel_ns = rt[: rt.index("}") + 1]
             for rel in tree.iter(f"{rel_ns}Relationship"):
                 rid = rel.get("Id", "")
                 target = rel.get("Target", "")
@@ -107,7 +119,9 @@ def extract_cell_images_from_xlsx(
             pass
 
     # Find sheet XML and parse DISPIMG formulas
-    sheet_files = [n for n in zf.namelist() if re.match(r"xl/worksheets/sheet\d+\.xml", n)]
+    sheet_files = [
+        n for n in zf.namelist() if re.match(r"xl/worksheets/sheet\d+\.xml", n)
+    ]
     if not sheet_files:
         zf.close()
         return []
@@ -122,7 +136,7 @@ def extract_cell_images_from_xlsx(
     s_ns = ""
     root_tag = sheet_root.tag
     if root_tag.startswith("{"):
-        s_ns = root_tag[:root_tag.index("}")+1]
+        s_ns = root_tag[: root_tag.index("}") + 1]
 
     row_elements = list(sheet_root.iter(f"{s_ns}row"))
     if not row_elements:
@@ -156,7 +170,9 @@ def extract_cell_images_from_xlsx(
             except Exception:
                 continue
 
-            suffix = (media_path.rsplit(".", 1)[-1] if "." in media_path else "png").lower()
+            suffix = (
+                media_path.rsplit(".", 1)[-1] if "." in media_path else "png"
+            ).lower()
             mime_type = _MIME_MAP.get(suffix, "image/png")
             ext = _EXT_MAP.get(suffix, ".png")
             name = f"image_row{data_row+1}_col{col_0based+1}{ext}"
@@ -165,10 +181,16 @@ def extract_cell_images_from_xlsx(
             if headers and col_0based < len(headers):
                 field_name = headers[col_0based]
 
-            extracted.append(ExtractedImage(
-                data=raw_bytes, mime_type=mime_type, original_name=name,
-                row_index=data_row, col_index=col_0based, field_name=field_name,
-            ))
+            extracted.append(
+                ExtractedImage(
+                    data=raw_bytes,
+                    mime_type=mime_type,
+                    original_name=name,
+                    row_index=data_row,
+                    col_index=col_0based,
+                    field_name=field_name,
+                )
+            )
 
     zf.close()
 
@@ -190,7 +212,10 @@ def extract_cell_images_from_xlsx(
 
 
 def extract_images_from_xlsx(
-    content: bytes, header_row_count: int = 1, data_row_indices: list[int] | None = None
+    content: bytes,
+    headers: list[str] | None = None,
+    header_row_count: int = 1,
+    data_row_indices: list[int] | None = None,
 ) -> list[ExtractedImage]:
     """Extract floating images anchored to cells (legacy compatibility)."""
     wb = load_workbook(BytesIO(content), read_only=False)
@@ -212,11 +237,20 @@ def extract_images_from_xlsx(
             mime_type = _MIME_MAP.get(fmt, "image/png")
             ext = _EXT_MAP.get(fmt, ".png")
             name = f"image_row{data_row+1}_col{col_0based+1}{ext}"
+            field_name = None
+            if headers and col_0based < len(headers):
+                field_name = headers[col_0based]
 
-            extracted.append(ExtractedImage(
-                data=raw_bytes, mime_type=mime_type, original_name=name,
-                row_index=data_row, col_index=col_0based,
-            ))
+            extracted.append(
+                ExtractedImage(
+                    data=raw_bytes,
+                    mime_type=mime_type,
+                    original_name=name,
+                    row_index=data_row,
+                    col_index=col_0based,
+                    field_name=field_name,
+                )
+            )
         except Exception:
             continue
 
@@ -260,38 +294,49 @@ def upload_import_images(
 
     for img in images:
         if img.row_index < 0 or img.row_index >= len(objects):
-            image_errors.append({
-                "row": img.row_index,
-                "column": img.field_name or "未知",
-                "reason": f"行索引 {img.row_index} 超出数据范围",
-            })
+            image_errors.append(
+                {
+                    "row": img.row_index,
+                    "column": img.field_name or "未知",
+                    "reason": f"行索引 {img.row_index} 超出数据范围",
+                }
+            )
             continue
 
         # Validate format
         try:
             pil_img = PILImage.open(io.BytesIO(img.data))
             if pil_img.format and pil_img.format.upper() not in ALLOWED_FORMATS:
-                image_errors.append({
-                    "row": img.row_index + 2, "column": img.field_name or "",
-                    "reason": f"不支持的图片格式: {pil_img.format}",
-                    "suggestion": f"支持的格式: {', '.join(ALLOWED_FORMATS)}",
-                })
+                image_errors.append(
+                    {
+                        "row": img.row_index + 2,
+                        "column": img.field_name or "",
+                        "reason": f"不支持的图片格式: {pil_img.format}",
+                        "suggestion": f"支持的格式: {', '.join(ALLOWED_FORMATS)}",
+                    }
+                )
                 continue
         except Exception:
-            image_errors.append({
-                "row": img.row_index + 2, "column": img.field_name or "",
-                "reason": "图片文件损坏或无法解析",
-            })
+            image_errors.append(
+                {
+                    "row": img.row_index + 2,
+                    "column": img.field_name or "",
+                    "reason": "图片文件损坏或无法解析",
+                }
+            )
             continue
 
         # Validate size
         if len(img.data) > MAX_SIZE:
             size_mb = len(img.data) / (1024 * 1024)
-            image_errors.append({
-                "row": img.row_index + 2, "column": img.field_name or "",
-                "reason": f"图片过大({size_mb:.1f}MB)",
-                "suggestion": "请压缩到 10MB 以内",
-            })
+            image_errors.append(
+                {
+                    "row": img.row_index + 2,
+                    "column": img.field_name or "",
+                    "reason": f"图片过大({size_mb:.1f}MB)",
+                    "suggestion": "请压缩到 10MB 以内",
+                }
+            )
             continue
 
         entity_id = objects[img.row_index].id
@@ -411,15 +456,17 @@ def _build_cellimages_xml(image_ids: dict[str, str]) -> str:
         f'<cellImages xmlns="{ci_ns}" xmlns:a="{a_ns}" xmlns:r="{r_ns}">',
     ]
     for cell_ref, image_id in image_ids.items():
-        lines.extend([
-            f"<cellImage>",
-            f"<pic>",
-            f'<nvPicPr><cNvPr name="{image_id}"/></nvPicPr>',
-            f"<blipFill><a:blip r:embed=\"rId_{image_id}\"/>",
-            f"<a:stretch><a:fillRect/></a:stretch></blipFill>",
-            f"</pic>",
-            f"</cellImage>",
-        ])
+        lines.extend(
+            [
+                f"<cellImage>",
+                f"<pic>",
+                f'<nvPicPr><cNvPr name="{image_id}"/></nvPicPr>',
+                f'<blipFill><a:blip r:embed="rId_{image_id}"/>',
+                f"<a:stretch><a:fillRect/></a:stretch></blipFill>",
+                f"</pic>",
+                f"</cellImage>",
+            ]
+        )
     lines.append("</cellImages>")
     return "\n".join(lines)
 
@@ -456,7 +503,7 @@ def _build_sheet_cellimage_rels(image_ids: dict[str, str]) -> str:
 
 
 def _inject_content_type(ct_xml: str) -> str:
-    if "<Override PartName=\"/xl/cellimages.xml\"" not in ct_xml:
+    if '<Override PartName="/xl/cellimages.xml"' not in ct_xml:
         ct_xml = ct_xml.replace(
             "</Types>",
             '<Override PartName="/xl/cellimages.xml" '
@@ -467,7 +514,7 @@ def _inject_content_type(ct_xml: str) -> str:
 
 def _inject_dispimg_formulas(sheet_xml: str, image_ids: dict[str, str]) -> str:
     root = ET.fromstring(sheet_xml)
-    ns = root.tag[:root.tag.index("}")+1] if "}" in root.tag else ""
+    ns = root.tag[: root.tag.index("}") + 1] if "}" in root.tag else ""
     sheet_data = root.find(f"{ns}sheetData")
 
     if sheet_data is None:

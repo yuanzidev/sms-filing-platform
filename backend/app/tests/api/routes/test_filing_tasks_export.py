@@ -1,15 +1,20 @@
 """Regression tests for filing task export — all selected fields must appear in Excel."""
+
+import hashlib
 from io import BytesIO
 from typing import Generator
+import uuid
+import zipfile
 
 import pytest
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
+from PIL import Image as PILImage
 from sqlmodel import Session, delete
 
 from app.core.config import settings
 from app.core.db import engine
-from app.models import FilingSubPortUsage, FilingTask
+from app.models import FileAttachment, FilingSubPortUsage, FilingTask
 from app.services.export_field_registry import REGISTRY
 
 
@@ -84,7 +89,11 @@ def _create_export_group(client, headers, name):
         json={
             "name": name,
             "fields": [
-                {"field_name": "main_port_number", "field_label": "主端口号", "sort_order": 1},
+                {
+                    "field_name": "main_port_number",
+                    "field_label": "主端口号",
+                    "sort_order": 1,
+                },
             ],
         },
     )
@@ -92,12 +101,21 @@ def _create_export_group(client, headers, name):
     return r.json()["id"]
 
 
+def _png_bytes(color: str) -> bytes:
+    image = PILImage.new("RGB", (20, 20), color=color)
+    buf = BytesIO()
+    image.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 def test_export_includes_all_registry_fields(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
     qual_id = _create_qualification(client, superuser_token_headers, "全字段企业")
     port_id = _create_port(client, superuser_token_headers, "10698全部")
-    group_id = _create_export_group_all_fields(client, superuser_token_headers, "全字段组")
+    group_id = _create_export_group_all_fields(
+        client, superuser_token_headers, "全字段组"
+    )
 
     r = client.post(
         f"{settings.API_V1_STR}/filing-tasks",
@@ -127,6 +145,115 @@ def test_export_includes_all_registry_fields(
     assert not missing, f"导出缺失列: {missing}"
 
 
+def test_filing_task_download_embeds_qualification_and_port_images(
+    client: TestClient, superuser_token_headers: dict[str, str], monkeypatch
+) -> None:
+    from app.api.routes import filing_tasks
+
+    qual_id = _create_qualification(client, superuser_token_headers, "图片导出企业")
+    port_id = _create_port(client, superuser_token_headers, "10698IMG")
+    qual_png = _png_bytes("red")
+    port_png = _png_bytes("blue")
+
+    class _MemoryStorage:
+        def __init__(self) -> None:
+            self.files = {
+                "qualification-cert.png": qual_png,
+                "port-auth.png": port_png,
+            }
+
+        def upload(self, key, data, content_type):
+            self.files[key] = data
+            return key
+
+        def download(self, key):
+            return self.files[key]
+
+        def exists(self, key):
+            return key in self.files
+
+        def delete(self, key):
+            self.files.pop(key, None)
+
+    storage = _MemoryStorage()
+    monkeypatch.setattr(filing_tasks, "get_storage", lambda: storage)
+
+    with Session(engine) as session:
+        session.add_all(
+            [
+                FileAttachment(
+                    original_name="image_row1_col4.png",
+                    stored_path="qualification-cert.png",
+                    file_size=len(qual_png),
+                    mime_type="image/png",
+                    md5_hash=hashlib.md5(qual_png).hexdigest(),
+                    entity_type="qualification_info",
+                    entity_id=uuid.UUID(qual_id),
+                    field_name=None,
+                ),
+                FileAttachment(
+                    original_name="auth.png",
+                    stored_path="port-auth.png",
+                    file_size=len(port_png),
+                    mime_type="image/png",
+                    md5_hash=hashlib.md5(port_png).hexdigest(),
+                    entity_type="port_info",
+                    entity_id=uuid.UUID(port_id),
+                    field_name="授权书图片",
+                ),
+            ]
+        )
+        session.commit()
+
+    r = client.post(
+        f"{settings.API_V1_STR}/export-groups",
+        headers=superuser_token_headers,
+        json={
+            "name": "图片导出组",
+            "fields": [
+                {
+                    "field_name": "cert_image",
+                    "field_label": "单位证件图片",
+                    "sort_order": 1,
+                },
+                {
+                    "field_name": "auth_image",
+                    "field_label": "授权书图片",
+                    "sort_order": 2,
+                },
+            ],
+        },
+    )
+    assert r.status_code == 200, r.text
+    group_id = r.json()["id"]
+
+    r = client.post(
+        f"{settings.API_V1_STR}/filing-tasks",
+        headers=superuser_token_headers,
+        json={
+            "qualification_ids": [qual_id],
+            "port_ids": [port_id],
+            "export_group_id": group_id,
+        },
+    )
+    assert r.status_code == 200, r.text
+    task_id = r.json()["id"]
+
+    r = client.get(
+        f"{settings.API_V1_STR}/filing-tasks/{task_id}/download",
+        headers=superuser_token_headers,
+    )
+    assert r.status_code == 200
+
+    with zipfile.ZipFile(BytesIO(r.content)) as zf:
+        media_files = [name for name in zf.namelist() if name.startswith("xl/media/")]
+        drawing_files = [
+            name for name in zf.namelist() if name.startswith("xl/drawings/")
+        ]
+    assert len(media_files) >= 2
+    assert drawing_files
+
+
 def test_create_filing_task_with_auto_sub_ports(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
@@ -142,8 +269,16 @@ def test_create_filing_task_with_auto_sub_ports(
         json={
             "name": "子端口导出组",
             "fields": [
-                {"field_name": "main_port_number", "field_label": "主端口号", "sort_order": 1},
-                {"field_name": "sub_port_number", "field_label": "子端口号", "sort_order": 2},
+                {
+                    "field_name": "main_port_number",
+                    "field_label": "主端口号",
+                    "sort_order": 1,
+                },
+                {
+                    "field_name": "sub_port_number",
+                    "field_label": "子端口号",
+                    "sort_order": 2,
+                },
             ],
         },
     )
@@ -191,7 +326,11 @@ def test_create_filing_task_range_exhausted_409(
         json={
             "name": "耗尽组",
             "fields": [
-                {"field_name": "main_port_number", "field_label": "主端口号", "sort_order": 1},
+                {
+                    "field_name": "main_port_number",
+                    "field_label": "主端口号",
+                    "sort_order": 1,
+                },
             ],
         },
     )
@@ -219,7 +358,9 @@ def test_auto_sub_ports_range_too_large_rejected(
     """范围超过 100 万 → 400"""
     qual_id = _create_qualification(client, superuser_token_headers, "范围过大企业")
     port_id = _create_port(client, superuser_token_headers, "10698TOOBIG")
-    group_id = _create_export_group_all_fields(client, superuser_token_headers, "范围过大组")
+    group_id = _create_export_group_all_fields(
+        client, superuser_token_headers, "范围过大组"
+    )
 
     r = client.post(
         f"{settings.API_V1_STR}/filing-tasks",
@@ -243,7 +384,9 @@ def test_auto_sub_ports_non_6digit_rejected(
     """范围不是 6 位数字 → 400"""
     qual_id = _create_qualification(client, superuser_token_headers, "非6位企业")
     port_id = _create_port(client, superuser_token_headers, "10698NOT6")
-    group_id = _create_export_group_all_fields(client, superuser_token_headers, "非6位组")
+    group_id = _create_export_group_all_fields(
+        client, superuser_token_headers, "非6位组"
+    )
 
     r = client.post(
         f"{settings.API_V1_STR}/filing-tasks",
@@ -279,8 +422,16 @@ def test_failed_upload_releases_sub_ports(
         json={
             "name": "上传失败组",
             "fields": [
-                {"field_name": "main_port_number", "field_label": "主端口号", "sort_order": 1},
-                {"field_name": "sub_port_number", "field_label": "子端口号", "sort_order": 2},
+                {
+                    "field_name": "main_port_number",
+                    "field_label": "主端口号",
+                    "sort_order": 1,
+                },
+                {
+                    "field_name": "sub_port_number",
+                    "field_label": "子端口号",
+                    "sort_order": 2,
+                },
             ],
         },
     )
@@ -341,8 +492,16 @@ def test_delete_filing_task_keeps_usage(
         json={
             "name": "保留组",
             "fields": [
-                {"field_name": "main_port_number", "field_label": "主端口号", "sort_order": 1},
-                {"field_name": "sub_port_number", "field_label": "子端口号", "sort_order": 2},
+                {
+                    "field_name": "main_port_number",
+                    "field_label": "主端口号",
+                    "sort_order": 1,
+                },
+                {
+                    "field_name": "sub_port_number",
+                    "field_label": "子端口号",
+                    "sort_order": 2,
+                },
             ],
         },
     )

@@ -1,4 +1,5 @@
 """Port info management routes."""
+
 import io
 import uuid
 from typing import Any
@@ -111,16 +112,22 @@ def download_port_info_template() -> Any:
 
     example_data = [
         "中国移动",
-        "10690001", "示例企业有限公司", "0001",
+        "10690001",
+        "示例企业有限公司",
+        "0001",
         "全国",
-        "广东", "深圳",
-        "短信", "新增",
+        "广东",
+        "深圳",
+        "短信",
+        "新增",
         "2024-01-15",
         "是",
         "运营商XX机房-XX设备",
         "企业XX机房-XX设备",
-        "是", "授权书编号001",
-        "2024-01-01", "2025-12-31",
+        "是",
+        "授权书编号001",
+        "2024-01-01",
+        "2025-12-31",
         "G001",
         "华南地区",
         "备用机房A",
@@ -133,7 +140,9 @@ def download_port_info_template() -> Any:
         ws.cell(row=2, column=col_idx, value=val)
 
     instructions = wb.create_sheet("填写说明")
-    instructions.cell(row=1, column=1, value="Excel 导入图片填写说明").font = Font(bold=True, size=14)
+    instructions.cell(row=1, column=1, value="Excel 导入图片填写说明").font = Font(
+        bold=True, size=14
+    )
     notes = [
         "1. 请勿修改表头行（第一行）的列标题",
         "2. 每条数据填写一行，从第二行开始",
@@ -165,7 +174,9 @@ def download_port_info_template() -> Any:
     return StreamingResponse(
         io.BytesIO(xlsx_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote('端口信息导入模板_v2.xlsx')}"},
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote('端口信息导入模板_v2.xlsx')}"
+        },
     )
 
 
@@ -191,7 +202,11 @@ def preview_port_info_import(file: UploadFile = File(...)) -> Any:
         if h in header_to_field:
             col_map[header_to_field[h]] = col_idx
 
-    unrecognized = [h for h in header_row if h and h not in header_to_field and h not in ("", "None")]
+    unrecognized = [
+        h
+        for h in header_row
+        if h and h not in header_to_field and h not in ("", "None")
+    ]
 
     preview_rows = []
     for row in rows[1:6]:  # first 5 data rows
@@ -200,21 +215,27 @@ def preview_port_info_import(file: UploadFile = File(...)) -> Any:
         row_data = {}
         for field_name, col_idx in col_map.items():
             v = row[col_idx] if col_idx < len(row) else None
-            row_data[field_name] = str(v).strip() if v is not None and str(v).strip() else None
+            row_data[field_name] = (
+                str(v).strip() if v is not None and str(v).strip() else None
+            )
         preview_rows.append(row_data)
 
     return {
         "headers": header_row,
         "rows": preview_rows,
         "unrecognized_headers": unrecognized,
-        "total_data_rows": len([r for r in rows[1:] if not all(c is None or str(c).strip() == "" for c in r)]),
+        "total_data_rows": len(
+            [
+                r
+                for r in rows[1:]
+                if not all(c is None or str(c).strip() == "" for c in r)
+            ]
+        ),
     }
 
 
 @router.post("/import")
-def import_port_infos(
-    *, session: SessionDep, file: UploadFile = File(...)
-) -> Any:
+def import_port_infos(*, session: SessionDep, file: UploadFile = File(...)) -> Any:
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
 
@@ -222,7 +243,9 @@ def import_port_infos(
     try:
         wb = load_workbook(io.BytesIO(content))
     except Exception:
-        raise HTTPException(status_code=400, detail="无法解析 Excel 文件，请检查文件格式")
+        raise HTTPException(
+            status_code=400, detail="无法解析 Excel 文件，请检查文件格式"
+        )
 
     ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
@@ -237,10 +260,18 @@ def import_port_infos(
         if h in header_to_field:
             col_map[header_to_field[h]] = col_idx
 
-    unrecognized_headers = [h for h in header_row if h and h not in header_to_field and h not in ("", "None")]
+    unrecognized_headers = [
+        h
+        for h in header_row
+        if h and h not in header_to_field and h not in ("", "None")
+    ]
 
     required_fields = ["carrier", "main_port_number", "enterprise_name", "port_type"]
-    missing = [h for h, f in header_to_field.items() if f in required_fields and f not in col_map]
+    missing = [
+        h
+        for h, f in header_to_field.items()
+        if f in required_fields and f not in col_map
+    ]
     if missing:
         raise HTTPException(
             status_code=400,
@@ -285,6 +316,7 @@ def import_port_infos(
             if v is None:
                 return None
             from datetime import date, datetime
+
             if isinstance(v, datetime):
                 return v.date()
             if isinstance(v, date):
@@ -295,39 +327,64 @@ def import_port_infos(
             try:
                 return date.fromisoformat(s)
             except ValueError:
-                row_errors.append({
-                    "row": row_idx, "field": cn_name, "value": s,
-                    "reason": "日期格式无效", "suggestion": "请使用 YYYY-MM-DD 格式",
-                })
+                row_errors.append(
+                    {
+                        "row": row_idx,
+                        "field": cn_name,
+                        "value": s,
+                        "reason": "日期格式无效",
+                        "suggestion": "请使用 YYYY-MM-DD 格式",
+                    }
+                )
                 return None
 
         carrier = cell("carrier")
         if not carrier:
-            row_errors.append({
-                "row": row_idx, "field": "运营商", "value": "",
-                "reason": "运营商不能为空", "suggestion": "请填写运营商",
-            })
+            row_errors.append(
+                {
+                    "row": row_idx,
+                    "field": "运营商",
+                    "value": "",
+                    "reason": "运营商不能为空",
+                    "suggestion": "请填写运营商",
+                }
+            )
 
         main_port_number = cell("main_port_number")
         if not main_port_number:
-            row_errors.append({
-                "row": row_idx, "field": "主端口号", "value": "",
-                "reason": "主端口号不能为空", "suggestion": "请填写主端口号",
-            })
+            row_errors.append(
+                {
+                    "row": row_idx,
+                    "field": "主端口号",
+                    "value": "",
+                    "reason": "主端口号不能为空",
+                    "suggestion": "请填写主端口号",
+                }
+            )
 
         enterprise_name = cell("enterprise_name")
         if not enterprise_name:
-            row_errors.append({
-                "row": row_idx, "field": "主端口备案公司", "value": "",
-                "reason": "企业名称不能为空", "suggestion": "请填写主端口备案公司",
-            })
+            row_errors.append(
+                {
+                    "row": row_idx,
+                    "field": "主端口备案公司",
+                    "value": "",
+                    "reason": "企业名称不能为空",
+                    "suggestion": "请填写主端口备案公司",
+                }
+            )
 
         port_type = cell("port_type")
         if not port_type:
-            row_errors.append({
-                "row": row_idx, "field": "端口类型", "value": "",
-                "reason": "端口类型不能为空", "suggestion": "请填写端口类型",
-            })
+            row_errors.append(
+                {
+                    "row": row_idx,
+                    "field": "端口类型",
+                    "value": "",
+                    "reason": "端口类型不能为空",
+                    "suggestion": "请填写端口类型",
+                }
+            )
 
         # Validate booleans
         for bool_field, cn_name in [
@@ -336,11 +393,27 @@ def import_port_infos(
             ("is_green_channel", "是否绿色通道"),
         ]:
             v = cell(bool_field)
-            if v and v not in ("是", "否", "true", "True", "1", "TRUE", "false", "False", "0", "FALSE"):
-                row_errors.append({
-                    "row": row_idx, "field": cn_name, "value": v,
-                    "reason": "布尔字段值无效", "suggestion": "请填写「是」或「否」",
-                })
+            if v and v not in (
+                "是",
+                "否",
+                "true",
+                "True",
+                "1",
+                "TRUE",
+                "false",
+                "False",
+                "0",
+                "FALSE",
+            ):
+                row_errors.append(
+                    {
+                        "row": row_idx,
+                        "field": cn_name,
+                        "value": v,
+                        "reason": "布尔字段值无效",
+                        "suggestion": "请填写「是」或「否」",
+                    }
+                )
 
         # Validate dates (collects errors into row_errors)
         parse_date("port_activation_date", "端口入网时间")
@@ -350,33 +423,37 @@ def import_port_infos(
         if row_errors:
             errors.extend(row_errors)
         else:
-            objects.append(PortInfo(
-                carrier=carrier,
-                main_port_number=main_port_number,
-                enterprise_name=enterprise_name,
-                sub_port_number=cell("sub_port_number"),
-                port_range=cell("port_range"),
-                province=cell("province"),
-                city=cell("city"),
-                port_type=port_type,
-                operation_type=cell("operation_type"),
-                port_activation_date=parse_date("port_activation_date", "端口入网时间"),
-                allow_self_extension=parse_bool("allow_self_extension"),
-                carrier_room=cell("carrier_room"),
-                enterprise_room=cell("enterprise_room"),
-                has_authorization=parse_bool("has_authorization"),
-                authorization_letter=cell("authorization_letter"),
-                auth_start_date=parse_date("auth_start_date", "授权开始日期"),
-                auth_end_date=parse_date("auth_end_date", "授权结束日期"),
-                group_code=cell("group_code"),
-                region=cell("region"),
-                other_room_description=cell("other_room_description"),
-                is_green_channel=parse_bool("is_green_channel"),
-                blacklist_whitelist_type=cell("blacklist_whitelist_type"),
-                audit_form=cell("audit_form"),
-                customer_type=cell("customer_type"),
-                basic_telecom_enterprise_id=cell("basic_telecom_enterprise_id"),
-            ))
+            objects.append(
+                PortInfo(
+                    carrier=carrier,
+                    main_port_number=main_port_number,
+                    enterprise_name=enterprise_name,
+                    sub_port_number=cell("sub_port_number"),
+                    port_range=cell("port_range"),
+                    province=cell("province"),
+                    city=cell("city"),
+                    port_type=port_type,
+                    operation_type=cell("operation_type"),
+                    port_activation_date=parse_date(
+                        "port_activation_date", "端口入网时间"
+                    ),
+                    allow_self_extension=parse_bool("allow_self_extension"),
+                    carrier_room=cell("carrier_room"),
+                    enterprise_room=cell("enterprise_room"),
+                    has_authorization=parse_bool("has_authorization"),
+                    authorization_letter=cell("authorization_letter"),
+                    auth_start_date=parse_date("auth_start_date", "授权开始日期"),
+                    auth_end_date=parse_date("auth_end_date", "授权结束日期"),
+                    group_code=cell("group_code"),
+                    region=cell("region"),
+                    other_room_description=cell("other_room_description"),
+                    is_green_channel=parse_bool("is_green_channel"),
+                    blacklist_whitelist_type=cell("blacklist_whitelist_type"),
+                    audit_form=cell("audit_form"),
+                    customer_type=cell("customer_type"),
+                    basic_telecom_enterprise_id=cell("basic_telecom_enterprise_id"),
+                )
+            )
             data_row_indices.append(row_idx)
 
     # Phase 2: If no valid rows, return all errors
@@ -400,13 +477,23 @@ def import_port_infos(
     if file.filename.endswith(".xlsx"):
         all_images: list = []
         try:
-            all_images.extend(extract_cell_images_from_xlsx(
-                content, headers=header_row, data_row_indices=data_row_indices,
-            ))
+            all_images.extend(
+                extract_cell_images_from_xlsx(
+                    content,
+                    headers=header_row,
+                    data_row_indices=data_row_indices,
+                )
+            )
         except Exception as e:
             warnings.append(f"单元格图片提取失败: {e}")
         try:
-            all_images.extend(extract_images_from_xlsx(content, data_row_indices=data_row_indices))
+            all_images.extend(
+                extract_images_from_xlsx(
+                    content,
+                    headers=header_row,
+                    data_row_indices=data_row_indices,
+                )
+            )
         except Exception as e:
             warnings.append(f"浮动图片提取失败: {e}")
         if all_images:
@@ -465,7 +552,9 @@ def download_import_error_report(body: ImportErrorReport) -> Any:
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote('导入错误报告.xlsx')}"},
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote('导入错误报告.xlsx')}"
+        },
     )
 
 
@@ -484,9 +573,14 @@ def read_port_infos(
 ) -> Any:
     skip = (page - 1) * page_size
     items, total = list_port_infos(
-        session=session, skip=skip, limit=page_size,
-        carrier=carrier, province=province,
-        keyword=keyword, city=city, port_type=port_type,
+        session=session,
+        skip=skip,
+        limit=page_size,
+        carrier=carrier,
+        province=province,
+        keyword=keyword,
+        city=city,
+        port_type=port_type,
         main_port_number=main_port_number,
     )
     return PortInfosPublic(data=items, total=total, page=page, page_size=page_size)
@@ -494,7 +588,13 @@ def read_port_infos(
 
 @router.post("", response_model=PortInfoPublic)
 @router.post("/", include_in_schema=False, response_model=PortInfoPublic)
-def create_port_info_endpoint(*, session: SessionDep, create: PortInfoCreate, current_user: CurrentUser, request: Request) -> Any:
+def create_port_info_endpoint(
+    *,
+    session: SessionDep,
+    create: PortInfoCreate,
+    current_user: CurrentUser,
+    request: Request,
+) -> Any:
     try:
         result = create_port_info(session=session, create=create)
     except Exception as e:
@@ -502,13 +602,24 @@ def create_port_info_endpoint(*, session: SessionDep, create: PortInfoCreate, cu
         if "unique" in error_str.lower() or "duplicate" in error_str.lower():
             raise HTTPException(
                 status_code=409,
-                detail={"field": "main_port_number", "reason": "主端口号已存在", "suggestion": "请使用不同的主端口号，或先查询已有端口信息"},
+                detail={
+                    "field": "main_port_number",
+                    "reason": "主端口号已存在",
+                    "suggestion": "请使用不同的主端口号，或先查询已有端口信息",
+                },
             )
         raise HTTPException(
             status_code=500,
             detail={"field": "", "reason": error_str, "suggestion": "请联系管理员"},
         )
-    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="port_info", action="create", target=f"{result.main_port_number or result.sub_port_number or result.id}")
+    log_operation(
+        session=session,
+        user=current_user,
+        user_ip=request.client.host if request.client else "",
+        module="port_info",
+        action="create",
+        target=f"{result.main_port_number or result.sub_port_number or result.id}",
+    )
     return result
 
 
@@ -522,22 +633,43 @@ def read_port_info(*, session: SessionDep, id: uuid.UUID) -> Any:
 
 @router.patch("/{id}", response_model=PortInfoPublic)
 def update_port_info_endpoint(
-    *, session: SessionDep, id: uuid.UUID, update: PortInfoUpdate, current_user: CurrentUser, request: Request
+    *,
+    session: SessionDep,
+    id: uuid.UUID,
+    update: PortInfoUpdate,
+    current_user: CurrentUser,
+    request: Request,
 ) -> Any:
     db_obj = get_port_info(session=session, id=id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="端口信息不存在")
     result = update_port_info(session=session, db_obj=db_obj, update=update)
-    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="port_info", action="update", target=f"{result.main_port_number or result.sub_port_number or id}")
+    log_operation(
+        session=session,
+        user=current_user,
+        user_ip=request.client.host if request.client else "",
+        module="port_info",
+        action="update",
+        target=f"{result.main_port_number or result.sub_port_number or id}",
+    )
     return result
 
 
 @router.delete("/{id}")
-def delete_port_info_endpoint(*, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request) -> Message:
+def delete_port_info_endpoint(
+    *, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request
+) -> Message:
     db_obj = get_port_info(session=session, id=id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="端口信息不存在")
     target = f"{db_obj.main_port_number or db_obj.sub_port_number or id}"
     delete_port_info(session=session, db_obj=db_obj)
-    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="port_info", action="delete", target=target)
+    log_operation(
+        session=session,
+        user=current_user,
+        user_ip=request.client.host if request.client else "",
+        module="port_info",
+        action="delete",
+        target=target,
+    )
     return Message(message="端口信息删除成功")

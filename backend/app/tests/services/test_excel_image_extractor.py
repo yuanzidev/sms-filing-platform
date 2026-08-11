@@ -1,4 +1,5 @@
 """Tests for Excel image extraction row-index remapping (empty rows skipped in data list)."""
+
 import io
 
 from openpyxl import Workbook
@@ -41,6 +42,29 @@ def test_extract_images_from_xlsx_remaps_row_indices() -> None:
 
     images = extract_images_from_xlsx(buf.getvalue(), data_row_indices=[2, 4])
     assert sorted(img.row_index for img in images) == [0, 1]
+
+
+def test_extract_images_from_xlsx_sets_field_name_from_headers() -> None:
+    """浮动图片：按锚点列匹配表头，保存附件时能知道图片字段。"""
+    png = _png_bytes()
+    wb = Workbook()
+    ws = wb.active
+    ws["A1"] = "运营商"
+    ws["B1"] = "授权书图片"
+    ws["A2"] = "中国移动"
+    ws["B2"] = "img"
+    ws.add_image(XLImage(io.BytesIO(png)), "B2")
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    images = extract_images_from_xlsx(
+        buf.getvalue(),
+        headers=["运营商", "授权书图片"],
+        data_row_indices=[2],
+    )
+    assert [img.field_name for img in images] == ["授权书图片"]
 
 
 def test_extract_images_from_xlsx_drops_images_on_empty_rows() -> None:

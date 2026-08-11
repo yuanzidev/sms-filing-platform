@@ -1,4 +1,5 @@
 """Qualification info management routes."""
+
 import io
 import uuid
 from typing import Any
@@ -144,56 +145,58 @@ def download_qualification_template() -> Any:
 
     example_data = [
         "示例企业有限公司",
-        "91110108MA01XXXXX",          # 单位证件号码
-        "营业执照",                    # 单位证件类型
-        "",                            # 单位证件图片
-        "李四",                        # 责任人姓名
-        "身份证",                      # 责任人证件类型
-        "110101199001011234",          # 责任人证件号码
-        "13800138000",                 # 责任人手机号
-        "北京市朝阳区XX路1号",         # 责任人证件地址
-        "",                            # 责任人身份证正面
-        "",                            # 责任人身份证反面
-        "王五",                        # 经办人姓名
-        "身份证",                      # 经办人证件类型
-        "110101199501011234",          # 经办人证件号码
-        "13900139000",                 # 经办人手机号
-        "北京市海淀区XX路2号",         # 经办人证件地址
-        "",                            # 经办人现场照片
-        "张三",                        # 法人姓名
-        "身份证",                      # 法人证件类型
-        "110101199001011234",          # 法人证件号码
-        "北京市朝阳区XX路1号",         # 法人证件地址
-        "",                            # 法人身份证正面
-        "",                            # 法人身份证反面
-        "示例平台",                    # 短信签名
-        "自营签名",                    # 签名类型/来源
+        "91110108MA01XXXXX",  # 单位证件号码
+        "营业执照",  # 单位证件类型
+        "",  # 单位证件图片
+        "李四",  # 责任人姓名
+        "身份证",  # 责任人证件类型
+        "110101199001011234",  # 责任人证件号码
+        "13800138000",  # 责任人手机号
+        "北京市朝阳区XX路1号",  # 责任人证件地址
+        "",  # 责任人身份证正面
+        "",  # 责任人身份证反面
+        "王五",  # 经办人姓名
+        "身份证",  # 经办人证件类型
+        "110101199501011234",  # 经办人证件号码
+        "13900139000",  # 经办人手机号
+        "北京市海淀区XX路2号",  # 经办人证件地址
+        "",  # 经办人现场照片
+        "张三",  # 法人姓名
+        "身份证",  # 法人证件类型
+        "110101199001011234",  # 法人证件号码
+        "北京市朝阳区XX路1号",  # 法人证件地址
+        "",  # 法人身份证正面
+        "",  # 法人身份证反面
+        "示例平台",  # 短信签名
+        "自营签名",  # 签名类型/来源
         "您的验证码是{code}，请在5分钟内完成验证",  # 短信模板内容
-        "是",                          # 是否签名校验
-        "否",                          # 是否网关签名
-        "是",                          # 模板是否包含变量
-        "数字",                        # 模板参数类型
-        "6",                           # 模板参数长度
-        "营销类",                      # 业务属性
-        "验证码",                      # 业务类型
-        "登录验证",                    # 业务细类
-        "用户登录验证",                # 具体用途
-        "13800000000",                 # 引流号码
-        "https://example.com",         # 引流链接
-        "手机号",                      # 引流号码类型
-        "业务联系",                    # 引流号码用途
-        "欢迎使用我们的服务",          # 引流内容
-        "H5",                          # 链接类型
-        "",                            # 签名举证附件
-        "",                            # 引流号码举证附件
-        "",                            # 引流链接举证
-        "示例平台",                    # APP/平台名称
+        "是",  # 是否签名校验
+        "否",  # 是否网关签名
+        "是",  # 模板是否包含变量
+        "数字",  # 模板参数类型
+        "6",  # 模板参数长度
+        "营销类",  # 业务属性
+        "验证码",  # 业务类型
+        "登录验证",  # 业务细类
+        "用户登录验证",  # 具体用途
+        "13800000000",  # 引流号码
+        "https://example.com",  # 引流链接
+        "手机号",  # 引流号码类型
+        "业务联系",  # 引流号码用途
+        "欢迎使用我们的服务",  # 引流内容
+        "H5",  # 链接类型
+        "",  # 签名举证附件
+        "",  # 引流号码举证附件
+        "",  # 引流链接举证
+        "示例平台",  # APP/平台名称
     ]
     for col_idx, val in enumerate(example_data, 1):
         ws.cell(row=2, column=col_idx, value=val)
 
     instructions = wb.create_sheet("填写说明")
-    instructions.cell(row=1, column=1, value="Excel 导入图片填写说明").font = Font(bold=True, size=14)
+    instructions.cell(row=1, column=1, value="Excel 导入图片填写说明").font = Font(
+        bold=True, size=14
+    )
     notes = [
         "1. 请勿修改表头行（第一行）的列标题",
         "2. 每条数据填写一行，从第二行开始",
@@ -226,7 +229,9 @@ def download_qualification_template() -> Any:
     return StreamingResponse(
         io.BytesIO(xlsx_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote('资质导入模板_v2.xlsx')}"},
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote('资质导入模板_v2.xlsx')}"
+        },
     )
 
 
@@ -252,7 +257,11 @@ def preview_qualifications_import(file: UploadFile = File(...)) -> Any:
         if h in header_to_field:
             col_map[header_to_field[h]] = col_idx
 
-    unrecognized = [h for h in header_row if h and h not in header_to_field and h not in ("", "None")]
+    unrecognized = [
+        h
+        for h in header_row
+        if h and h not in header_to_field and h not in ("", "None")
+    ]
 
     preview_rows = []
     for row in rows[1:6]:  # first 5 data rows
@@ -261,21 +270,27 @@ def preview_qualifications_import(file: UploadFile = File(...)) -> Any:
         row_data = {}
         for field_name, col_idx in col_map.items():
             v = row[col_idx] if col_idx < len(row) else None
-            row_data[field_name] = str(v).strip() if v is not None and str(v).strip() else None
+            row_data[field_name] = (
+                str(v).strip() if v is not None and str(v).strip() else None
+            )
         preview_rows.append(row_data)
 
     return {
         "headers": header_row,
         "rows": preview_rows,
         "unrecognized_headers": unrecognized,
-        "total_data_rows": len([r for r in rows[1:] if not all(c is None or str(c).strip() == "" for c in r)]),
+        "total_data_rows": len(
+            [
+                r
+                for r in rows[1:]
+                if not all(c is None or str(c).strip() == "" for c in r)
+            ]
+        ),
     }
 
 
 @router.post("/import")
-def import_qualifications(
-    *, session: SessionDep, file: UploadFile = File(...)
-) -> Any:
+def import_qualifications(*, session: SessionDep, file: UploadFile = File(...)) -> Any:
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
 
@@ -283,7 +298,9 @@ def import_qualifications(
     try:
         wb = load_workbook(io.BytesIO(content))
     except Exception:
-        raise HTTPException(status_code=400, detail="无法解析 Excel 文件，请检查文件格式")
+        raise HTTPException(
+            status_code=400, detail="无法解析 Excel 文件，请检查文件格式"
+        )
 
     ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
@@ -298,9 +315,17 @@ def import_qualifications(
         if h in header_to_field:
             col_map[header_to_field[h]] = col_idx
 
-    unrecognized_headers = [h for h in header_row if h and h not in header_to_field and h not in ("", "None")]
+    unrecognized_headers = [
+        h
+        for h in header_row
+        if h and h not in header_to_field and h not in ("", "None")
+    ]
 
-    missing = [h for h, f in header_to_field.items() if f == "enterprise_name" and f not in col_map]
+    missing = [
+        h
+        for h, f in header_to_field.items()
+        if f == "enterprise_name" and f not in col_map
+    ]
     if missing:
         raise HTTPException(
             status_code=400,
@@ -337,10 +362,15 @@ def import_qualifications(
         row_errors: list[dict] = []
         enterprise_name = cell("enterprise_name")
         if not enterprise_name:
-            row_errors.append({
-                "row": row_idx, "field": "企业名称", "value": "",
-                "reason": "企业名称不能为空", "suggestion": "请填写企业名称",
-            })
+            row_errors.append(
+                {
+                    "row": row_idx,
+                    "field": "企业名称",
+                    "value": "",
+                    "reason": "企业名称不能为空",
+                    "suggestion": "请填写企业名称",
+                }
+            )
 
         # Validate booleans
         for bool_field, cn_name in [
@@ -349,11 +379,27 @@ def import_qualifications(
             ("template_has_variable", "模板是否包含变量"),
         ]:
             v = cell(bool_field)
-            if v and v not in ("是", "否", "true", "True", "1", "TRUE", "false", "False", "0", "FALSE"):
-                row_errors.append({
-                    "row": row_idx, "field": cn_name, "value": v,
-                    "reason": "布尔字段值无效", "suggestion": "请填写「是」或「否」",
-                })
+            if v and v not in (
+                "是",
+                "否",
+                "true",
+                "True",
+                "1",
+                "TRUE",
+                "false",
+                "False",
+                "0",
+                "FALSE",
+            ):
+                row_errors.append(
+                    {
+                        "row": row_idx,
+                        "field": cn_name,
+                        "value": v,
+                        "reason": "布尔字段值无效",
+                        "suggestion": "请填写「是」或「否」",
+                    }
+                )
 
         if row_errors:
             errors.extend(row_errors)
@@ -362,44 +408,46 @@ def import_qualifications(
             legal_rep_cert_number = cell("legal_representative_cert_number")
             legal_rep_cert_address = cell("legal_representative_cert_address")
 
-            objects.append(QualificationInfo(
-                enterprise_name=enterprise_name,
-                cert_type=cell("cert_type"),
-                cert_number=cell("cert_number"),
-                app_platform_name=cell("app_platform_name"),
-                legal_representative_name=cell("legal_representative_name"),
-                legal_representative_cert_type=legal_rep_cert_type,
-                legal_representative_cert_number=legal_rep_cert_number,
-                legal_representative_cert_address=legal_rep_cert_address,
-                responsible_name=cell("responsible_name"),
-                responsible_cert_type=cell("responsible_cert_type"),
-                responsible_cert_number=cell("responsible_cert_number"),
-                responsible_address=cell("responsible_address"),
-                responsible_phone=cell("responsible_phone"),
-                handler_name=cell("handler_name"),
-                handler_cert_type=cell("handler_cert_type"),
-                handler_cert_number=cell("handler_cert_number"),
-                handler_address=cell("handler_address"),
-                handler_phone=cell("handler_phone"),
-                sms_signature=cell("sms_signature"),
-                signature_type=cell("signature_type"),
-                signature_verified=parse_bool("signature_verified"),
-                is_gateway_signature=parse_bool("is_gateway_signature"),
-                sms_template_content=cell("sms_template_content"),
-                template_has_variable=parse_bool("template_has_variable"),
-                template_param_type=cell("template_param_type"),
-                template_param_length=cell("template_param_length"),
-                business_attribute=cell("business_attribute"),
-                business_type=cell("business_type"),
-                business_subtype=cell("business_subtype"),
-                specific_usage=cell("specific_usage"),
-                diversion_number=cell("diversion_number"),
-                diversion_number_type=cell("diversion_number_type"),
-                diversion_number_usage=cell("diversion_number_usage"),
-                diversion_content=cell("diversion_content"),
-                link_address=cell("link_address"),
-                link_type=cell("link_type"),
-            ))
+            objects.append(
+                QualificationInfo(
+                    enterprise_name=enterprise_name,
+                    cert_type=cell("cert_type"),
+                    cert_number=cell("cert_number"),
+                    app_platform_name=cell("app_platform_name"),
+                    legal_representative_name=cell("legal_representative_name"),
+                    legal_representative_cert_type=legal_rep_cert_type,
+                    legal_representative_cert_number=legal_rep_cert_number,
+                    legal_representative_cert_address=legal_rep_cert_address,
+                    responsible_name=cell("responsible_name"),
+                    responsible_cert_type=cell("responsible_cert_type"),
+                    responsible_cert_number=cell("responsible_cert_number"),
+                    responsible_address=cell("responsible_address"),
+                    responsible_phone=cell("responsible_phone"),
+                    handler_name=cell("handler_name"),
+                    handler_cert_type=cell("handler_cert_type"),
+                    handler_cert_number=cell("handler_cert_number"),
+                    handler_address=cell("handler_address"),
+                    handler_phone=cell("handler_phone"),
+                    sms_signature=cell("sms_signature"),
+                    signature_type=cell("signature_type"),
+                    signature_verified=parse_bool("signature_verified"),
+                    is_gateway_signature=parse_bool("is_gateway_signature"),
+                    sms_template_content=cell("sms_template_content"),
+                    template_has_variable=parse_bool("template_has_variable"),
+                    template_param_type=cell("template_param_type"),
+                    template_param_length=cell("template_param_length"),
+                    business_attribute=cell("business_attribute"),
+                    business_type=cell("business_type"),
+                    business_subtype=cell("business_subtype"),
+                    specific_usage=cell("specific_usage"),
+                    diversion_number=cell("diversion_number"),
+                    diversion_number_type=cell("diversion_number_type"),
+                    diversion_number_usage=cell("diversion_number_usage"),
+                    diversion_content=cell("diversion_content"),
+                    link_address=cell("link_address"),
+                    link_type=cell("link_type"),
+                )
+            )
             data_row_indices.append(row_idx)
 
     # Phase 2: If no valid rows, return all errors
@@ -423,13 +471,23 @@ def import_qualifications(
     if file.filename.endswith(".xlsx"):
         all_images: list = []
         try:
-            all_images.extend(extract_cell_images_from_xlsx(
-                content, headers=header_row, data_row_indices=data_row_indices,
-            ))
+            all_images.extend(
+                extract_cell_images_from_xlsx(
+                    content,
+                    headers=header_row,
+                    data_row_indices=data_row_indices,
+                )
+            )
         except Exception as e:
             warnings.append(f"单元格图片提取失败: {e}")
         try:
-            all_images.extend(extract_images_from_xlsx(content, data_row_indices=data_row_indices))
+            all_images.extend(
+                extract_images_from_xlsx(
+                    content,
+                    headers=header_row,
+                    data_row_indices=data_row_indices,
+                )
+            )
         except Exception as e:
             warnings.append(f"浮动图片提取失败: {e}")
         if all_images:
@@ -488,14 +546,14 @@ def download_import_error_report(body: ImportErrorReport) -> Any:
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote('导入错误报告.xlsx')}"},
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote('导入错误报告.xlsx')}"
+        },
     )
 
 
 @router.post("/batch-by-signatures", response_model=BatchSignatureResponse)
-def batch_by_signatures(
-    *, session: SessionDep, body: BatchSignatureRequest
-) -> Any:
+def batch_by_signatures(*, session: SessionDep, body: BatchSignatureRequest) -> Any:
     qualified, unmatched = get_qualifications_by_signatures(
         session=session, signatures=body.signatures
     )
@@ -517,17 +575,36 @@ def read_qualifications(
 ) -> Any:
     skip = (page - 1) * page_size
     items, total = list_qualifications(
-        session=session, skip=skip, limit=page_size,
-        enterprise_name=enterprise_name, cert_number=cert_number, sms_signature=sms_signature,
+        session=session,
+        skip=skip,
+        limit=page_size,
+        enterprise_name=enterprise_name,
+        cert_number=cert_number,
+        sms_signature=sms_signature,
     )
-    return QualificationInfosPublic(data=items, total=total, page=page, page_size=page_size)
+    return QualificationInfosPublic(
+        data=items, total=total, page=page, page_size=page_size
+    )
 
 
 @router.post("", response_model=QualificationInfoPublic)
 @router.post("/", include_in_schema=False, response_model=QualificationInfoPublic)
-def create_qualification_endpoint(*, session: SessionDep, create: QualificationInfoCreate, current_user: CurrentUser, request: Request) -> Any:
+def create_qualification_endpoint(
+    *,
+    session: SessionDep,
+    create: QualificationInfoCreate,
+    current_user: CurrentUser,
+    request: Request,
+) -> Any:
     result = create_qualification(session=session, create=create)
-    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="qualifications", action="create", target=result.enterprise_name or str(result.id))
+    log_operation(
+        session=session,
+        user=current_user,
+        user_ip=request.client.host if request.client else "",
+        module="qualifications",
+        action="create",
+        target=result.enterprise_name or str(result.id),
+    )
     return result
 
 
@@ -541,22 +618,43 @@ def read_qualification(*, session: SessionDep, id: uuid.UUID) -> Any:
 
 @router.patch("/{id}", response_model=QualificationInfoPublic)
 def update_qualification_endpoint(
-    *, session: SessionDep, id: uuid.UUID, update: QualificationInfoUpdate, current_user: CurrentUser, request: Request
+    *,
+    session: SessionDep,
+    id: uuid.UUID,
+    update: QualificationInfoUpdate,
+    current_user: CurrentUser,
+    request: Request,
 ) -> Any:
     db_obj = get_qualification(session=session, id=id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="资质信息不存在")
     result = update_qualification(session=session, db_obj=db_obj, update=update)
-    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="qualifications", action="update", target=result.enterprise_name or str(id))
+    log_operation(
+        session=session,
+        user=current_user,
+        user_ip=request.client.host if request.client else "",
+        module="qualifications",
+        action="update",
+        target=result.enterprise_name or str(id),
+    )
     return result
 
 
 @router.delete("/{id}")
-def delete_qualification_endpoint(*, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request) -> Message:
+def delete_qualification_endpoint(
+    *, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request
+) -> Message:
     db_obj = get_qualification(session=session, id=id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="资质信息不存在")
     target = db_obj.enterprise_name or str(id)
     delete_qualification(session=session, db_obj=db_obj)
-    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="qualifications", action="delete", target=target)
+    log_operation(
+        session=session,
+        user=current_user,
+        user_ip=request.client.host if request.client else "",
+        module="qualifications",
+        action="delete",
+        target=target,
+    )
     return Message(message="资质信息删除成功")

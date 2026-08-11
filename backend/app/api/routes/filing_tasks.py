@@ -1,5 +1,7 @@
 """Filing tasks API routes — export task management."""
+
 import io
+import re
 import uuid
 from datetime import date, datetime
 from typing import Any
@@ -103,18 +105,21 @@ def generate_excel(
     export_group: ExportGroup,
     group_by_field: str | None = None,
     qual_images: dict[uuid.UUID, dict[str, bytes]] | None = None,
+    port_images: dict[uuid.UUID, dict[str, bytes]] | None = None,
     allocated_sub_ports: dict[tuple[uuid.UUID, str], str] | None = None,
     auto_allocate_sub_ports: bool = False,
 ) -> io.BytesIO:
     """Generate Excel bytes from qualification+port Cartesian product.
 
     qual_images: {qual_id: {field_name: image_bytes}} for cell-embedded images.
+    port_images: {port_id: {field_name: image_bytes}} for cell-embedded images.
     field_name is the logical name (e.g. "cert_image").
 
     auto_allocate_sub_ports: 为 True 时只输出主端口行，子端口号取 allocated_sub_ports
     中按 (qualification_id, main_port_number) 分配的结果。
     """
     qual_images = qual_images or {}
+    port_images = port_images or {}
     allocated_sub_ports = allocated_sub_ports or {}
     fm = field_map()
     img_field_names = {f.name for f in REGISTRY if f.source.startswith("image")}
@@ -124,11 +129,15 @@ def generate_excel(
 
     # Header style
     header_font = Font(bold=True, color="FFFFFF", size=11)
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="4472C4", end_color="4472C4", fill_type="solid"
+    )
     header_alignment = Alignment(horizontal="center", vertical="center")
     thin_border = Border(
-        left=Side(style="thin"), right=Side(style="thin"),
-        top=Side(style="thin"), bottom=Side(style="thin"),
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
     )
 
     sorted_fields = sorted(export_group.fields, key=lambda f: f.sort_order)
@@ -187,14 +196,19 @@ def generate_excel(
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
             cell.border = thin_border
 
-        # Collect images for this row from the qualification
-        if img_col_map and q.id in qual_images:
-            qual_imgs = qual_images[q.id]
-            for field_name, col_idx in img_col_map.items():
-                if field_name in qual_imgs:
-                    col_letter = ws.cell(row=row_idx, column=col_idx).column_letter
-                    cell_ref = f"{col_letter}{row_idx}"
-                    cell_images[cell_ref] = qual_imgs[field_name]
+        # Collect images for this row from qualification/port attachments.
+        for field_name, col_idx in img_col_map.items():
+            image_bytes = None
+            source = field_source(field_name)
+            if source == "image_qualification":
+                image_bytes = qual_images.get(q.id, {}).get(field_name)
+            elif source == "image_port":
+                image_bytes = port_images.get(p.id, {}).get(field_name)
+            if image_bytes:
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.value = None
+                cell.border = thin_border
+                cell_images[cell.coordinate] = image_bytes
 
         row_idx += 1
 
@@ -208,18 +222,52 @@ def generate_excel(
         letter = ws.cell(row=1, column=col_idx).column_letter
         ws.column_dimensions[letter].width = min(max_width + 4, 50)
 
+    image_streams = _embed_cell_images(ws, cell_images)
     output = io.BytesIO()
     wb.save(output)
     xlsx_bytes = output.getvalue()
-
-    # Inject cell images if any
-    if cell_images:
-        from app.services.excel_image_extractor import inject_cell_images
-        xlsx_bytes = inject_cell_images(xlsx_bytes, cell_images)
+    image_streams.clear()
 
     output = io.BytesIO(xlsx_bytes)
     output.seek(0)
     return output
+
+
+def _embed_cell_images(ws, cell_images: dict[str, bytes]) -> list[io.BytesIO]:
+    """Embed image bytes as normal xlsx drawing images anchored to cells."""
+    from openpyxl.drawing.image import Image as XLImage
+
+    streams: list[io.BytesIO] = []
+    max_width_px = 120
+    max_height_px = 80
+
+    for cell_ref, image_bytes in cell_images.items():
+        stream = io.BytesIO(image_bytes)
+        try:
+            image = XLImage(stream)
+        except Exception:
+            continue
+
+        width = image.width or max_width_px
+        height = image.height or max_height_px
+        scale = min(max_width_px / width, max_height_px / height)
+        image.width = max(1, int(width * scale))
+        image.height = max(1, int(height * scale))
+
+        ws.add_image(image, cell_ref)
+        streams.append(stream)
+
+        cell = ws[cell_ref]
+        current_height = ws.row_dimensions[cell.row].height or 15
+        ws.row_dimensions[cell.row].height = max(
+            current_height, image.height * 0.75 + 6
+        )
+
+        column = ws.column_dimensions[cell.column_letter]
+        current_width = column.width or 0
+        column.width = max(current_width, min(max(image.width / 7 + 2, 14), 24))
+
+    return streams
 
 
 # 中文字段名 → 逻辑字段名（导出图片列）映射
@@ -236,23 +284,66 @@ _CN_TO_LOGICAL_IMG = {
     "经办人现场照片": "handler_scene_photo",
 }
 
+_LOGICAL_IMG_FIELDS = {f.name for f in REGISTRY if f.source.startswith("image")}
+_ATTACHMENT_COL_RE = re.compile(r"(?:^|_)col(\d+)", re.IGNORECASE)
+_QUALIFICATION_IMAGE_COL_TO_LOGICAL = {
+    4: "cert_image",
+    10: "responsible_id_front",
+    11: "responsible_id_back",
+    17: "handler_scene_photo",
+    22: "handler_id_front",
+    23: "handler_id_back",
+    42: "signature_proof",
+    43: "diversion_number_proof",
+    44: "diversion_link_proof",
+}
+_PORT_IMAGE_COL_TO_LOGICAL = {
+    26: "auth_image",
+}
 
-def _load_qualification_images(
-    session, qualifications: list[QualificationInfo]
+
+def _attachment_logical_image_field(
+    field_name: str | None,
+    original_name: str,
+    column_fallback: dict[int, str],
+) -> str | None:
+    if field_name in _LOGICAL_IMG_FIELDS:
+        return field_name
+
+    logical = _CN_TO_LOGICAL_IMG.get(field_name or "")
+    if logical:
+        return logical
+
+    match = _ATTACHMENT_COL_RE.search(original_name)
+    if match:
+        return column_fallback.get(int(match.group(1)))
+
+    return None
+
+
+def _load_entity_images(
+    session,
+    entity_type: str,
+    objects: list[QualificationInfo] | list[PortInfo],
+    column_fallback: dict[int, str],
 ) -> dict[uuid.UUID, dict[str, bytes]]:
-    """Load image attachments for selected qualifications (failures do not block export)."""
+    """Load image attachments for selected entities (failures do not block export)."""
     from app.crud.file_attachment import get_file_attachments_by_entity
 
-    qual_images: dict[uuid.UUID, dict[str, bytes]] = {}
+    entity_images: dict[uuid.UUID, dict[str, bytes]] = {}
     try:
         storage = get_storage()
-        for q in qualifications:
+        for obj in objects:
             attachments = get_file_attachments_by_entity(
-                session=session, entity_type="qualification_info", entity_id=q.id
+                session=session, entity_type=entity_type, entity_id=obj.id
             )
             img_map: dict[str, bytes] = {}
             for att in attachments:
-                logical = _CN_TO_LOGICAL_IMG.get(att.field_name or "")
+                logical = _attachment_logical_image_field(
+                    att.field_name,
+                    att.original_name,
+                    column_fallback,
+                )
                 if logical and att.stored_path:
                     try:
                         raw = storage.download(att.stored_path)
@@ -260,10 +351,32 @@ def _load_qualification_images(
                     except Exception:
                         pass
             if img_map:
-                qual_images[q.id] = img_map
+                entity_images[obj.id] = img_map
     except Exception:
         pass  # Image loading failure should not block export
-    return qual_images
+    return entity_images
+
+
+def _load_qualification_images(
+    session, qualifications: list[QualificationInfo]
+) -> dict[uuid.UUID, dict[str, bytes]]:
+    return _load_entity_images(
+        session,
+        "qualification_info",
+        qualifications,
+        _QUALIFICATION_IMAGE_COL_TO_LOGICAL,
+    )
+
+
+def _load_port_images(
+    session, ports: list[PortInfo]
+) -> dict[uuid.UUID, dict[str, bytes]]:
+    return _load_entity_images(
+        session,
+        "port_info",
+        ports,
+        _PORT_IMAGE_COL_TO_LOGICAL,
+    )
 
 
 def _get_operator_name(session, operator_id: uuid.UUID) -> str:
@@ -292,7 +405,9 @@ def _task_to_public(session, task) -> FilingTaskPublic:
 
 def _task_to_detail(session, task) -> FilingTaskDetail:
     public = _task_to_public(session, task)
-    download_url = f"/api/v1/filing-tasks/{task.id}/download" if task.file_path else None
+    download_url = (
+        f"/api/v1/filing-tasks/{task.id}/download" if task.file_path else None
+    )
 
     return FilingTaskDetail(
         id=public.id,
@@ -321,6 +436,7 @@ def check_sub_port_availability(
     mode: str = Query("random"),
 ) -> dict:
     from app.crud.filing_sub_port_usage import count_used_in_range
+
     result = {}
     for mpn in main_port_numbers.split(","):
         mpn = mpn.strip()
@@ -358,8 +474,12 @@ def read_tasks(
 ) -> Any:
     skip = (page - 1) * page_size
     items, total = list_filing_tasks(
-        session=session, skip=skip, limit=page_size,
-        start_date=start_date, end_date=end_date, keyword=keyword,
+        session=session,
+        skip=skip,
+        limit=page_size,
+        start_date=start_date,
+        end_date=end_date,
+        keyword=keyword,
     )
     data = [_task_to_public(session, t) for t in items]
     return FilingTasksPublic(data=data, total=total, page=page, page_size=page_size)
@@ -375,7 +495,13 @@ def read_task(*, session: SessionDep, id: uuid.UUID) -> Any:
 
 @router.post("", response_model=FilingTaskDetail)
 @router.post("/", include_in_schema=False, response_model=FilingTaskDetail)
-def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: CurrentUser, request: Request) -> Any:
+def create_task(
+    *,
+    session: SessionDep,
+    create: FilingTaskCreate,
+    current_user: CurrentUser,
+    request: Request,
+) -> Any:
     # 1. Validate export group exists
     export_group = get_export_group(session=session, id=create.export_group_id)
     if not export_group:
@@ -389,7 +515,9 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
 
     qualifications = list(
         session.exec(
-            select(QualificationInfo).where(QualificationInfo.id.in_(create.qualification_ids))  # type: ignore
+            select(QualificationInfo).where(
+                QualificationInfo.id.in_(create.qualification_ids)
+            )  # type: ignore
         ).all()
     )
     if not qualifications:
@@ -413,8 +541,9 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
         session=session, create=create, operator_id=current_user.id
     )
 
-    # 5. Load image attachments for selected qualifications
+    # 5. Load image attachments for selected qualifications and ports
     qual_images = _load_qualification_images(session, qualifications)
+    port_images = _load_port_images(session, selected_ports)
 
     # 5.5 自动分配子端口号（可选）
     allocated_sub_ports: dict[tuple[uuid.UUID, str], str] = {}
@@ -425,7 +554,10 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
             try:
                 mode = AllocationMode(create.allocation_mode or "random")
             except ValueError:
-                raise HTTPException(status_code=400, detail=f"不支持的分配模式: {create.allocation_mode}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"不支持的分配模式: {create.allocation_mode}",
+                )
             range_start = create.sub_port_range_start
             range_end = create.sub_port_range_end
             if mode == AllocationMode.fixed_suffix:
@@ -434,19 +566,35 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
                 range_end = range_end or 0
             else:
                 if not (range_start and range_end):
-                    raise HTTPException(status_code=400, detail="自动分配子端口时必须提供范围")
+                    raise HTTPException(
+                        status_code=400, detail="自动分配子端口时必须提供范围"
+                    )
                 if range_start > range_end:
-                    raise HTTPException(status_code=400, detail="子端口范围起始必须 ≤ 结束")
+                    raise HTTPException(
+                        status_code=400, detail="子端口范围起始必须 ≤ 结束"
+                    )
                 if mode == AllocationMode.random:
                     if range_end - range_start + 1 > MAX_RANGE_SIZE:
-                        raise HTTPException(status_code=400, detail="子端口范围过大（最多 100 万个号码）")
+                        raise HTTPException(
+                            status_code=400,
+                            detail="子端口范围过大（最多 100 万个号码）",
+                        )
                     # 固定 6 位格式（与默认值 100001 及规范一致），防止不同位数范围产生重复号码
-                    if not (100000 <= range_start <= 999999 and 100000 <= range_end <= 999999):
-                        raise HTTPException(status_code=400, detail="子端口范围必须是6位数字（100000-999999）")
+                    if not (
+                        100000 <= range_start <= 999999
+                        and 100000 <= range_end <= 999999
+                    ):
+                        raise HTTPException(
+                            status_code=400,
+                            detail="子端口范围必须是6位数字（100000-999999）",
+                        )
 
             main_ports = [p for p in selected_ports if not p.sub_port_number]
             if not main_ports:
-                raise HTTPException(status_code=400, detail="未找到主端口行（sub_port_number 为空的端口记录）")
+                raise HTTPException(
+                    status_code=400,
+                    detail="未找到主端口行（sub_port_number 为空的端口记录）",
+                )
             main_port_numbers = sorted({p.main_port_number for p in main_ports})
 
             allocation = allocate_sub_ports(
@@ -476,6 +624,7 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
             export_group=export_group,
             group_by_field=create.group_by_field,
             qual_images=qual_images,
+            port_images=port_images,
             allocated_sub_ports=allocated_sub_ports,
             auto_allocate_sub_ports=auto_allocate,
         )
@@ -491,7 +640,11 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
     file_key = f"filing-exports/{task.id}.xlsx"
     try:
         storage = get_storage()
-        storage.upload(key=file_key, data=file_data, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        storage.upload(
+            key=file_key,
+            data=file_data,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
     except Exception as e:
         # 任务失败未产出文件：释放本任务已分配的子端口占用，避免永久烧号
         delete_usages_by_task(session=session, filing_task_id=task.id)
@@ -509,12 +662,22 @@ def create_task(*, session: SessionDep, create: FilingTaskCreate, current_user: 
     session.commit()
     session.refresh(task)
 
-    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="filing_tasks", action="create", target=task.task_name, detail=f"资质:{task.qualification_count} 端口:{task.port_count}")
+    log_operation(
+        session=session,
+        user=current_user,
+        user_ip=request.client.host if request.client else "",
+        module="filing_tasks",
+        action="create",
+        target=task.task_name,
+        detail=f"资质:{task.qualification_count} 端口:{task.port_count}",
+    )
     return _task_to_detail(session, task)
 
 
 @router.delete("/{id}")
-def delete_task(*, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request) -> Message:
+def delete_task(
+    *, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request
+) -> Message:
     task = get_filing_task(session=session, id=id)
     if not task:
         raise HTTPException(status_code=404, detail="报备任务不存在")
@@ -529,7 +692,14 @@ def delete_task(*, session: SessionDep, id: uuid.UUID, current_user: CurrentUser
 
     target = task.task_name
     delete_filing_task(session=session, db_obj=task)
-    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="filing_tasks", action="delete", target=target)
+    log_operation(
+        session=session,
+        user=current_user,
+        user_ip=request.client.host if request.client else "",
+        module="filing_tasks",
+        action="delete",
+        target=target,
+    )
     return Message(message="报备任务删除成功")
 
 
@@ -540,33 +710,35 @@ def download_filing_task(*, session: SessionDep, id: uuid.UUID) -> Any:
         raise HTTPException(status_code=404, detail="报备任务不存在")
     if not task.file_path:
         raise HTTPException(
-            status_code=404,
-            detail={"reason": "文件尚未生成", "can_retry": True}
+            status_code=404, detail={"reason": "文件尚未生成", "can_retry": True}
         )
     try:
         storage = get_storage()
         if not storage.exists(task.file_path):
             raise HTTPException(
                 status_code=404,
-                detail={"reason": "文件已过期或已被删除", "can_retry": True}
+                detail={"reason": "文件已过期或已被删除", "can_retry": True},
             )
         data = storage.download(task.file_path)
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=503,
-            detail={"reason": f"存储服务异常: {e}", "can_retry": True}
+            status_code=503, detail={"reason": f"存储服务异常: {e}", "can_retry": True}
         )
     return StreamingResponse(
         io.BytesIO(data),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(task.task_name or 'export')}.xlsx"},
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(task.task_name or 'export')}.xlsx"
+        },
     )
 
 
 @router.post("/{id}/regenerate")
-def regenerate_filing_task(*, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request) -> Any:
+def regenerate_filing_task(
+    *, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request
+) -> Any:
     task = get_filing_task(session=session, id=id)
     if not task:
         raise HTTPException(status_code=404, detail="报备任务不存在")
@@ -574,12 +746,16 @@ def regenerate_filing_task(*, session: SessionDep, id: uuid.UUID, current_user: 
     # Re-run generate_excel with the same task parameters
     qualifications = list(
         session.exec(
-            select(QualificationInfo).where(QualificationInfo.id.in_([uuid.UUID(x) for x in task.qualification_ids]))  # type: ignore
+            select(QualificationInfo).where(
+                QualificationInfo.id.in_([uuid.UUID(x) for x in task.qualification_ids])
+            )  # type: ignore
         ).all()
     )
     ports = list(
         session.exec(
-            select(PortInfo).where(PortInfo.id.in_([uuid.UUID(x) for x in task.port_ids]))  # type: ignore
+            select(PortInfo).where(
+                PortInfo.id.in_([uuid.UUID(x) for x in task.port_ids])
+            )  # type: ignore
         ).all()
     )
     export_group = get_export_group(session=session, id=task.export_group_id)
@@ -591,9 +767,12 @@ def regenerate_filing_task(*, session: SessionDep, id: uuid.UUID, current_user: 
     allocated_sub_ports: dict[tuple[uuid.UUID, str], str] = {}
     for usage in usages:
         if usage.qualification_id:
-            allocated_sub_ports[(usage.qualification_id, usage.main_port_number)] = usage.port_number
+            allocated_sub_ports[(usage.qualification_id, usage.main_port_number)] = (
+                usage.port_number
+            )
 
     qual_images = _load_qualification_images(session, qualifications)
+    port_images = _load_port_images(session, ports)
 
     output = generate_excel(
         qualifications,
@@ -601,6 +780,7 @@ def regenerate_filing_task(*, session: SessionDep, id: uuid.UUID, current_user: 
         export_group,
         group_by_field=task.group_by_field,
         qual_images=qual_images,
+        port_images=port_images,
         allocated_sub_ports=allocated_sub_ports,
         auto_allocate_sub_ports=bool(usages),
     )
@@ -618,5 +798,12 @@ def regenerate_filing_task(*, session: SessionDep, id: uuid.UUID, current_user: 
     session.add(task)
     session.commit()
 
-    log_operation(session=session, user=current_user, user_ip=request.client.host if request.client else "", module="filing_tasks", action="regenerate", target=task.task_name)
+    log_operation(
+        session=session,
+        user=current_user,
+        user_ip=request.client.host if request.client else "",
+        module="filing_tasks",
+        action="regenerate",
+        target=task.task_name,
+    )
     return {"message": "文件已重新生成", "task_id": str(task.id)}
