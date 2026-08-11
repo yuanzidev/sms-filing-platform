@@ -183,10 +183,12 @@ export function FilingCreatePage() {
   // Field options for group_by_field from the selected export group's fields
   const groupByFieldOptions = useMemo(() => {
     if (!selectedExportGroup?.fields) return []
-    return selectedExportGroup.fields.map((f) => ({
-      value: f.field_name,
-      label: `${getFieldLabel(f.field_name)} (${f.field_name})`,
-    }))
+    return selectedExportGroup.fields
+      .filter((f) => f.field_name.trim())
+      .map((f) => ({
+        value: f.field_name,
+        label: `${getFieldLabel(f.field_name)} (${f.field_name})`,
+      }))
   }, [selectedExportGroup])
 
   const qualificationColumns = useMemo<ColumnDef<QualificationInfo>[]>(() => [
@@ -243,7 +245,10 @@ export function FilingCreatePage() {
 
   const carrierOptions = useMemo(() => {
     const set = new Set<string>()
-    for (const p of portsForSelection) set.add(p.carrier)
+    for (const p of portsForSelection) {
+      const carrier = p.carrier?.trim()
+      if (carrier) set.add(carrier)
+    }
     return Array.from(set).sort()
   }, [portsForSelection])
 
