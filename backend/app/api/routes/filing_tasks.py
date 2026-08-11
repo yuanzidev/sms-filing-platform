@@ -194,7 +194,7 @@ def generate_excel(
         for col_idx, field_name in enumerate(col_names, 1):
             value = get_field_value(q, p, field_name, allocated_sub)
             if field_name in img_col_map:
-                value = "无图片"
+                value = "[无图片]"
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
             cell.border = thin_border
 

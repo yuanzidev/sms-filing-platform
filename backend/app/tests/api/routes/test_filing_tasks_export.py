@@ -294,8 +294,8 @@ def test_filing_task_image_columns_show_no_image_when_attachment_missing(
 
     wb = load_workbook(BytesIO(r.content))
     ws = wb.active
-    assert ws.cell(row=2, column=1).value == "无图片"
-    assert ws.cell(row=2, column=2).value == "无图片"
+    assert ws.cell(row=2, column=1).value == "[无图片]"
+    assert ws.cell(row=2, column=2).value == "[无图片]"
 
 
 def test_create_filing_task_with_auto_sub_ports(
