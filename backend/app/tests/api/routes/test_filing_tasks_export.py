@@ -254,6 +254,50 @@ def test_filing_task_download_embeds_qualification_and_port_images(
     assert drawing_files
 
 
+def test_filing_task_image_columns_show_no_image_when_attachment_missing(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    qual_id = _create_qualification(client, superuser_token_headers, "无图片企业")
+    port_id = _create_port(client, superuser_token_headers, "10698NOIMG")
+
+    r = client.post(
+        f"{settings.API_V1_STR}/export-groups",
+        headers=superuser_token_headers,
+        json={
+            "name": "无图片字段组",
+            "fields": [
+                {"field_name": "cert_image", "field_label": "单位证件图片", "sort_order": 1},
+                {"field_name": "auth_image", "field_label": "授权书图片", "sort_order": 2},
+            ],
+        },
+    )
+    assert r.status_code == 200, r.text
+    group_id = r.json()["id"]
+
+    r = client.post(
+        f"{settings.API_V1_STR}/filing-tasks",
+        headers=superuser_token_headers,
+        json={
+            "qualification_ids": [qual_id],
+            "port_ids": [port_id],
+            "export_group_id": group_id,
+        },
+    )
+    assert r.status_code == 200, r.text
+    task_id = r.json()["id"]
+
+    r = client.get(
+        f"{settings.API_V1_STR}/filing-tasks/{task_id}/download",
+        headers=superuser_token_headers,
+    )
+    assert r.status_code == 200
+
+    wb = load_workbook(BytesIO(r.content))
+    ws = wb.active
+    assert ws.cell(row=2, column=1).value == "无图片"
+    assert ws.cell(row=2, column=2).value == "无图片"
+
+
 def test_create_filing_task_with_auto_sub_ports(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
