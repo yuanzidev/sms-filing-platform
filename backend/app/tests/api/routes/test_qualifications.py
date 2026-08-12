@@ -30,6 +30,45 @@ def test_list_qualifications_filter_by_sms_signature(
     assert all("平台A" in item["sms_signature"] for item in body["data"])
 
 
+def test_list_qualifications_filter_by_identity_cert_number(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = "IDSEARCH001"
+    legal_number = f"11010119900101{marker}"
+    responsible_number = f"11010119900202{marker}"
+    handler_number = f"11010119900303{marker}"
+
+    for enterprise_name, field_name, value in (
+        ("法人证件搜索企业", "legal_representative_cert_number", legal_number),
+        ("责任人证件搜索企业", "responsible_cert_number", responsible_number),
+        ("经办人证件搜索企业", "handler_cert_number", handler_number),
+    ):
+        payload = {
+            "enterprise_name": enterprise_name,
+            "cert_number": f"91330100{marker}{field_name}",
+            field_name: value,
+        }
+        r = client.post(
+            f"{settings.API_V1_STR}/qualifications",
+            headers=superuser_token_headers,
+            json=payload,
+        )
+        assert r.status_code == 200, r.text
+
+    r = client.get(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        params={"identity_cert_number": marker},
+    )
+    assert r.status_code == 200
+    names = {item["enterprise_name"] for item in r.json()["data"]}
+    assert {
+        "法人证件搜索企业",
+        "责任人证件搜索企业",
+        "经办人证件搜索企业",
+    }.issubset(names)
+
+
 def test_template_has_required_headers(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:

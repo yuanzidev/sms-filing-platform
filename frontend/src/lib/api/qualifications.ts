@@ -6,6 +6,7 @@ export const getQualifications = async (params?: {
   page_size?: number
   enterprise_name?: string
   cert_number?: string
+  identity_cert_number?: string
   sms_signature?: string
 }): Promise<QualificationListResponse> => {
   const response = await api.get('/api/v1/qualifications', { params })

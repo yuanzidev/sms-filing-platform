@@ -571,6 +571,7 @@ def read_qualifications(
     page_size: int = Query(20, ge=1, le=100),
     enterprise_name: str | None = None,
     cert_number: str | None = None,
+    identity_cert_number: str | None = None,
     sms_signature: str | None = None,
 ) -> Any:
     skip = (page - 1) * page_size
@@ -580,6 +581,7 @@ def read_qualifications(
         limit=page_size,
         enterprise_name=enterprise_name,
         cert_number=cert_number,
+        identity_cert_number=identity_cert_number,
         sms_signature=sms_signature,
     )
     return QualificationInfosPublic(

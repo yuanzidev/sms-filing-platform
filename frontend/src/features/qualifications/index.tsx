@@ -60,11 +60,13 @@ export function QualificationsPage() {
   const [searchInputs, setSearchInputs] = useState({
     enterprise_name: '',
     cert_number: '',
+    identity_cert_number: '',
     sms_signature: '',
   })
   const [appliedFilters, setAppliedFilters] = useState<{
     enterprise_name?: string
     cert_number?: string
+    identity_cert_number?: string
     sms_signature?: string
   }>({})
   const queryClient = useQueryClient()
@@ -82,13 +84,19 @@ export function QualificationsPage() {
     setAppliedFilters({
       enterprise_name: searchInputs.enterprise_name.trim() || undefined,
       cert_number: searchInputs.cert_number.trim() || undefined,
+      identity_cert_number: searchInputs.identity_cert_number.trim() || undefined,
       sms_signature: searchInputs.sms_signature.trim() || undefined,
     })
     setPage(1)
   }
 
   const handleReset = () => {
-    setSearchInputs({ enterprise_name: '', cert_number: '', sms_signature: '' })
+    setSearchInputs({
+      enterprise_name: '',
+      cert_number: '',
+      identity_cert_number: '',
+      sms_signature: '',
+    })
     setAppliedFilters({})
     setPage(1)
   }
@@ -291,16 +299,36 @@ export function QualificationsPage() {
             </div>
           </div>
           <div className='flex flex-col gap-1'>
-            <label className='text-muted-foreground text-sm'>证件号码</label>
+            <label className='text-muted-foreground text-sm'>单位证件号</label>
             <div className='relative'>
               <SearchIcon className='text-muted-foreground pointer-events-none absolute top-2.5 left-2.5 h-4 w-4' />
               <Input
-                placeholder='搜索证件号码'
+                placeholder='搜索单位证件号'
                 value={searchInputs.cert_number}
                 onChange={(e) =>
                   setSearchInputs((s) => ({
                     ...s,
                     cert_number: e.target.value,
+                  }))
+                }
+                className='w-56 pl-8'
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSearch()
+                }}
+              />
+            </div>
+          </div>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>身份证件号</label>
+            <div className='relative'>
+              <SearchIcon className='text-muted-foreground pointer-events-none absolute top-2.5 left-2.5 h-4 w-4' />
+              <Input
+                placeholder='搜索身份证件号'
+                value={searchInputs.identity_cert_number}
+                onChange={(e) =>
+                  setSearchInputs((s) => ({
+                    ...s,
+                    identity_cert_number: e.target.value,
                   }))
                 }
                 className='w-56 pl-8'

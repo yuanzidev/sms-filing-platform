@@ -1,7 +1,7 @@
 """CRUD operations for QualificationInfo."""
 import uuid
 
-from sqlmodel import Session, func, select
+from sqlmodel import Session, col, func, or_, select
 
 from app.models import (
     QualificationInfo,
@@ -21,6 +21,7 @@ def list_qualifications(
     limit: int = 20,
     enterprise_name: str | None = None,
     cert_number: str | None = None,
+    identity_cert_number: str | None = None,
     sms_signature: str | None = None,
 ) -> tuple[list[QualificationInfo], int]:
     query = select(QualificationInfo)
@@ -29,6 +30,14 @@ def list_qualifications(
         query = query.where(QualificationInfo.enterprise_name.contains(enterprise_name))
     if cert_number:
         query = query.where(QualificationInfo.cert_number.contains(cert_number))
+    if identity_cert_number:
+        query = query.where(
+            or_(
+                col(QualificationInfo.legal_representative_cert_number).contains(identity_cert_number),
+                col(QualificationInfo.responsible_cert_number).contains(identity_cert_number),
+                col(QualificationInfo.handler_cert_number).contains(identity_cert_number),
+            )
+        )
     if sms_signature:
         query = query.where(QualificationInfo.sms_signature.contains(sms_signature))
 
