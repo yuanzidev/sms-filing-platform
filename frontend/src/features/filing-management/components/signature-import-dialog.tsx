@@ -38,25 +38,31 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
   const [activeTab, setActiveTab] = useState('paste')
   const [pasteText, setPasteText] = useState('')
   const [result, setResult] = useState<BatchSignatureResponse | null>(null)
+  const [resultKey, setResultKey] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const signatures = useMemo(() => parseSignaturesFromText(pasteText), [pasteText])
   const uniqueCount = useMemo(() => new Set(signatures).size, [signatures])
+  const signatureKey = useMemo(() => [...new Set(signatures)].join('\n'), [signatures])
 
-  const querySignatures = useCallback(async (sigs: string[]) => {
+  const querySignatures = useCallback(async (sigs: string[]): Promise<BatchSignatureResponse | null> => {
     const unique = [...new Set(sigs)]
     if (unique.length === 0) {
       setResult(null)
-      return
+      setResultKey('')
+      return null
     }
     setLoading(true)
     setError(null)
     try {
       const res = await getQualificationsBySignatures(unique)
       setResult(res)
+      setResultKey(unique.join('\n'))
+      return res
     } catch {
       setError('查询失败，请稍后重试')
+      return null
     } finally {
       setLoading(false)
     }
@@ -100,16 +106,24 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
     }
   }, [signatures, querySignatures])
 
-  const handleConfirm = useCallback(() => {
-    if (!result) return
-    const ids = result.matched_qualifications.map((q) => q.id)
+  const handleConfirm = useCallback(async () => {
+    if (signatures.length === 0) {
+      setError('请先输入或导入签名')
+      return
+    }
+    const currentResult = result && resultKey === signatureKey
+      ? result
+      : await querySignatures(signatures)
+    if (!currentResult) return
+    const ids = currentResult.matched_qualifications.map((q) => q.id)
     onConfirm(ids)
     onOpenChange(false)
     // Reset
     setPasteText('')
     setResult(null)
+    setResultKey('')
     setError(null)
-  }, [result, onConfirm, onOpenChange])
+  }, [result, resultKey, signatureKey, signatures, querySignatures, onConfirm, onOpenChange])
 
   const matchedCount = result?.matched_qualifications.length ?? 0
   const unmatchedCount = result?.unmatched_signatures.length ?? 0
@@ -213,7 +227,7 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             取消
           </Button>
-          <Button onClick={handleConfirm} disabled={!result || loading}>
+          <Button onClick={handleConfirm} disabled={signatures.length === 0 || loading}>
             {matchedCount > 0 ? `确认并勾选 ${matchedCount} 个资质` : '确认'}
           </Button>
         </DialogFooter>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   type ColumnDef,
   type SortingState,
@@ -9,6 +9,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -28,7 +29,9 @@ interface DataTableProps<TData, TValue> {
   onPageChange: (page: number) => void
   onSortingChange?: (sorting: SortingState) => void
   enableRowSelection?: boolean
+  rowSelection?: RowSelectionState
   onRowSelectionChange?: (selection: RowSelectionState) => void
+  getRowId?: (originalRow: TData, index: number) => string
 }
 
 export function DataTable<TData, TValue>({
@@ -40,14 +43,19 @@ export function DataTable<TData, TValue>({
   onPageChange,
   onSortingChange,
   enableRowSelection,
+  rowSelection,
   onRowSelectionChange,
+  getRowId,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([])
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [internalRowSelection, setInternalRowSelection] = useState<RowSelectionState>({})
+  const [pageInput, setPageInput] = useState(String(page))
+  const effectiveRowSelection = rowSelection ?? internalRowSelection
 
   const table = useReactTable({
     data,
     columns,
+    getRowId,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     onSortingChange: (updater) => {
@@ -57,15 +65,37 @@ export function DataTable<TData, TValue>({
     },
     onRowSelectionChange: (updater) => {
       const next =
-        typeof updater === 'function' ? updater(rowSelection) : updater
-      setRowSelection(next)
+        typeof updater === 'function' ? updater(effectiveRowSelection) : updater
+      if (rowSelection === undefined) {
+        setInternalRowSelection(next)
+      }
       onRowSelectionChange?.(next)
     },
     enableRowSelection,
-    state: { sorting, rowSelection },
+    state: { sorting, rowSelection: effectiveRowSelection },
   })
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+  useEffect(() => {
+    setPageInput(String(page))
+  }, [page])
+
+  const goToPage = () => {
+    const nextPage = Number(pageInput)
+    if (!Number.isFinite(nextPage)) {
+      setPageInput(String(page))
+      return
+    }
+    const normalizedPage = Math.min(
+      Math.max(1, Math.trunc(nextPage)),
+      totalPages
+    )
+    setPageInput(String(normalizedPage))
+    if (normalizedPage !== page) {
+      onPageChange(normalizedPage)
+    }
+  }
 
   return (
     <div className='space-y-4'>
@@ -124,7 +154,7 @@ export function DataTable<TData, TValue>({
       </div>
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <span className='text-muted-foreground text-sm'>共 {total} 条记录</span>
-        <div className='flex items-center gap-2'>
+        <div className='flex flex-wrap items-center justify-end gap-2'>
           <Button
             variant='outline'
             size='sm'
@@ -136,6 +166,35 @@ export function DataTable<TData, TValue>({
           <span className='text-muted-foreground text-sm'>
             第 {page} / {totalPages} 页
           </span>
+          <div className='flex items-center gap-2'>
+            <span className='text-muted-foreground text-sm'>跳至</span>
+            <Input
+              type='number'
+              min={1}
+              max={totalPages}
+              value={pageInput}
+              onChange={(event) => setPageInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  goToPage()
+                }
+              }}
+              onBlur={() => {
+                if (!pageInput.trim()) {
+                  setPageInput(String(page))
+                }
+              }}
+              className='h-8 w-20'
+            />
+            <span className='text-muted-foreground text-sm'>页</span>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={goToPage}
+            >
+              跳转
+            </Button>
+          </div>
           <Button
             variant='outline'
             size='sm'

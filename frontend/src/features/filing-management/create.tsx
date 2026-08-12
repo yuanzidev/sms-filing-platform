@@ -1,7 +1,7 @@
 import { Fragment, useState, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { type ColumnDef } from '@tanstack/react-table'
+import { type ColumnDef, type RowSelectionState } from '@tanstack/react-table'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
@@ -98,7 +98,7 @@ export function FilingCreatePage() {
   // Step 1 state
   const [qualPage, setQualPage] = useState(1)
   const [qualSearch, setQualSearch] = useState('')
-  const [selectedRows, setSelectedRows] = useState<Record<number, boolean>>({})
+  const [selectedRows, setSelectedRows] = useState<RowSelectionState>({})
 
   // Step 2 state (port selection)
   const [portSearch, setPortSearch] = useState('')
@@ -145,7 +145,7 @@ export function FilingCreatePage() {
     queryFn: () => getPortInfos({ page: 1, page_size: 500 }),
   })
 
-  const allPorts: PortInfo[] = portData?.data ?? []
+  const allPorts: PortInfo[] = useMemo(() => portData?.data ?? [], [portData?.data])
 
   const queryClient = useQueryClient()
   const createMutation = useCreateFilingTask()
@@ -167,14 +167,13 @@ export function FilingCreatePage() {
     onError: () => toast.error('规则保存失败'),
   })
 
-  // Get selected qualification IDs (from row indices + data)
+  // Get selected qualification IDs from stable row ids, not current-page row indices.
   const qualifications = qualData?.data ?? []
   const selectedIds = useMemo(() => {
     return Object.entries(selectedRows)
-      .filter(([, v]) => v)
-      .map(([idx]) => qualifications[Number(idx)]?.id)
-      .filter(Boolean) as string[]
-  }, [selectedRows, qualifications])
+      .filter(([, selected]) => selected)
+      .map(([id]) => id)
+  }, [selectedRows])
 
   const [signatureImportOpen, setSignatureImportOpen] = useState(false)
 
@@ -320,10 +319,7 @@ export function FilingCreatePage() {
     setSelectedRows((prev) => {
       const next = { ...prev }
       matchedIds.forEach((id) => {
-        const idx = qualifications.findIndex((q) => q.id === id)
-        if (idx !== -1) {
-          next[idx] = true
-        }
+        next[id] = true
       })
       return next
     })
@@ -489,9 +485,9 @@ export function FilingCreatePage() {
               total={qualData?.total ?? 0}
               onPageChange={setQualPage}
               enableRowSelection
-              onRowSelectionChange={(selection) => {
-                setSelectedRows(selection as Record<number, boolean>)
-              }}
+              rowSelection={selectedRows}
+              onRowSelectionChange={setSelectedRows}
+              getRowId={(row) => row.id}
             />
             <div className="flex justify-end">
               <Button onClick={() => setStep(2)} disabled={selectedIds.length === 0}>
