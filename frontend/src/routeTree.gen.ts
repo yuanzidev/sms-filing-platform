@@ -36,8 +36,6 @@ import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes
 import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_authenticated/settings/display'
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
-import { Route as AuthenticatedPortsSubRouteImport } from './routes/_authenticated/ports/sub'
-import { Route as AuthenticatedPortsMainRouteImport } from './routes/_authenticated/ports/main'
 import { Route as AuthenticatedFilingManagementCreateRouteImport } from './routes/_authenticated/filing-management/create'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -186,16 +184,6 @@ const AuthenticatedSettingsAccountRoute =
     path: '/account',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
-const AuthenticatedPortsSubRoute = AuthenticatedPortsSubRouteImport.update({
-  id: '/ports/sub',
-  path: '/ports/sub',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedPortsMainRoute = AuthenticatedPortsMainRouteImport.update({
-  id: '/ports/main',
-  path: '/ports/main',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedFilingManagementCreateRoute =
   AuthenticatedFilingManagementCreateRouteImport.update({
     id: '/filing-management/create',
@@ -217,8 +205,6 @@ export interface FileRoutesByFullPath {
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
   '/filing-management/create': typeof AuthenticatedFilingManagementCreateRoute
-  '/ports/main': typeof AuthenticatedPortsMainRoute
-  '/ports/sub': typeof AuthenticatedPortsSubRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
@@ -247,8 +233,6 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
   '/filing-management/create': typeof AuthenticatedFilingManagementCreateRoute
-  '/ports/main': typeof AuthenticatedPortsMainRoute
-  '/ports/sub': typeof AuthenticatedPortsSubRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
@@ -280,8 +264,6 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/filing-management/create': typeof AuthenticatedFilingManagementCreateRoute
-  '/_authenticated/ports/main': typeof AuthenticatedPortsMainRoute
-  '/_authenticated/ports/sub': typeof AuthenticatedPortsSubRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
@@ -313,8 +295,6 @@ export interface FileRouteTypes {
     | '/503'
     | '/'
     | '/filing-management/create'
-    | '/ports/main'
-    | '/ports/sub'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
@@ -343,8 +323,6 @@ export interface FileRouteTypes {
     | '/503'
     | '/'
     | '/filing-management/create'
-    | '/ports/main'
-    | '/ports/sub'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
@@ -375,8 +353,6 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/'
     | '/_authenticated/filing-management/create'
-    | '/_authenticated/ports/main'
-    | '/_authenticated/ports/sub'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/display'
@@ -598,20 +574,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsAccountRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
-    '/_authenticated/ports/sub': {
-      id: '/_authenticated/ports/sub'
-      path: '/ports/sub'
-      fullPath: '/ports/sub'
-      preLoaderRoute: typeof AuthenticatedPortsSubRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/ports/main': {
-      id: '/_authenticated/ports/main'
-      path: '/ports/main'
-      fullPath: '/ports/main'
-      preLoaderRoute: typeof AuthenticatedPortsMainRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/filing-management/create': {
       id: '/_authenticated/filing-management/create'
       path: '/filing-management/create'
@@ -649,8 +611,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedFilingManagementCreateRoute: typeof AuthenticatedFilingManagementCreateRoute
-  AuthenticatedPortsMainRoute: typeof AuthenticatedPortsMainRoute
-  AuthenticatedPortsSubRoute: typeof AuthenticatedPortsSubRoute
   AuthenticatedUsersLogsRoute: typeof AuthenticatedUsersLogsRoute
   AuthenticatedUsersOperationLogsRoute: typeof AuthenticatedUsersOperationLogsRoute
   AuthenticatedUsersRolesRoute: typeof AuthenticatedUsersRolesRoute
@@ -667,8 +627,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedFilingManagementCreateRoute:
     AuthenticatedFilingManagementCreateRoute,
-  AuthenticatedPortsMainRoute: AuthenticatedPortsMainRoute,
-  AuthenticatedPortsSubRoute: AuthenticatedPortsSubRoute,
   AuthenticatedUsersLogsRoute: AuthenticatedUsersLogsRoute,
   AuthenticatedUsersOperationLogsRoute: AuthenticatedUsersOperationLogsRoute,
   AuthenticatedUsersRolesRoute: AuthenticatedUsersRolesRoute,

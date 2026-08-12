@@ -17,7 +17,6 @@ REGISTRY: list[ExportField] = [
     ExportField("carrier", "运营商", "port", "端口信息"),
     ExportField("operation_type", "操作类型", "port", "端口信息"),
     ExportField("main_port_number", "主端口号", "port", "端口信息"),
-    ExportField("port_main_number", "主端口号", "port", "端口信息", "主端口号码"),
     ExportField("port_sub_extension", "子端口扩展码", "port", "端口信息", "子端口扩展码（分配或输入）"),
     ExportField("port_full_number", "短信子端口号", "port", "端口信息", "完整短信子端口号 = 主端口号 + 子端口扩展码"),
     ExportField("sub_port_number", "子端口号", "port", "端口信息", deprecated=True),

@@ -236,47 +236,6 @@ export interface OperationLogListResponse {
   count: number
 }
 
-// ─── Ports (Main/Sub) ──────────────────────────────────────
-
-export interface MainPort {
-  id: string
-  port_number: string
-  carrier: string
-  port_range: string | null
-  province: string | null
-  city: string | null
-  port_type: string | null
-  status: string
-  sub_port_count: number
-  created_at: string
-  updated_at: string
-}
-
-export interface SubPort {
-  id: string
-  port_number: string
-  main_port_id: string
-  main_port_number: string
-  carrier: string
-  status: string
-  created_at: string
-  updated_at: string
-}
-
-export interface MainPortListResponse {
-  data: MainPort[]
-  total: number
-  page: number
-  page_size: number
-}
-
-export interface SubPortListResponse {
-  data: SubPort[]
-  total: number
-  page: number
-  page_size: number
-}
-
 // ─── API Access ────────────────────────────────────────────
 
 export interface ApiAccessConfig {

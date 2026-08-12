@@ -4,7 +4,7 @@ from typing import Any
 
 from sqlmodel import Session, func, select
 
-from app.models import MainPort, PortInfo, SubPort
+from app.models import PortInfo
 from app.models.filing_task import FilingTask
 
 
@@ -30,8 +30,14 @@ def get_stats(session: Session) -> dict[str, Any]:
         )
     ).one()
 
-    main_port_count = session.exec(select(func.count()).select_from(MainPort)).one()
-    sub_port_count = session.exec(select(func.count()).select_from(SubPort)).one()
+    main_port_count = session.exec(
+        select(func.count(func.distinct(PortInfo.main_port_number)))
+    ).one()
+    sub_port_count = session.exec(
+        select(func.count()).select_from(PortInfo).where(
+            PortInfo.sub_port_number.is_not(None)
+        )
+    ).one()
 
     return {
         "total_records": total,

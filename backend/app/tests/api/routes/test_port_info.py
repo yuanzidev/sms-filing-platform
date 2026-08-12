@@ -6,6 +6,17 @@ from fastapi.testclient import TestClient
 from app.core.config import settings
 
 
+def test_legacy_main_sub_ports_routes_are_unmounted(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    for path in ("/ports/main", "/ports/sub"):
+        r = client.get(
+            f"{settings.API_V1_STR}{path}",
+            headers=superuser_token_headers,
+        )
+        assert r.status_code == 404
+
+
 def test_port_info_accepts_large_page_size(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
