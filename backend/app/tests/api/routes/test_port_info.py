@@ -41,6 +41,24 @@ def test_port_info_rejects_too_large_page_size(
     assert r.status_code == 422
 
 
+def test_create_port_info_rejects_invalid_port_type(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex
+    r = client.post(
+        f"{settings.API_V1_STR}/port-info",
+        headers=superuser_token_headers,
+        json={
+            "carrier": "中国移动",
+            "main_port_number": f"1069{marker[:6]}",
+            "enterprise_name": f"非法类型企业{marker}",
+            "port_type": "短信",
+        },
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"]["field"] == "port_type"
+
+
 def test_import_port_info_with_empty_operation_and_group(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
@@ -59,7 +77,7 @@ def test_import_port_info_with_empty_operation_and_group(
     ws.cell(row=2, column=1, value="中国移动")
     ws.cell(row=2, column=2, value="10698999")
     ws.cell(row=2, column=3, value="测试企业")
-    ws.cell(row=2, column=4, value="短信")
+    ws.cell(row=2, column=4, value="普通短信端口")
     ws.cell(row=2, column=5, value="机房A")
     ws.cell(row=2, column=6, value="机房B")
     ws.cell(row=2, column=7, value="授字001")
@@ -93,18 +111,18 @@ def test_import_port_infos_collects_errors_and_writes_valid_rows(
     # 行2：运营商为空
     ws.cell(row=2, column=2, value="10690001")
     ws.cell(row=2, column=3, value="错误企业A")
-    ws.cell(row=2, column=4, value="短信")
+    ws.cell(row=2, column=4, value="普通短信端口")
     # 行3：日期格式无效
     ws.cell(row=3, column=1, value="中国移动")
     ws.cell(row=3, column=2, value="10690002")
     ws.cell(row=3, column=3, value="错误企业B")
-    ws.cell(row=3, column=4, value="短信")
+    ws.cell(row=3, column=4, value="普通短信端口")
     ws.cell(row=3, column=5, value="2024-13-99")
     # 行4：有效
     ws.cell(row=4, column=1, value="中国移动")
     ws.cell(row=4, column=2, value="10690003")
     ws.cell(row=4, column=3, value="有效企业C")
-    ws.cell(row=4, column=4, value="短信")
+    ws.cell(row=4, column=4, value="普通短信端口")
 
     buf = BytesIO()
     wb.save(buf)
@@ -121,6 +139,38 @@ def test_import_port_infos_collects_errors_and_writes_valid_rows(
     assert body["error_count"] == 2
     err_fields = {e["field"] for e in body["errors"]}
     assert err_fields == {"运营商", "端口入网时间"}
+
+
+def test_import_port_infos_rejects_invalid_port_type(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    from io import BytesIO
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    headers = ["运营商", "主端口号", "主端口备案公司", "端口类型"]
+    for col_idx, h in enumerate(headers, 1):
+        ws.cell(row=1, column=col_idx, value=h)
+    ws.cell(row=2, column=1, value="中国移动")
+    ws.cell(row=2, column=2, value="10690009")
+    ws.cell(row=2, column=3, value="非法类型导入企业")
+    ws.cell(row=2, column=4, value="短信")
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    r = client.post(
+        f"{settings.API_V1_STR}/port-info/import",
+        headers=superuser_token_headers,
+        files={"file": ("test.xlsx", buf, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["success_count"] == 0
+    assert body["error_count"] == 1
+    assert body["errors"][0]["field"] == "port_type"
 
 
 def test_port_info_import_error_report_xlsx(
@@ -158,7 +208,7 @@ def test_filter_port_infos_by_keyword(
             "carrier": "中国移动",
             "main_port_number": f"1069{marker[:6]}",
             "enterprise_name": f"测试备案公司{marker}",
-            "port_type": "短信",
+            "port_type": "普通短信端口",
             "carrier_room": "X机房",
             "enterprise_room": "Y机房",
             "authorization_letter": "授字001",
@@ -214,7 +264,7 @@ def test_filter_port_infos_by_city_and_type(
             "carrier": "中国联通",
             "main_port_number": f"1069{marker[:6]}",
             "enterprise_name": f"城市测试公司{marker}",
-            "port_type": "语音",
+            "port_type": "5G消息端口",
             "city": city,
             "carrier_room": "A机房",
             "enterprise_room": "B机房",
@@ -224,7 +274,7 @@ def test_filter_port_infos_by_city_and_type(
     r = client.get(
         f"{settings.API_V1_STR}/port-info",
         headers=superuser_token_headers,
-        params={"city": city, "port_type": "语音"},
+        params={"city": city, "port_type": "5G消息端口"},
     )
     assert r.status_code == 200
     body = r.json()
@@ -255,7 +305,7 @@ def test_preview_port_info_import(
     ws.cell(row=2, column=1, value="中国移动")
     ws.cell(row=2, column=2, value="10690001")
     ws.cell(row=2, column=3, value="测试企业")
-    ws.cell(row=2, column=4, value="短信")
+    ws.cell(row=2, column=4, value="普通短信端口")
     ws.cell(row=2, column=5, value="忽略值")
 
     buf = BytesIO()

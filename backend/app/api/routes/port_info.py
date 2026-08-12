@@ -96,6 +96,22 @@ _PORT_HEADERS = [
     "授权书图片",
 ]
 
+PORT_TYPE_OPTIONS = {"普通短信端口", "5G消息端口"}
+
+
+def _port_type_error(value: str) -> dict[str, str]:
+    return {
+        "field": "port_type",
+        "value": value,
+        "reason": "端口类型无效",
+        "suggestion": "端口类型只能填写「普通短信端口」或「5G消息端口」",
+    }
+
+
+def _validate_port_type(value: str) -> None:
+    if value not in PORT_TYPE_OPTIONS:
+        raise HTTPException(status_code=400, detail=_port_type_error(value))
+
 
 @router.get("/template")
 def download_port_info_template() -> Any:
@@ -118,7 +134,7 @@ def download_port_info_template() -> Any:
         "全国",
         "广东",
         "深圳",
-        "短信",
+        "普通短信端口",
         "新增",
         "2024-01-15",
         "是",
@@ -385,6 +401,13 @@ def import_port_infos(*, session: SessionDep, file: UploadFile = File(...)) -> A
                     "suggestion": "请填写端口类型",
                 }
             )
+        elif port_type not in PORT_TYPE_OPTIONS:
+            row_errors.append(
+                {
+                    "row": row_idx,
+                    **_port_type_error(port_type),
+                }
+            )
 
         # Validate booleans
         for bool_field, cn_name in [
@@ -595,6 +618,7 @@ def create_port_info_endpoint(
     current_user: CurrentUser,
     request: Request,
 ) -> Any:
+    _validate_port_type(create.port_type)
     try:
         result = create_port_info(session=session, create=create)
     except Exception as e:
@@ -643,6 +667,8 @@ def update_port_info_endpoint(
     db_obj = get_port_info(session=session, id=id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="端口信息不存在")
+    if update.port_type is not None:
+        _validate_port_type(update.port_type)
     result = update_port_info(session=session, db_obj=db_obj, update=update)
     log_operation(
         session=session,

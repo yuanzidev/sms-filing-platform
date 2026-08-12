@@ -48,6 +48,7 @@ import { PortInfoDialog } from './components/port-info-dialog'
 
 const PAGE_SIZE = 10
 const CARRIERS = ['中国移动', '中国联通', '中国电信', '中国广电']
+const PORT_TYPE_OPTIONS = ['普通短信端口', '5G消息端口']
 
 export function PortInfoPage() {
   const [page, setPage] = useState(1)
@@ -92,14 +93,6 @@ export function PortInfoPage() {
     const set = new Set<string>()
     for (const p of data?.data ?? []) {
       if (p.city) set.add(p.city)
-    }
-    return Array.from(set).sort()
-  }, [data])
-
-  const portTypeOptions = useMemo(() => {
-    const set = new Set<string>()
-    for (const p of data?.data ?? []) {
-      if (p.port_type) set.add(p.port_type)
     }
     return Array.from(set).sort()
   }, [data])
@@ -400,7 +393,7 @@ export function PortInfoPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value='__all__'>全部类型</SelectItem>
-                {portTypeOptions.map((t) => (
+                {PORT_TYPE_OPTIONS.map((t) => (
                   <SelectItem key={t} value={t}>
                     {t}
                   </SelectItem>

@@ -37,7 +37,7 @@ import type { PortInfo } from '@/lib/api/types'
 
 const EMPTY_SELECT_VALUE = '__empty__'
 const CARRIER_OPTIONS = ['中国移动', '中国联通', '中国电信', '中国广电']
-const PORT_TYPE_OPTIONS = ['短信', '语音', '物联网', '其他']
+const PORT_TYPE_OPTIONS = ['普通短信端口', '5G消息端口']
 const CUSTOMER_TYPE_OPTIONS = ['企业客户', '个人客户', '政企客户', '代理商', '其他']
 
 function PresetInput({
@@ -92,7 +92,10 @@ const formSchema = z.object({
   port_range: z.string().optional(),
   province: z.string().optional(),
   city: z.string().optional(),
-  port_type: z.string().min(1, '端口类型不能为空'),
+  port_type: z.enum(['普通短信端口', '5G消息端口'], {
+    required_error: '端口类型不能为空',
+    invalid_type_error: '端口类型不能为空',
+  }),
   operation_type: z.string().optional(),
   port_activation_date: z.string().optional(),
   allow_self_extension: z.boolean().optional(),
@@ -288,13 +291,18 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>端口类型 *</FormLabel>
-                    <PresetInput
-                      value={field.value || ''}
-                      onChange={field.onChange}
-                      options={PORT_TYPE_OPTIONS}
-                      selectPlaceholder="选择端口类型"
-                      inputPlaceholder="也可手动输入端口类型"
-                    />
+                    <Select value={field.value || ''} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="选择端口类型" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {PORT_TYPE_OPTIONS.map((option) => (
+                          <SelectItem key={option} value={option}>{option}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
