@@ -15,8 +15,30 @@ interface DatePickerProps {
   className?: string
 }
 
+const START_MONTH = new Date(2000, 0)
+const END_MONTH = new Date(new Date().getFullYear() + 10, 11)
+
+function parseDateValue(value?: string) {
+  if (!value) return undefined
+
+  const [year, month, day] = value.replace(/\//g, "-").split("-").map(Number)
+  if (year && month && day) {
+    return new Date(year, month - 1, day)
+  }
+
+  const fallback = new Date(value)
+  return Number.isNaN(fallback.getTime()) ? undefined : fallback
+}
+
+function formatDateValue(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
 export function DatePicker({ value, onChange, placeholder = "选择日期", className }: DatePickerProps) {
-  const date = value ? new Date(value) : undefined
+  const date = parseDateValue(value)
 
   return (
     <Popover>
@@ -30,20 +52,21 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
           )}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
-          {date ? (
-            new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" }).format(date)
-          ) : (
-            <span>{placeholder}</span>
-          )}
+          {date ? formatDateValue(date) : <span>{placeholder}</span>}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
+          captionLayout="dropdown"
+          navLayout="after"
           mode="single"
+          startMonth={START_MONTH}
+          endMonth={END_MONTH}
+          defaultMonth={date}
           selected={date}
           onSelect={(d) => {
             if (d) {
-              onChange(new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" }).format(d).replace(/\//g, "-"))
+              onChange(formatDateValue(d))
             }
           }}
           initialFocus

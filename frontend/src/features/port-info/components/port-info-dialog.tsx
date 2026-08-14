@@ -92,10 +92,11 @@ const formSchema = z.object({
   port_range: z.string().optional(),
   province: z.string().optional(),
   city: z.string().optional(),
-  port_type: z.enum(['普通短信端口', '5G消息端口'], {
-    required_error: '端口类型不能为空',
-    invalid_type_error: '端口类型不能为空',
-  }),
+  port_type: z.string()
+    .min(1, '端口类型不能为空')
+    .refine((value) => PORT_TYPE_OPTIONS.includes(value), {
+      message: '端口类型只能选择普通短信端口或5G消息端口',
+    }),
   operation_type: z.string().optional(),
   port_activation_date: z.string().optional(),
   allow_self_extension: z.boolean().optional(),
