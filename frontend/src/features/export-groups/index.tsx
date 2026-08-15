@@ -56,7 +56,11 @@ export function ExportGroupsPage() {
       queryClient.invalidateQueries({ queryKey: ['export-groups'] })
       setToDelete(undefined)
     },
-    onError: () => toast.error('字段组删除失败'),
+    onError: (error) => {
+      const detail = (error as { response?: { data?: { detail?: string } } })
+        ?.response?.data?.detail
+      toast.error(detail || '字段组删除失败')
+    },
   })
 
   const groups = data?.data ?? []
