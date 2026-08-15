@@ -40,7 +40,8 @@ import { Input } from '@/components/ui/input'
 import { ActionIconButton } from '@/components/shared/action-icon-button'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { ImportDialog } from '@/components/shared/import-dialog'
-import { PROVINCES } from '@/components/shared/province-city-fields'
+import { PROVINCE_OPTIONS } from '@/components/shared/province-city-data'
+import { SearchableSelect } from '@/components/shared/searchable-select'
 import { StatusTag } from '@/components/shared/status-tag'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { PortInfoDetailDialog } from './components/port-info-detail-dialog'
@@ -94,7 +95,7 @@ export function PortInfoPage() {
     for (const p of data?.data ?? []) {
       if (p.city) set.add(p.city)
     }
-    return Array.from(set).sort()
+    return Array.from(set).sort().map((city) => ({ value: city, label: city }))
   }, [data])
 
   const handleSearch = () => {
@@ -323,27 +324,20 @@ export function PortInfoPage() {
           </div>
           <div className='flex flex-col gap-1'>
             <label className='text-muted-foreground text-sm'>接入省</label>
-            <Select
-              value={searchInputs.province}
+            <SearchableSelect
+              value={searchInputs.province || '__all__'}
               onValueChange={(v) =>
                 setSearchInputs((s) => ({
                   ...s,
                   province: v === '__all__' ? '' : v,
                 }))
               }
-            >
-              <SelectTrigger className='w-40'>
-                <SelectValue placeholder='全部' />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='__all__'>全部</SelectItem>
-                {PROVINCES.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {p}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={[{ value: '__all__', label: '全部' }, ...PROVINCE_OPTIONS]}
+              placeholder='全部'
+              searchPlaceholder='搜索省份...'
+              emptyText='未找到省份'
+              className='w-40'
+            />
           </div>
           <div className='flex flex-col gap-1'>
             <label className='text-muted-foreground text-sm'>关键词</label>
@@ -359,25 +353,18 @@ export function PortInfoPage() {
           </div>
           <div className='flex flex-col gap-1'>
             <label className='text-muted-foreground text-sm'>城市</label>
-            <Select
+            <SearchableSelect
               value={cityFilter}
               onValueChange={(v) => {
                 setCityFilter(v)
                 setPage(1)
               }}
-            >
-              <SelectTrigger className='w-32'>
-                <SelectValue placeholder='城市' />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='__all__'>全部城市</SelectItem>
-                {cityOptions.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={[{ value: '__all__', label: '全部城市' }, ...cityOptions]}
+              placeholder='城市'
+              searchPlaceholder='搜索城市...'
+              emptyText='未找到城市'
+              className='w-32'
+            />
           </div>
           <div className='flex flex-col gap-1'>
             <label className='text-muted-foreground text-sm'>端口类型</label>

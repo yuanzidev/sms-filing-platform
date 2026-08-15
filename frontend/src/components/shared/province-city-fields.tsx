@@ -1,23 +1,13 @@
 import { useMemo } from 'react'
-import pcData from 'china-division/dist/pc.json'
 import type { FieldPath, FieldValues, UseFormReturn } from 'react-hook-form'
 import {
   FormField,
   FormItem,
   FormLabel,
-  FormControl,
   FormMessage,
 } from '@/components/ui/form'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-
-const pc = pcData as Record<string, string[]>
-export const PROVINCES = Object.keys(pc)
+import { SearchableSelect } from '@/components/shared/searchable-select'
+import { PROVINCES, PROVINCE_CITY_MAP, PROVINCE_OPTIONS } from './province-city-data'
 
 interface Props<T extends FieldValues> {
   form: UseFormReturn<T>
@@ -34,9 +24,14 @@ export function ProvinceCityFields<T extends FieldValues>({
 
   const cityOptions = useMemo<string[]>(() => {
     if (!provinceValue) return []
-    const list = pc[provinceValue]
+    const list = PROVINCE_CITY_MAP[provinceValue]
     return Array.isArray(list) ? list : []
   }, [provinceValue])
+
+  const citySelectOptions = useMemo(
+    () => cityOptions.map((city) => ({ value: city, label: city })),
+    [cityOptions]
+  )
 
   return (
     <>
@@ -46,29 +41,27 @@ export function ProvinceCityFields<T extends FieldValues>({
         render={({ field }) => (
           <FormItem>
             <FormLabel>省份</FormLabel>
-            <Select
+            <SearchableSelect
               value={(field.value as string) || ''}
               onValueChange={(v) => {
                 field.onChange(v)
                 form.setValue(cityName, '' as never, { shouldValidate: false })
               }}
-            >
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="选择省份" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {PROVINCES.map((p) => (
-                  <SelectItem key={p} value={p}>{p}</SelectItem>
-                ))}
-                {field.value && !PROVINCES.includes(field.value as string) && (
-                  <SelectItem value={field.value as string}>
-                    {field.value as string}（自定义）
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+              options={
+                field.value && !PROVINCES.includes(field.value as string)
+                  ? [
+                      ...PROVINCE_OPTIONS,
+                      {
+                        value: field.value as string,
+                        label: `${field.value as string}（自定义）`,
+                      },
+                    ]
+                  : PROVINCE_OPTIONS
+              }
+              placeholder='选择省份'
+              searchPlaceholder='搜索省份...'
+              emptyText='未找到省份'
+            />
             <FormMessage />
           </FormItem>
         )}
@@ -79,27 +72,25 @@ export function ProvinceCityFields<T extends FieldValues>({
         render={({ field }) => (
           <FormItem>
             <FormLabel>城市</FormLabel>
-            <Select
+            <SearchableSelect
               value={(field.value as string) || ''}
               onValueChange={field.onChange}
               disabled={!provinceValue}
-            >
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder={provinceValue ? '选择城市' : '请先选省份'} />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {cityOptions.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-                {field.value && !cityOptions.includes(field.value as string) && (
-                  <SelectItem value={field.value as string}>
-                    {field.value as string}（自定义）
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+              options={
+                field.value && !cityOptions.includes(field.value as string)
+                  ? [
+                      ...citySelectOptions,
+                      {
+                        value: field.value as string,
+                        label: `${field.value as string}（自定义）`,
+                      },
+                    ]
+                  : citySelectOptions
+              }
+              placeholder={provinceValue ? '选择城市' : '请先选省份'}
+              searchPlaceholder='搜索城市...'
+              emptyText='未找到城市'
+            />
             <FormMessage />
           </FormItem>
         )}
