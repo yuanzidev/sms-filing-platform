@@ -30,7 +30,7 @@ def _create_qualification(client, headers, name="测试企业"):
         headers=headers,
         json={
             "enterprise_name": name,
-            "signature": "签名X",
+            "sms_signature": "签名X",
         },
     )
     assert r.status_code == 200, r.text
@@ -45,7 +45,7 @@ def _create_port(client, headers, main_port_number, sub_port_number=None):
         "group_code": "G001",
         "carrier_room": "机房A",
         "enterprise_room": "机房B",
-        "port_type": "短信",
+        "port_type": "普通短信端口",
     }
     if sub_port_number is not None:
         payload["sub_port_number"] = sub_port_number
@@ -130,6 +130,10 @@ def test_create_filing_task_with_explicit_port_ids(
     assert body["qualification_count"] == 1
     assert body["port_count"] == 2
     assert len(body["port_ids"]) == 2
+    assert body["qualifications"][0]["enterprise_name"] == "测试企业"
+    assert body["qualifications"][0]["sms_signature"] == "签名X"
+    assert {p["main_port_number"] for p in body["ports"]} == {"10698"}
+    assert {p["sub_port_number"] for p in body["ports"]} == {None, "0001"}
     assert body["download_url"]
 
     # 下载并校验 Excel 包含两个端口行（资质×端口=2行 + 表头）

@@ -37,7 +37,9 @@ from .filing_task import (
     FilingTask,
     FilingTaskCreate,
     FilingTaskDetail,
+    FilingTaskPortSummary,
     FilingTaskPublic,
+    FilingTaskQualificationSummary,
     FilingTasksPublic,
 )
 from .login_log import (
@@ -160,7 +162,9 @@ __all__ = [
     "FilingTask",
     "FilingTaskCreate",
     "FilingTaskDetail",
+    "FilingTaskPortSummary",
     "FilingTaskPublic",
+    "FilingTaskQualificationSummary",
     "FilingTasksPublic",
     "FilingSubPortUsage",
     "MainPort",

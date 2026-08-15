@@ -149,7 +149,7 @@ export function FilingManagementPage() {
         }
       }
     },
-    [tasks, handleRegenerate]
+    [handleRegenerate]
   )
 
   const handleSearch = () => {
@@ -315,7 +315,7 @@ export function FilingManagementPage() {
           open={!!detailId}
           onOpenChange={(open) => !open && setDetailId(null)}
         >
-          <DialogContent className='max-w-lg'>
+          <DialogContent className='max-w-2xl'>
             <DialogHeader>
               <DialogTitle>任务详情</DialogTitle>
             </DialogHeader>
@@ -362,21 +362,57 @@ export function FilingManagementPage() {
                   </div>
                 </div>
                 <Separator />
-                <div className='text-sm'>
-                  <span className='text-muted-foreground'>资质ID列表：</span>
-                  <pre className='bg-muted mt-1 max-h-24 overflow-auto rounded p-2 text-xs'>
-                    {JSON.stringify(
-                      taskDetail.qualification_ids ?? [],
-                      null,
-                      2
+                <div className='space-y-2 text-sm'>
+                  <div className='flex items-center justify-between'>
+                    <span className='font-medium'>资质明细</span>
+                    <span className='text-muted-foreground'>
+                      {taskDetail.qualifications?.length ?? 0} / {taskDetail.qualification_count}
+                    </span>
+                  </div>
+                  <div className='max-h-44 space-y-2 overflow-auto rounded-md border p-2'>
+                    {taskDetail.qualifications?.length ? (
+                      taskDetail.qualifications.map((qualification) => (
+                        <div key={qualification.id} className='rounded-md bg-muted/60 p-2'>
+                          <div className='font-medium'>{qualification.enterprise_name}</div>
+                          <div className='mt-1 grid grid-cols-2 gap-2 text-xs text-muted-foreground'>
+                            <span>签名：{qualification.sms_signature || '-'}</span>
+                            <span>单位证件号：{qualification.cert_number || '-'}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className='py-4 text-center text-muted-foreground'>暂无资质明细</div>
                     )}
-                  </pre>
+                  </div>
                 </div>
-                <div className='text-sm'>
-                  <span className='text-muted-foreground'>端口ID列表：</span>
-                  <pre className='bg-muted mt-1 max-h-24 overflow-auto rounded p-2 text-xs'>
-                    {JSON.stringify(taskDetail.port_ids ?? [], null, 2)}
-                  </pre>
+                <div className='space-y-2 text-sm'>
+                  <div className='flex items-center justify-between'>
+                    <span className='font-medium'>端口明细</span>
+                    <span className='text-muted-foreground'>
+                      {taskDetail.ports?.length ?? 0} / {taskDetail.port_count}
+                    </span>
+                  </div>
+                  <div className='max-h-44 space-y-2 overflow-auto rounded-md border p-2'>
+                    {taskDetail.ports?.length ? (
+                      taskDetail.ports.map((port) => (
+                        <div key={port.id} className='rounded-md bg-muted/60 p-2'>
+                          <div className='flex flex-wrap items-center gap-x-3 gap-y-1 font-medium'>
+                            <span>{port.main_port_number}</span>
+                            <span className='text-muted-foreground'>
+                              子端口：{port.sub_port_number || '-'}
+                            </span>
+                          </div>
+                          <div className='mt-1 grid grid-cols-2 gap-2 text-xs text-muted-foreground'>
+                            <span>运营商：{port.carrier}</span>
+                            <span>端口类型：{port.port_type}</span>
+                            <span className='col-span-2'>备案公司：{port.enterprise_name}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className='py-4 text-center text-muted-foreground'>暂无端口明细</div>
+                    )}
+                  </div>
                 </div>
                 {taskDetail.download_url && (
                   <Button

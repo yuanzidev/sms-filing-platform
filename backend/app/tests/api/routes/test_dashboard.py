@@ -18,7 +18,7 @@ def test_dashboard_port_counts_use_port_info(
             "carrier": "中国移动",
             "main_port_number": main_port_number,
             "enterprise_name": f"统计测试企业{marker}",
-            "port_type": "短信",
+            "port_type": "普通短信端口",
         }
         if sub_port_number:
             payload["sub_port_number"] = sub_port_number

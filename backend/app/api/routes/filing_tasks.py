@@ -32,7 +32,9 @@ from app.models import (
     ExportGroup,
     FilingTaskCreate,
     FilingTaskDetail,
+    FilingTaskPortSummary,
     FilingTaskPublic,
+    FilingTaskQualificationSummary,
     FilingTasksPublic,
     Message,
     PortInfo,
@@ -398,6 +400,60 @@ def _task_to_public(session, task) -> FilingTaskPublic:
     )
 
 
+def _parse_uuid_list(values: list[str]) -> list[uuid.UUID]:
+    result: list[uuid.UUID] = []
+    for value in values:
+        try:
+            result.append(uuid.UUID(str(value)))
+        except (TypeError, ValueError):
+            continue
+    return result
+
+
+def _qualification_summaries(
+    session, qualification_ids: list[str]
+) -> list[FilingTaskQualificationSummary]:
+    ids = _parse_uuid_list(qualification_ids)
+    if not ids:
+        return []
+    items = session.exec(
+        select(QualificationInfo).where(QualificationInfo.id.in_(ids))  # type: ignore[attr-defined]
+    ).all()
+    by_id = {item.id: item for item in items}
+    return [
+        FilingTaskQualificationSummary(
+            id=item.id,
+            enterprise_name=item.enterprise_name,
+            sms_signature=item.sms_signature,
+            cert_number=item.cert_number,
+        )
+        for item_id in ids
+        if (item := by_id.get(item_id)) is not None
+    ]
+
+
+def _port_summaries(session, port_ids: list[str]) -> list[FilingTaskPortSummary]:
+    ids = _parse_uuid_list(port_ids)
+    if not ids:
+        return []
+    items = session.exec(
+        select(PortInfo).where(PortInfo.id.in_(ids))  # type: ignore[attr-defined]
+    ).all()
+    by_id = {item.id: item for item in items}
+    return [
+        FilingTaskPortSummary(
+            id=item.id,
+            carrier=item.carrier,
+            main_port_number=item.main_port_number,
+            sub_port_number=item.sub_port_number,
+            enterprise_name=item.enterprise_name,
+            port_type=item.port_type,
+        )
+        for item_id in ids
+        if (item := by_id.get(item_id)) is not None
+    ]
+
+
 def _task_to_detail(session, task) -> FilingTaskDetail:
     public = _task_to_public(session, task)
     download_url = (
@@ -416,6 +472,8 @@ def _task_to_detail(session, task) -> FilingTaskDetail:
         created_at=public.created_at,
         qualification_ids=task.qualification_ids,
         port_ids=task.port_ids,
+        qualifications=_qualification_summaries(session, task.qualification_ids),
+        ports=_port_summaries(session, task.port_ids),
         file_path=task.file_path,
         download_url=download_url,
     )

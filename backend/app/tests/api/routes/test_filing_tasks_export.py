@@ -59,7 +59,7 @@ def _create_port(client, headers, main_port_number):
             "group_code": "G001",
             "carrier_room": "机房A",
             "enterprise_room": "机房B",
-            "port_type": "短信",
+            "port_type": "普通短信端口",
             "operation_type": "新增",
             "authorization_letter": "授字001",
         },

@@ -64,9 +64,27 @@ class FilingTaskPublic(SQLModel):
     created_at: datetime
 
 
+class FilingTaskQualificationSummary(SQLModel):
+    id: uuid.UUID
+    enterprise_name: str
+    sms_signature: str | None = None
+    cert_number: str | None = None
+
+
+class FilingTaskPortSummary(SQLModel):
+    id: uuid.UUID
+    carrier: str
+    main_port_number: str
+    sub_port_number: str | None = None
+    enterprise_name: str
+    port_type: str
+
+
 class FilingTaskDetail(FilingTaskPublic):
     qualification_ids: list[str]
     port_ids: list[str]
+    qualifications: list[FilingTaskQualificationSummary] = Field(default_factory=list)
+    ports: list[FilingTaskPortSummary] = Field(default_factory=list)
     file_path: str | None
     download_url: str | None
 

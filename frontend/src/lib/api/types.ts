@@ -265,6 +265,22 @@ export interface ApiAccessDataResponse {
 
 // ─── FilingTask ─────────────────────────────────────────────
 
+export interface FilingTaskQualificationSummary {
+  id: string
+  enterprise_name: string
+  sms_signature: string | null
+  cert_number: string | null
+}
+
+export interface FilingTaskPortSummary {
+  id: string
+  carrier: string
+  main_port_number: string
+  sub_port_number: string | null
+  enterprise_name: string
+  port_type: string
+}
+
 export interface FilingTask {
   id: string
   task_name: string
@@ -278,6 +294,8 @@ export interface FilingTask {
   // detail only:
   qualification_ids?: string[]
   port_ids?: string[]
+  qualifications?: FilingTaskQualificationSummary[]
+  ports?: FilingTaskPortSummary[]
   file_path?: string | null
   download_url?: string | null
 }
