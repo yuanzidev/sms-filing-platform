@@ -1,11 +1,26 @@
 """Tests for export groups API."""
 
 import io
+import uuid
+from collections.abc import Generator
 
+import pytest
 from fastapi.testclient import TestClient
 from openpyxl import Workbook, load_workbook
+from sqlmodel import Session, delete, select
 
 from app.core.config import settings
+from app.core.db import engine
+from app.models import FilingTask, User
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _cleanup_filing_tasks() -> Generator[None, None, None]:
+    # 清理本模块创建的 filing_task 行，避免 conftest 清理 User 时触发外键约束
+    yield
+    with Session(engine) as session:
+        session.execute(delete(FilingTask))
+        session.commit()
 
 
 def test_registry_returns_all_fields(
@@ -248,3 +263,91 @@ def test_import_export_group_bad_extension(
     )
     assert r.status_code == 400
     assert "仅支持" in r.json()["detail"]
+
+
+def test_delete_export_group_referenced_by_filing_task(
+    client: TestClient,
+    superuser_token_headers: dict[str, str],
+    db: Session,
+) -> None:
+    gid = _create_group(client, superuser_token_headers, name="历史字段组")
+    user = db.exec(select(User)).first()
+    assert user is not None
+
+    task = FilingTask(
+        task_name=f"BEI-TEST-{uuid.uuid4()}",
+        qualification_ids=[],
+        port_ids=[],
+        export_group_id=uuid.UUID(gid),
+        export_group_name="历史字段组",
+        qualification_count=0,
+        port_count=0,
+        operator_id=user.id,
+    )
+    db.add(task)
+    db.commit()
+
+    # 删除字段组不再受报备任务限制
+    r = client.delete(
+        f"{settings.API_V1_STR}/export-groups/{gid}",
+        headers=superuser_token_headers,
+    )
+    assert r.status_code == 200
+
+    # 任务仍在，引用被置空，展示用快照组名
+    db.expire_all()
+    task_after = db.get(FilingTask, task.id)
+    assert task_after is not None
+    assert task_after.export_group_id is None
+
+    detail = client.get(
+        f"{settings.API_V1_STR}/filing-tasks/{task.id}",
+        headers=superuser_token_headers,
+    ).json()
+    assert detail["export_group_name"] == "历史字段组"
+
+
+def test_regenerate_filing_task_after_group_deleted(
+    client: TestClient,
+    superuser_token_headers: dict[str, str],
+    db: Session,
+) -> None:
+    gid = _create_group(client, superuser_token_headers)
+    user = db.exec(select(User)).first()
+    assert user is not None
+
+    task = FilingTask(
+        task_name=f"BEI-TEST-{uuid.uuid4()}",
+        qualification_ids=[],
+        port_ids=[],
+        export_group_id=uuid.UUID(gid),
+        qualification_count=0,
+        port_count=0,
+        operator_id=user.id,
+    )
+    db.add(task)
+    db.commit()
+
+    r = client.delete(
+        f"{settings.API_V1_STR}/export-groups/{gid}",
+        headers=superuser_token_headers,
+    )
+    assert r.status_code == 200
+
+    r = client.post(
+        f"{settings.API_V1_STR}/filing-tasks/{task.id}/regenerate",
+        headers=superuser_token_headers,
+    )
+    assert r.status_code == 400
+    assert "已被删除" in r.json()["detail"]
+
+
+def test_delete_export_group_success(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    gid = _create_group(client, superuser_token_headers)
+    r = client.delete(
+        f"{settings.API_V1_STR}/export-groups/{gid}",
+        headers=superuser_token_headers,
+    )
+    assert r.status_code == 200

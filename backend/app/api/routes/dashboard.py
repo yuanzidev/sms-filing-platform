@@ -13,7 +13,7 @@ from app.crud.dashboard import (
     get_status_distribution,
     get_trends,
 )
-from app.models import ExportGroup, FilingTaskPublic, User
+from app.models import FilingTaskPublic, User
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -58,11 +58,7 @@ def dashboard_recent_changes(session: SessionDep, limit: int = Query(10, ge=1, l
             user = session.get(User, t.operator_id)
             if user:
                 operator_name = user.full_name or user.username
-        export_group_name = ""
-        if t.export_group_id:
-            group = session.get(ExportGroup, t.export_group_id)
-            if group:
-                export_group_name = group.name
+        export_group_name = t.export_group_name or ""
         result.append(
             FilingTaskPublic(
                 id=t.id,

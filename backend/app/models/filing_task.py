@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Column
+from sqlalchemy import JSON, Column, ForeignKey
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.timezone import utcnow
@@ -12,7 +12,15 @@ class FilingTaskBase(SQLModel):
     task_name: str = Field(max_length=256)
     qualification_ids: list[str] = Field(sa_column=Column(JSON))
     port_ids: list[str] = Field(sa_column=Column(JSON))
-    export_group_id: uuid.UUID = Field(foreign_key="export_group.id")
+    export_group_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            "export_group_id",
+            ForeignKey("export_group.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+    )
+    export_group_name: str | None = Field(default=None, max_length=100)
     group_by_field: str | None = Field(default=None, max_length=64)
     file_path: str | None = Field(default=None, max_length=512)
     file_size: int | None = Field(default=None)

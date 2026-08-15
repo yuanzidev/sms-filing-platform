@@ -384,18 +384,13 @@ def _get_operator_name(session, operator_id: uuid.UUID) -> str:
     return user.full_name or user.username if user else "未知"
 
 
-def _get_export_group_name(session, export_group_id: uuid.UUID) -> str:
-    group = session.get(ExportGroup, export_group_id)
-    return group.name if group else "未知"
-
-
 def _task_to_public(session, task) -> FilingTaskPublic:
     return FilingTaskPublic(
         id=task.id,
         task_name=task.task_name,
         qualification_count=task.qualification_count,
         port_count=task.port_count,
-        export_group_name=_get_export_group_name(session, task.export_group_id),
+        export_group_name=task.export_group_name or "未知",
         group_by_field=task.group_by_field,
         file_size=task.file_size,
         operator_name=_get_operator_name(session, task.operator_id),
@@ -538,7 +533,10 @@ def create_task(
 
     # 4. Create task record first (so we have an ID)
     task = crud_create_filing_task(
-        session=session, create=create, operator_id=current_user.id
+        session=session,
+        create=create,
+        operator_id=current_user.id,
+        export_group_name=export_group.name,
     )
 
     # 5. Load image attachments for selected qualifications and ports
@@ -758,6 +756,8 @@ def regenerate_filing_task(
             )  # type: ignore
         ).all()
     )
+    if not task.export_group_id:
+        raise HTTPException(status_code=400, detail="导出字段组已被删除，无法重新生成")
     export_group = get_export_group(session=session, id=task.export_group_id)
     if not export_group:
         raise HTTPException(status_code=400, detail="导出字段组已被删除，无法重新生成")

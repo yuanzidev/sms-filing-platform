@@ -74,6 +74,40 @@ def _create_export_group(client, headers, name="导出组"):
     return r.json()["id"]
 
 
+def test_create_filing_task_snapshots_export_group_name(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    qual_id = _create_qualification(client, superuser_token_headers)
+    r = client.post(
+        f"{settings.API_V1_STR}/port-info",
+        headers=superuser_token_headers,
+        json={
+            "carrier": "中国移动",
+            "enterprise_name": "测试备案公司",
+            "main_port_number": "10699",
+            "group_code": "G002",
+            "carrier_room": "机房A",
+            "enterprise_room": "机房B",
+            "port_type": "普通短信端口",
+        },
+    )
+    assert r.status_code == 200, r.text
+    port_id = r.json()["id"]
+    group_id = _create_export_group(client, superuser_token_headers, name="快照组")
+
+    r = client.post(
+        f"{settings.API_V1_STR}/filing-tasks",
+        headers=superuser_token_headers,
+        json={
+            "qualification_ids": [qual_id],
+            "port_ids": [port_id],
+            "export_group_id": group_id,
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["export_group_name"] == "快照组"
+
+
 def test_create_filing_task_with_explicit_port_ids(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:

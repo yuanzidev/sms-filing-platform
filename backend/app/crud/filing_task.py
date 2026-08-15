@@ -5,7 +5,6 @@ from datetime import date, datetime
 from sqlalchemy import or_
 from sqlmodel import Session, func, select
 
-from app.models.export_group import ExportGroup
 from app.models.filing_task import FilingTask, FilingTaskCreate
 from app.models.user import User
 
@@ -23,7 +22,11 @@ def _task_name_sequence(session: Session) -> int:
 
 
 def create_filing_task(
-    *, session: Session, create: FilingTaskCreate, operator_id: uuid.UUID
+    *,
+    session: Session,
+    create: FilingTaskCreate,
+    operator_id: uuid.UUID,
+    export_group_name: str | None = None,
 ) -> FilingTask:
     task_name = create.task_name or f"BEI-{date.today().strftime('%Y%m%d')}-{_task_name_sequence(session):03d}"
     db_obj = FilingTask(
@@ -31,6 +34,7 @@ def create_filing_task(
         qualification_ids=[str(qid) for qid in create.qualification_ids],
         port_ids=[],  # will be set by the route after random port selection
         export_group_id=create.export_group_id,
+        export_group_name=export_group_name,
         group_by_field=create.group_by_field,
         file_path=None,
         file_size=None,
@@ -57,11 +61,7 @@ def list_filing_tasks(
     end_date: date | None = None,
     keyword: str | None = None,
 ) -> tuple[list[FilingTask], int]:
-    query = (
-        select(FilingTask)
-        .join(User, FilingTask.operator_id == User.id)
-        .join(ExportGroup, FilingTask.export_group_id == ExportGroup.id)
-    )
+    query = select(FilingTask).join(User, FilingTask.operator_id == User.id)
 
     if start_date:
         start_dt = datetime.combine(start_date, datetime.min.time())
@@ -75,7 +75,7 @@ def list_filing_tasks(
                 FilingTask.task_name.contains(keyword),
                 User.full_name.contains(keyword),
                 User.username.contains(keyword),
-                ExportGroup.name.contains(keyword),
+                FilingTask.export_group_name.contains(keyword),  # type: ignore[union-attr]
             )
         )
 
