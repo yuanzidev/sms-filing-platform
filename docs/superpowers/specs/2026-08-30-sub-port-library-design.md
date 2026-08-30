@@ -46,7 +46,7 @@ class SubPortRecord(SQLModel, table=True):
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/template?group_id=` | 按字段组生成导入模板 Excel：固定列（主端口号、子端口号、状态）+ 字段组字段列，含示例行与"填写说明" sheet |
+| GET | `/template?group_id=` | 按字段组生成导入模板 Excel：固定列（主端口号、子端口号、状态）+ 字段组字段列表头 + "填写说明" sheet。**不含示例数据行**，避免用户直接导入模板时把示例数据入库 |
 | POST | `/import/preview`（FormData: file, group_id） | 解析 Excel 返回前 5 行预览、未识别表头、总行数 |
 | POST | `/import`（FormData: file, group_id） | Upsert 导入：按主端口号+子端口号匹配，存在则覆盖更新，不存在则新增；返回 total/success_count/error_count/errors |
 | POST | `/import/parse-delete`（FormData: file） | 解析删除清单，返回 matched_count、unmatched 列表明细，不执行删除 |
