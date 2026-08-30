@@ -10,8 +10,12 @@ RUN npm config set registry https://registry.npmmirror.com
 COPY package.json pnpm-lock.yaml ./
 
 # 安装 pnpm 并配置镜像源，然后安装依赖
-RUN npm install -g pnpm --registry=https://registry.npmmirror.com && \
+# pnpm 锁定 10.x：pnpm 11 不再读取 package.json 的 pnpm 字段，且会对未执行构建脚本的依赖直接报错
+# 加长 fetch 超时并增加重试(china-division 等大包在构建网络内 60s 默认超时不够)
+RUN npm install -g pnpm@10.31.0 --registry=https://registry.npmmirror.com && \
     pnpm config set registry https://registry.npmmirror.com && \
+    pnpm config set fetch-timeout 600000 && \
+    pnpm config set fetch-retries 5 && \
     pnpm install --frozen-lockfile
 
 # 复制源代码
