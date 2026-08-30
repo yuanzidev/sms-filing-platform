@@ -100,6 +100,15 @@ from .sub_port_generation_rule import (
     SubPortGenerationRulesPublic,
     SubPortGenerationRuleUpdate,
 )
+from .sub_port_record import (
+    SUB_PORT_STATUSES,
+    SubPortBatchDelete,
+    SubPortRecord,
+    SubPortRecordCreate,
+    SubPortRecordPublic,
+    SubPortRecordsPublic,
+    SubPortRecordUpdate,
+)
 from .user import (
     NewPassword,
     ResetPassword,
@@ -182,6 +191,13 @@ __all__ = [
     "SubPortGenerationRulePublic",
     "SubPortGenerationRulesPublic",
     "SubPortGenerationRuleUpdate",
+    "SubPortRecord",
+    "SubPortRecordCreate",
+    "SubPortRecordUpdate",
+    "SubPortRecordPublic",
+    "SubPortRecordsPublic",
+    "SubPortBatchDelete",
+    "SUB_PORT_STATUSES",
     "FileAttachment",
     "FileAttachmentCreate",
     "FileAttachmentPublic",
