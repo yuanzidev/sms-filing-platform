@@ -1,0 +1,99 @@
+"""CRUD operations for SubPortRecord."""
+import uuid
+
+from sqlalchemy import or_
+from sqlmodel import Session, func, select
+
+from app.core.timezone import utcnow
+from app.models import (
+    SubPortRecord,
+    SubPortRecordCreate,
+    SubPortRecordUpdate,
+)
+
+
+def list_sub_port_records(
+    *,
+    session: Session,
+    page: int = 1,
+    page_size: int = 20,
+    keyword: str | None = None,
+    status: str | None = None,
+    main_port_number: str | None = None,
+) -> tuple[list[SubPortRecord], int]:
+    query = select(SubPortRecord)
+
+    if keyword:
+        query = query.where(
+            or_(
+                SubPortRecord.main_port_number.contains(keyword),
+                SubPortRecord.sub_port_number.contains(keyword),
+            )
+        )
+    if status:
+        query = query.where(SubPortRecord.status == status)
+    if main_port_number:
+        query = query.where(SubPortRecord.main_port_number == main_port_number)
+
+    count = session.exec(select(func.count()).select_from(query.subquery())).one()
+    results = session.exec(
+        query.order_by(SubPortRecord.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+    return list(results), count
+
+
+def get_sub_port_record(*, session: Session, id: uuid.UUID) -> SubPortRecord | None:
+    return session.get(SubPortRecord, id)
+
+
+def get_by_main_and_sub(
+    *, session: Session, main_port_number: str, sub_port_number: str
+) -> SubPortRecord | None:
+    statement = select(SubPortRecord).where(
+        SubPortRecord.main_port_number == main_port_number,
+        SubPortRecord.sub_port_number == sub_port_number,
+    )
+    return session.exec(statement).first()
+
+
+def create_sub_port_record(
+    *, session: Session, create: SubPortRecordCreate
+) -> SubPortRecord:
+    db_obj = SubPortRecord.model_validate(create)
+    session.add(db_obj)
+    session.commit()
+    session.refresh(db_obj)
+    return db_obj
+
+
+def update_sub_port_record(
+    *, session: Session, db_obj: SubPortRecord, update: SubPortRecordUpdate
+) -> SubPortRecord:
+    data = update.model_dump(exclude_unset=True)
+    db_obj.sqlmodel_update(data)
+    db_obj.updated_at = utcnow()
+    session.add(db_obj)
+    session.commit()
+    session.refresh(db_obj)
+    return db_obj
+
+
+def delete_sub_port_record(*, session: Session, db_obj: SubPortRecord) -> None:
+    session.delete(db_obj)
+    session.commit()
+
+
+def delete_sub_port_records(
+    *, session: Session, ids: list[uuid.UUID]
+) -> int:
+    records = list(
+        session.exec(
+            select(SubPortRecord).where(SubPortRecord.id.in_(ids))  # type: ignore[attr-defined]
+        ).all()
+    )
+    for record in records:
+        session.delete(record)
+    session.commit()
+    return len(records)
