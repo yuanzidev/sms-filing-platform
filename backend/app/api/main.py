@@ -13,6 +13,7 @@ from app.api.routes import (
     qualifications,
     roles,
     sub_port_generation_rules,
+    sub_port_library,
     users,
     utils,
 )
@@ -31,4 +32,5 @@ api_router.include_router(api_access.router)
 api_router.include_router(qualifications.router)
 api_router.include_router(port_info.router)
 api_router.include_router(sub_port_generation_rules.router)
+api_router.include_router(sub_port_library.router)
 api_router.include_router(utils.router)
