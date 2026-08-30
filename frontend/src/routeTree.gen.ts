@@ -23,6 +23,7 @@ import { Route as authOtpRouteImport } from './routes/(auth)/otp'
 import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-password'
 import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authenticated/settings/route'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
+import { Route as AuthenticatedSubPortsIndexRouteImport } from './routes/_authenticated/sub-ports/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedQualificationsIndexRouteImport } from './routes/_authenticated/qualifications/index'
 import { Route as AuthenticatedPortInfoIndexRouteImport } from './routes/_authenticated/port-info/index'
@@ -108,6 +109,12 @@ const AuthenticatedUsersIndexRoute = AuthenticatedUsersIndexRouteImport.update({
   path: '/users/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSubPortsIndexRoute =
+  AuthenticatedSubPortsIndexRouteImport.update({
+    id: '/sub-ports/',
+    path: '/sub-ports/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSettingsIndexRoute =
   AuthenticatedSettingsIndexRouteImport.update({
     id: '/',
@@ -218,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/port-info': typeof AuthenticatedPortInfoIndexRoute
   '/qualifications': typeof AuthenticatedQualificationsIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/sub-ports': typeof AuthenticatedSubPortsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -246,6 +254,7 @@ export interface FileRoutesByTo {
   '/port-info': typeof AuthenticatedPortInfoIndexRoute
   '/qualifications': typeof AuthenticatedQualificationsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
+  '/sub-ports': typeof AuthenticatedSubPortsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
 }
 export interface FileRoutesById {
@@ -277,6 +286,7 @@ export interface FileRoutesById {
   '/_authenticated/port-info/': typeof AuthenticatedPortInfoIndexRoute
   '/_authenticated/qualifications/': typeof AuthenticatedQualificationsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/_authenticated/sub-ports/': typeof AuthenticatedSubPortsIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
 }
 export interface FileRouteTypes {
@@ -308,6 +318,7 @@ export interface FileRouteTypes {
     | '/port-info'
     | '/qualifications'
     | '/settings/'
+    | '/sub-ports'
     | '/users'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -336,6 +347,7 @@ export interface FileRouteTypes {
     | '/port-info'
     | '/qualifications'
     | '/settings'
+    | '/sub-ports'
     | '/users'
   id:
     | '__root__'
@@ -366,6 +378,7 @@ export interface FileRouteTypes {
     | '/_authenticated/port-info/'
     | '/_authenticated/qualifications/'
     | '/_authenticated/settings/'
+    | '/_authenticated/sub-ports/'
     | '/_authenticated/users/'
   fileRoutesById: FileRoutesById
 }
@@ -481,6 +494,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof AuthenticatedUsersIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/sub-ports/': {
+      id: '/_authenticated/sub-ports/'
+      path: '/sub-ports'
+      fullPath: '/sub-ports'
+      preLoaderRoute: typeof AuthenticatedSubPortsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings/': {
@@ -619,6 +639,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFilingManagementIndexRoute: typeof AuthenticatedFilingManagementIndexRoute
   AuthenticatedPortInfoIndexRoute: typeof AuthenticatedPortInfoIndexRoute
   AuthenticatedQualificationsIndexRoute: typeof AuthenticatedQualificationsIndexRoute
+  AuthenticatedSubPortsIndexRoute: typeof AuthenticatedSubPortsIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
 }
 
@@ -636,6 +657,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedFilingManagementIndexRoute,
   AuthenticatedPortInfoIndexRoute: AuthenticatedPortInfoIndexRoute,
   AuthenticatedQualificationsIndexRoute: AuthenticatedQualificationsIndexRoute,
+  AuthenticatedSubPortsIndexRoute: AuthenticatedSubPortsIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
 }
 

@@ -2,6 +2,7 @@ import {
   IconLayoutDashboard,
   IconFileDescription,
   IconPlugConnected,
+  IconNetwork,
   IconApi,
   IconSettings,
   IconUserCog,
@@ -47,6 +48,11 @@ export const sidebarData: SidebarData = {
           title: '端口管理',
           url: '/port-info',
           icon: IconPlugConnected,
+        },
+        {
+          title: '子端口库',
+          url: '/sub-ports',
+          icon: IconNetwork,
         },
         {
           title: '导出字段组',
