@@ -288,34 +288,34 @@ def test_update_password_me_same_password_error(
 
 
 def test_register_user(client: TestClient, db: Session) -> None:
-    username = random_email()
+    email = random_email()
+    username = random_lower_string()
     password = random_lower_string()
-    full_name = random_lower_string()
-    data = {"email": username, "password": password, "full_name": full_name}
+    data = {"email": email, "password": password, "username": username}
     r = client.post(
         f"{settings.API_V1_STR}/users/signup",
         json=data,
     )
     assert r.status_code == 200
     created_user = r.json()
-    assert created_user["email"] == username
-    assert created_user["full_name"] == full_name
+    assert created_user["email"] == email
+    assert created_user["username"] == username
 
-    user_query = select(User).where(User.email == username)
+    user_query = select(User).where(User.email == email)
     user_db = db.exec(user_query).first()
     assert user_db
-    assert user_db.email == username
-    assert user_db.full_name == full_name
+    assert user_db.email == email
+    assert user_db.username == username
     assert verify_password(password, user_db.hashed_password)
 
 
 def test_register_user_already_exists_error(client: TestClient) -> None:
     password = random_lower_string()
-    full_name = random_lower_string()
+    username = random_lower_string()
     data = {
         "email": settings.FIRST_SUPERUSER,
         "password": password,
-        "full_name": full_name,
+        "username": username,
     }
     r = client.post(
         f"{settings.API_V1_STR}/users/signup",
@@ -409,7 +409,7 @@ def test_delete_user_me(client: TestClient, db: Session) -> None:
     )
     assert r.status_code == 200
     deleted_user = r.json()
-    assert deleted_user["message"] == "User deleted successfully"
+    assert deleted_user["message"] == "用户删除成功"
     result = db.exec(select(User).where(User.id == user_id)).first()
     assert result is None
 
@@ -427,7 +427,7 @@ def test_delete_user_me_as_superuser(
     )
     assert r.status_code == 403
     response = r.json()
-    assert response["detail"] == "Super users are not allowed to delete themselves"
+    assert response["detail"] == "超级用户不能删除自己"
 
 
 def test_delete_user_super_user(
@@ -444,7 +444,7 @@ def test_delete_user_super_user(
     )
     assert r.status_code == 200
     deleted_user = r.json()
-    assert deleted_user["message"] == "User deleted successfully"
+    assert deleted_user["message"] == "用户删除成功"
     result = db.exec(select(User).where(User.id == user_id)).first()
     assert result is None
 
@@ -457,7 +457,7 @@ def test_delete_user_not_found(
         headers=superuser_token_headers,
     )
     assert r.status_code == 404
-    assert r.json()["detail"] == "User not found"
+    assert r.json()["detail"] == "用户不存在"
 
 
 def test_delete_user_current_super_user_error(
@@ -472,7 +472,7 @@ def test_delete_user_current_super_user_error(
         headers=superuser_token_headers,
     )
     assert r.status_code == 403
-    assert r.json()["detail"] == "Super users are not allowed to delete themselves"
+    assert r.json()["detail"] == "超级用户不能删除自己"
 
 
 def test_delete_user_without_privileges(
@@ -488,4 +488,4 @@ def test_delete_user_without_privileges(
         headers=normal_user_token_headers,
     )
     assert r.status_code == 403
-    assert r.json()["detail"] == "The user doesn't have enough privileges"
+    assert r.json()["detail"] == "没有执行此操作的权限，请联系管理员分配"
