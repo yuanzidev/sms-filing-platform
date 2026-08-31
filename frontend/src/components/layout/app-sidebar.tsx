@@ -8,20 +8,22 @@ import {
 import { NavGroup } from '@/components/layout/nav-group'
 import { NavUser } from '@/components/layout/nav-user'
 import { TeamSwitcher } from '@/components/layout/team-switcher'
+import { useNavGroups } from '@/hooks/use-permissions'
 import { sidebarData } from './data/sidebar-data'
 
 /**
  * 应用侧边栏组件
- * 包含团队切换器、导航组和用户面板
+ * 包含团队切换器、导航组（按权限过滤）和用户面板
  */
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const navGroups = useNavGroups()
   return (
     <Sidebar collapsible='icon' variant='floating' {...props}>
       <SidebarHeader>
         <TeamSwitcher teams={sidebarData.teams} />
       </SidebarHeader>
       <SidebarContent>
-        {sidebarData.navGroups.map((props) => (
+        {navGroups.map((props) => (
           <NavGroup key={props.title} {...props} />
         ))}
       </SidebarContent>

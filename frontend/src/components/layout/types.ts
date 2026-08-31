@@ -16,6 +16,8 @@ interface BaseNavItem {
   title: string
   badge?: string
   icon?: React.ElementType
+  /** 访问该菜单所需的权限点（任一满足即可），缺省表示不做限制 */
+  permissions?: string[]
 }
 
 type NavLink = BaseNavItem & {

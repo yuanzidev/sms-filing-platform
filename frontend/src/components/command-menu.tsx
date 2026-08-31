@@ -18,13 +18,14 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command'
-import { sidebarData } from './layout/data/sidebar-data'
+import { useNavGroups } from '@/hooks/use-permissions'
 import { ScrollArea } from './ui/scroll-area'
 
 export function CommandMenu() {
   const navigate = useNavigate()
   const { setTheme } = useTheme()
   const { open, setOpen } = useSearch()
+  const navGroups = useNavGroups()
 
   const runCommand = React.useCallback(
     (command: () => unknown) => {
@@ -40,7 +41,7 @@ export function CommandMenu() {
       <CommandList>
         <ScrollArea type='hover' className='h-72 pr-1'>
           <CommandEmpty>未找到结果。</CommandEmpty>
-          {sidebarData.navGroups.map((group) => (
+          {navGroups.map((group) => (
             <CommandGroup key={group.title} heading={group.title}>
               {group.items.map((navItem, i) => {
                 if (navItem.url)

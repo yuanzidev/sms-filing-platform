@@ -9,7 +9,7 @@ import api from '@/lib/api'
 
 const DEMO_TOKEN = 'demo-static-token-for-display'
 
-const isDemoMode = (): boolean => {
+export const isDemoMode = (): boolean => {
     return localStorage.getItem('access_token') === DEMO_TOKEN
 }
 
