@@ -1,50 +1,70 @@
 """
 Author: yuanzi
 Date: 2025-12-11
-Description: 
+Description: 角色管理路由。列表/详情对所有登录用户开放（用户表单需要角色下拉），
+写操作需要 role:write 权限，超级用户放行。
 """
 import json
 import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import col, delete, func, select
+from sqlmodel import func, select
 
 from app import crud
-from app.api.deps import (
-    CurrentUser,
-    SessionDep,
-    get_current_active_superuser,
-)
+from app.api.deps import SessionDep, require_permission
+from app.core.permissions import PERMISSION_CATALOG
 from app.models import (
     Message,
     Role,
     RoleCreate,
+    RolePublic,
+    RolesPublic,
     RoleUpdate,
     User,
 )
-from typing import List
-from pydantic import BaseModel
 
 router = APIRouter(prefix="/roles", tags=["roles"])
 
 
-class RolePublic(BaseModel):
-    """角色公开模型"""
-    id: str
-    name: str
-    description: str | None
-    permissions: List[str]
-    host_permissions: List[str]
-    created_at: str
-    updated_at: str
-    user_count: int = 0
+def _role_to_public(role: Role, session: Any) -> RolePublic:
+    """数据库角色转换为公开模型：解析权限 JSON 并统计关联用户数"""
+    try:
+        permissions = json.loads(role.permissions) if role.permissions else []
+    except (json.JSONDecodeError, TypeError):
+        permissions = []
+
+    user_count = session.exec(
+        select(func.count()).select_from(User).where(User.role_id == role.id)
+    ).one()
+
+    return RolePublic(
+        id=role.id,
+        name=role.name,
+        description=role.description,
+        permissions=permissions,
+        user_count=int(user_count),
+        created_at=role.created_at,
+        updated_at=role.updated_at,
+    )
 
 
-class RolesPublic(BaseModel):
-    """角色列表响应模型"""
-    data: List[RolePublic]
-    count: int
+@router.get("/permissions/catalog")
+def read_permission_catalog() -> Any:
+    """
+    获取权限点目录（供角色表单渲染）
+    """
+    return [
+        {
+            "module": group.module,
+            "label": group.label,
+            "permissions": [
+                {"code": item.code, "label": item.label}
+                for item in group.permissions
+            ],
+        }
+        for group in PERMISSION_CATALOG
+    ]
 
 
 @router.get("", response_model=RolesPublic)
@@ -59,40 +79,23 @@ def read_roles(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
     statement = select(Role).offset(skip).limit(limit)
     roles = session.exec(statement).all()
 
-    # 处理权限字段，将JSON字符串转换为数组
-    role_list = []
-    for role in roles:
-        try:
-            permissions = json.loads(role.permissions) if role.permissions else []
-        except (json.JSONDecodeError, TypeError):
-            permissions = []
-        
-        try:
-            host_permissions = json.loads(role.host_permissions) if role.host_permissions else []
-        except (json.JSONDecodeError, TypeError):
-            host_permissions = []
-        
-        # 统计该角色下的用户数量
-        user_count = session.exec(
-            select(func.count()).select_from(User).where(User.role_id == role.id)
-        ).one()
-
-        role_list.append(RolePublic(
-            id=str(role.id),
-            name=role.name,
-            description=role.description,
-            permissions=permissions,
-            host_permissions=host_permissions,
-            created_at=role.created_at.isoformat(),
-            updated_at=role.updated_at.isoformat(),
-            user_count=int(user_count),
-        ))
-
-    return RolesPublic(data=role_list, count=count)
+    return RolesPublic(
+        data=[_role_to_public(role, session) for role in roles],
+        count=count,
+    )
 
 
-@router.post("", dependencies=[Depends(get_current_active_superuser)], response_model=RolePublic)
-@router.post("/", dependencies=[Depends(get_current_active_superuser)], response_model=RolePublic, include_in_schema=False)
+@router.post(
+    "",
+    dependencies=[Depends(require_permission("role:write"))],
+    response_model=RolePublic,
+)
+@router.post(
+    "/",
+    dependencies=[Depends(require_permission("role:write"))],
+    response_model=RolePublic,
+    include_in_schema=False,
+)
 def create_role(*, session: SessionDep, role_in: RoleCreate) -> Any:
     """
     创建新角色
@@ -105,33 +108,7 @@ def create_role(*, session: SessionDep, role_in: RoleCreate) -> Any:
         )
 
     role = crud.create_role(session=session, role_create=role_in)
-    
-    # 返回正确格式的角色数据
-    try:
-        permissions = json.loads(role.permissions) if role.permissions else []
-    except (json.JSONDecodeError, TypeError):
-        permissions = []
-    
-    try:
-        host_permissions = json.loads(role.host_permissions) if role.host_permissions else []
-    except (json.JSONDecodeError, TypeError):
-        host_permissions = []
-    
-    # 统计该角色下的用户数量
-    user_count = session.exec(
-        select(func.count()).select_from(User).where(User.role_id == role.id)
-    ).one()
-
-    return RolePublic(
-        id=str(role.id),
-        name=role.name,
-        description=role.description,
-        permissions=permissions,
-        host_permissions=host_permissions,
-        created_at=role.created_at.isoformat(),
-        updated_at=role.updated_at.isoformat(),
-        user_count=int(user_count),
-    )
+    return _role_to_public(role, session)
 
 
 @router.get("/{role_id}", response_model=RolePublic)
@@ -145,38 +122,12 @@ def read_role_by_id(role_id: uuid.UUID, session: SessionDep) -> Any:
             status_code=404,
             detail="角色不存在",
         )
-    
-    # 处理权限字段，将JSON字符串转换为数组
-    try:
-        permissions = json.loads(role.permissions) if role.permissions else []
-    except (json.JSONDecodeError, TypeError):
-        permissions = []
-    
-    try:
-        host_permissions = json.loads(role.host_permissions) if role.host_permissions else []
-    except (json.JSONDecodeError, TypeError):
-        host_permissions = []
-    
-    # 统计该角色下的用户数量
-    user_count = session.exec(
-        select(func.count()).select_from(User).where(User.role_id == role.id)
-    ).one()
-
-    return RolePublic(
-        id=str(role.id),
-        name=role.name,
-        description=role.description,
-        permissions=permissions,
-        host_permissions=host_permissions,
-        created_at=role.created_at.isoformat(),
-        updated_at=role.updated_at.isoformat(),
-        user_count=int(user_count),
-    )
+    return _role_to_public(role, session)
 
 
 @router.patch(
     "/{role_id}",
-    dependencies=[Depends(get_current_active_superuser)],
+    dependencies=[Depends(require_permission("role:write"))],
     response_model=RolePublic,
 )
 def update_role(
@@ -203,30 +154,13 @@ def update_role(
             )
 
     role = crud.update_role(session=session, db_role=role, role_in=role_in)
-    
-    # 返回正确格式的角色数据
-    try:
-        permissions = json.loads(role.permissions) if role.permissions else []
-    except (json.JSONDecodeError, TypeError):
-        permissions = []
-    
-    try:
-        host_permissions = json.loads(role.host_permissions) if role.host_permissions else []
-    except (json.JSONDecodeError, TypeError):
-        host_permissions = []
-    
-    return RolePublic(
-        id=str(role.id),
-        name=role.name,
-        description=role.description,
-        permissions=permissions,
-        host_permissions=host_permissions,
-        created_at=role.created_at.isoformat(),
-        updated_at=role.updated_at.isoformat()
-    )
+    return _role_to_public(role, session)
 
 
-@router.delete("/{role_id}", dependencies=[Depends(get_current_active_superuser)])
+@router.delete(
+    "/{role_id}",
+    dependencies=[Depends(require_permission("role:write"))],
+)
 def delete_role(session: SessionDep, role_id: uuid.UUID) -> Message:
     """
     删除角色
