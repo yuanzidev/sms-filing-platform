@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 
-from app.api.deps import SessionDep, get_current_active_superuser
+from app.api.deps import SessionDep, require_permission
 from app.crud.export_group import get_export_group
 from app.crud.sub_port_record import (
     create_sub_port_record,
@@ -32,11 +32,11 @@ from app.models import (
     SubPortRecordUpdate,
 )
 
-router = APIRouter(
-    prefix="/sub-port-library",
-    tags=["sub-port-library"],
-    dependencies=[Depends(get_current_active_superuser)],
-)
+router = APIRouter(prefix="/sub-port-library", tags=["sub-port-library"])
+
+read_perm = Depends(require_permission("sub_port:read"))
+write_perm = Depends(require_permission("sub_port:write"))
+import_perm = Depends(require_permission("sub_port:import"))
 
 FIXED_HEADERS = ("主端口号", "子端口号", "状态")
 DELETE_MAIN_ALIASES = {"主端口号", "主端口"}
@@ -260,7 +260,7 @@ def _target_detail(target: tuple[str, str]) -> dict[str, str]:
     }
 
 
-@router.get("/template")
+@router.get("/template", dependencies=[import_perm])
 def download_template(*, session: SessionDep, group_id: uuid.UUID) -> Any:
     group = _load_group(session, group_id)
 
@@ -297,7 +297,7 @@ def download_template(*, session: SessionDep, group_id: uuid.UUID) -> Any:
     )
 
 
-@router.post("/import/preview")
+@router.post("/import/preview", dependencies=[import_perm])
 def preview_import(
     *, session: SessionDep, file: UploadFile = File(...), group_id: uuid.UUID = Form(...)
 ) -> Any:
@@ -337,7 +337,7 @@ def preview_import(
     }
 
 
-@router.post("/import")
+@router.post("/import", dependencies=[import_perm])
 def import_sub_ports(
     *, session: SessionDep, file: UploadFile = File(...), group_id: uuid.UUID = Form(...)
 ) -> Any:
@@ -372,7 +372,7 @@ def import_sub_ports(
     }
 
 
-@router.post("/import/parse-delete")
+@router.post("/import/parse-delete", dependencies=[import_perm])
 def parse_delete_list_endpoint(*, session: SessionDep, file: UploadFile = File(...)) -> Any:
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
@@ -396,7 +396,7 @@ def parse_delete_list_endpoint(*, session: SessionDep, file: UploadFile = File(.
     }
 
 
-@router.post("/import/delete")
+@router.post("/import/delete", dependencies=[import_perm])
 def delete_by_list_endpoint(*, session: SessionDep, file: UploadFile = File(...)) -> Any:
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
@@ -424,8 +424,8 @@ def delete_by_list_endpoint(*, session: SessionDep, file: UploadFile = File(...)
     }
 
 
-@router.get("", response_model=SubPortRecordsPublic)
-@router.get("/", include_in_schema=False, response_model=SubPortRecordsPublic)
+@router.get("", dependencies=[read_perm], response_model=SubPortRecordsPublic)
+@router.get("/", dependencies=[read_perm], include_in_schema=False, response_model=SubPortRecordsPublic)
 def read_sub_port_records(
     session: SessionDep,
     page: int = 1,
@@ -447,8 +447,8 @@ def read_sub_port_records(
     )
 
 
-@router.post("", response_model=SubPortRecordPublic)
-@router.post("/", include_in_schema=False, response_model=SubPortRecordPublic)
+@router.post("", dependencies=[write_perm], response_model=SubPortRecordPublic)
+@router.post("/", dependencies=[write_perm], include_in_schema=False, response_model=SubPortRecordPublic)
 def create_sub_port_record_endpoint(
     *, session: SessionDep, create: SubPortRecordCreate
 ) -> Any:
@@ -457,7 +457,7 @@ def create_sub_port_record_endpoint(
     return create_sub_port_record(session=session, create=create)
 
 
-@router.patch("/{id}", response_model=SubPortRecordPublic)
+@router.patch("/{id}", dependencies=[write_perm], response_model=SubPortRecordPublic)
 def update_sub_port_record_endpoint(
     *, session: SessionDep, id: uuid.UUID, update: SubPortRecordUpdate
 ) -> Any:
@@ -473,7 +473,7 @@ def update_sub_port_record_endpoint(
     return update_sub_port_record(session=session, db_obj=db_obj, update=update)
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", dependencies=[write_perm])
 def delete_sub_port_record_endpoint(
     *, session: SessionDep, id: uuid.UUID
 ) -> Message:
@@ -484,7 +484,7 @@ def delete_sub_port_record_endpoint(
     return Message(message="子端口记录删除成功")
 
 
-@router.post("/batch-delete")
+@router.post("/batch-delete", dependencies=[write_perm])
 def batch_delete_sub_port_records_endpoint(
     *, session: SessionDep, body: SubPortBatchDelete
 ) -> Any:

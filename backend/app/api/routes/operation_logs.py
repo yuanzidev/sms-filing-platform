@@ -12,7 +12,7 @@ from sqlmodel import func, select
 
 from app.api.deps import (
     SessionDep,
-    get_current_active_superuser,
+    require_permission,
 )
 from app.models import (
     OperationLog,
@@ -23,9 +23,11 @@ from app.models import (
 
 router = APIRouter(prefix="/operation-logs", tags=["operation-logs"])
 
+read_perm = Depends(require_permission("log:read"))
 
-@router.get("", dependencies=[Depends(get_current_active_superuser)], response_model=OperationLogsPublic)
-@router.get("/", dependencies=[Depends(get_current_active_superuser)], response_model=OperationLogsPublic, include_in_schema=False)
+
+@router.get("", dependencies=[read_perm], response_model=OperationLogsPublic)
+@router.get("/", dependencies=[read_perm], response_model=OperationLogsPublic, include_in_schema=False)
 def read_operation_logs(
     session: SessionDep,
     skip: int = 0,
@@ -66,7 +68,7 @@ def read_operation_logs(
     return OperationLogsPublic(data=logs, count=count)
 
 
-@router.get("/{log_id}", dependencies=[Depends(get_current_active_superuser)], response_model=OperationLogPublic)
+@router.get("/{log_id}", dependencies=[read_perm], response_model=OperationLogPublic)
 def read_operation_log_by_id(log_id: uuid.UUID, session: SessionDep) -> Any:
     """
     根据ID获取操作日志

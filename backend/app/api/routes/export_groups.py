@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 
-from app.api.deps import SessionDep, get_current_active_superuser
+from app.api.deps import SessionDep, require_permission
 from app.crud.export_group import (
     create_export_group,
     delete_export_group,
@@ -30,11 +30,12 @@ from app.models import (
 )
 from app.services.export_field_registry import all_fields
 
-router = APIRouter(
-    prefix="/export-groups",
-    tags=["export-groups"],
-    dependencies=[Depends(get_current_active_superuser)],
-)
+router = APIRouter(prefix="/export-groups", tags=["export-groups"])
+
+read_perm = Depends(require_permission("export_group:read"))
+write_perm = Depends(require_permission("export_group:write"))
+import_perm = Depends(require_permission("export_group:import"))
+export_perm = Depends(require_permission("export_group:export"))
 
 
 def _cell_text(value: Any) -> str:
@@ -54,12 +55,12 @@ def _find_header_index(headers: list[str], candidates: set[str]) -> int | None:
     return None
 
 
-@router.get("/registry", response_model=list[dict])
+@router.get("/registry", dependencies=[read_perm], response_model=list[dict])
 def read_field_registry() -> Any:
     return [{**asdict(f), "id": f.name} for f in all_fields()]
 
 
-@router.get("/registry/template")
+@router.get("/registry/template", dependencies=[import_perm])
 def download_registry_template() -> Any:
     wb = Workbook()
     ws = wb.active
@@ -83,15 +84,15 @@ def download_registry_template() -> Any:
     )
 
 
-@router.get("", response_model=ExportGroupsPublic)
-@router.get("/", include_in_schema=False, response_model=ExportGroupsPublic)
+@router.get("", dependencies=[read_perm], response_model=ExportGroupsPublic)
+@router.get("/", dependencies=[read_perm], include_in_schema=False, response_model=ExportGroupsPublic)
 def read_export_groups(session: SessionDep) -> Any:
     groups = list_export_groups(session=session)
     return ExportGroupsPublic(data=groups, count=len(groups))
 
 
-@router.post("", response_model=ExportGroupPublic)
-@router.post("/", include_in_schema=False, response_model=ExportGroupPublic)
+@router.post("", dependencies=[write_perm], response_model=ExportGroupPublic)
+@router.post("/", dependencies=[write_perm], include_in_schema=False, response_model=ExportGroupPublic)
 def create_export_group_endpoint(
     *, session: SessionDep, create: ExportGroupCreate
 ) -> Any:
@@ -99,7 +100,7 @@ def create_export_group_endpoint(
     return db_obj
 
 
-@router.get("/{id}", response_model=ExportGroupPublic)
+@router.get("/{id}", dependencies=[read_perm], response_model=ExportGroupPublic)
 def read_export_group(*, session: SessionDep, id: uuid.UUID) -> Any:
     db_obj = get_export_group(session=session, id=id)
     if not db_obj:
@@ -107,7 +108,7 @@ def read_export_group(*, session: SessionDep, id: uuid.UUID) -> Any:
     return db_obj
 
 
-@router.patch("/{id}", response_model=ExportGroupPublic)
+@router.patch("/{id}", dependencies=[write_perm], response_model=ExportGroupPublic)
 def update_export_group_endpoint(
     *, session: SessionDep, id: uuid.UUID, update: ExportGroupUpdate
 ) -> Any:
@@ -118,7 +119,7 @@ def update_export_group_endpoint(
     return db_obj
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", dependencies=[write_perm])
 def delete_export_group_endpoint(*, session: SessionDep, id: uuid.UUID) -> Message:
     db_obj = get_export_group(session=session, id=id)
     if not db_obj:
@@ -127,7 +128,7 @@ def delete_export_group_endpoint(*, session: SessionDep, id: uuid.UUID) -> Messa
     return Message(message="导出分组删除成功")
 
 
-@router.get("/{id}/export")
+@router.get("/{id}/export", dependencies=[export_perm])
 def export_export_group(*, session: SessionDep, id: uuid.UUID) -> Any:
     group = get_export_group(session=session, id=id)
     if not group:
@@ -160,7 +161,7 @@ def export_export_group(*, session: SessionDep, id: uuid.UUID) -> Any:
     )
 
 
-@router.post("/import")
+@router.post("/import", dependencies=[import_perm])
 def import_export_group(*, session: SessionDep, file: UploadFile = File(...)) -> Any:
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")

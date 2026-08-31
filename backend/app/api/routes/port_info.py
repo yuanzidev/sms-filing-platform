@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from pydantic import BaseModel
 
-from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
+from app.api.deps import CurrentUser, SessionDep, require_permission
 from app.crud.port_info import (
     create_port_info,
     delete_port_info,
@@ -33,11 +33,11 @@ from app.services.excel_image_extractor import (
 )
 from app.services.operation_log import log_operation
 
-router = APIRouter(
-    prefix="/port-info",
-    tags=["port-info"],
-    dependencies=[Depends(get_current_active_superuser)],
-)
+router = APIRouter(prefix="/port-info", tags=["port-info"])
+
+read_perm = Depends(require_permission("port:read"))
+write_perm = Depends(require_permission("port:write"))
+import_perm = Depends(require_permission("port:import"))
 
 _PORT_HEADER_TO_FIELD = {
     "运营商": "carrier",
@@ -113,7 +113,7 @@ def _validate_port_type(value: str) -> None:
         raise HTTPException(status_code=400, detail=_port_type_error(value))
 
 
-@router.get("/template")
+@router.get("/template", dependencies=[import_perm])
 def download_port_info_template() -> Any:
     from openpyxl.styles import Font
     from PIL import Image, ImageDraw
@@ -196,7 +196,7 @@ def download_port_info_template() -> Any:
     )
 
 
-@router.post("/import/preview")
+@router.post("/import/preview", dependencies=[import_perm])
 def preview_port_info_import(file: UploadFile = File(...)) -> Any:
     """解析 Excel 前 5 行数据并返回预览，供导入前核对表头与数据。"""
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
@@ -250,7 +250,7 @@ def preview_port_info_import(file: UploadFile = File(...)) -> Any:
     }
 
 
-@router.post("/import")
+@router.post("/import", dependencies=[import_perm])
 def import_port_infos(*, session: SessionDep, file: UploadFile = File(...)) -> Any:
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
@@ -545,7 +545,7 @@ class ImportErrorReport(BaseModel):
     errors: list[dict]
 
 
-@router.post("/import/error-report")
+@router.post("/import/error-report", dependencies=[import_perm])
 def download_import_error_report(body: ImportErrorReport) -> Any:
     """Generate an Excel file highlighting import errors."""
     from openpyxl.styles import Font, PatternFill
@@ -581,8 +581,8 @@ def download_import_error_report(body: ImportErrorReport) -> Any:
     )
 
 
-@router.get("", response_model=PortInfosPublic)
-@router.get("/", include_in_schema=False, response_model=PortInfosPublic)
+@router.get("", dependencies=[read_perm], response_model=PortInfosPublic)
+@router.get("/", dependencies=[read_perm], include_in_schema=False, response_model=PortInfosPublic)
 def read_port_infos(
     session: SessionDep,
     page: int = Query(1, ge=1),
@@ -609,8 +609,8 @@ def read_port_infos(
     return PortInfosPublic(data=items, total=total, page=page, page_size=page_size)
 
 
-@router.post("", response_model=PortInfoPublic)
-@router.post("/", include_in_schema=False, response_model=PortInfoPublic)
+@router.post("", dependencies=[write_perm], response_model=PortInfoPublic)
+@router.post("/", dependencies=[write_perm], include_in_schema=False, response_model=PortInfoPublic)
 def create_port_info_endpoint(
     *,
     session: SessionDep,
@@ -647,7 +647,7 @@ def create_port_info_endpoint(
     return result
 
 
-@router.get("/{id}", response_model=PortInfoPublic)
+@router.get("/{id}", dependencies=[read_perm], response_model=PortInfoPublic)
 def read_port_info(*, session: SessionDep, id: uuid.UUID) -> Any:
     db_obj = get_port_info(session=session, id=id)
     if not db_obj:
@@ -655,7 +655,7 @@ def read_port_info(*, session: SessionDep, id: uuid.UUID) -> Any:
     return db_obj
 
 
-@router.patch("/{id}", response_model=PortInfoPublic)
+@router.patch("/{id}", dependencies=[write_perm], response_model=PortInfoPublic)
 def update_port_info_endpoint(
     *,
     session: SessionDep,
@@ -681,7 +681,7 @@ def update_port_info_endpoint(
     return result
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", dependencies=[write_perm])
 def delete_port_info_endpoint(
     *, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request
 ) -> Message:

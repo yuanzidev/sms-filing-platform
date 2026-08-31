@@ -12,7 +12,7 @@ from sqlmodel import func, select
 
 from app.api.deps import (
     SessionDep,
-    get_current_active_superuser,
+    require_permission,
 )
 from app.models import (
     LoginLog,
@@ -23,9 +23,12 @@ from app.models import (
 
 router = APIRouter(prefix="/login-logs", tags=["login-logs"])
 
+read_perm = Depends(require_permission("log:read"))
+write_perm = Depends(require_permission("log:write"))
 
-@router.get("", dependencies=[Depends(get_current_active_superuser)], response_model=LoginLogsPublic)
-@router.get("/", dependencies=[Depends(get_current_active_superuser)], response_model=LoginLogsPublic, include_in_schema=False)
+
+@router.get("", dependencies=[read_perm], response_model=LoginLogsPublic)
+@router.get("/", dependencies=[read_perm], response_model=LoginLogsPublic, include_in_schema=False)
 def read_login_logs(
     session: SessionDep,
     skip: int = 0,
@@ -62,7 +65,7 @@ def read_login_logs(
     return LoginLogsPublic(data=logs, count=count)
 
 
-@router.get("/{log_id}", dependencies=[Depends(get_current_active_superuser)], response_model=LoginLogPublic)
+@router.get("/{log_id}", dependencies=[read_perm], response_model=LoginLogPublic)
 def read_login_log_by_id(log_id: uuid.UUID, session: SessionDep) -> Any:
     """
     根据ID获取登录日志
@@ -76,7 +79,7 @@ def read_login_log_by_id(log_id: uuid.UUID, session: SessionDep) -> Any:
     return log
 
 
-@router.delete("/{log_id}", dependencies=[Depends(get_current_active_superuser)])
+@router.delete("/{log_id}", dependencies=[write_perm])
 def delete_login_log(session: SessionDep, log_id: uuid.UUID) -> Message:
     """
     删除登录日志
@@ -90,8 +93,8 @@ def delete_login_log(session: SessionDep, log_id: uuid.UUID) -> Message:
     return Message(message="登录日志删除成功")
 
 
-@router.delete("", dependencies=[Depends(get_current_active_superuser)])
-@router.delete("/", dependencies=[Depends(get_current_active_superuser)], include_in_schema=False)
+@router.delete("", dependencies=[write_perm])
+@router.delete("/", dependencies=[write_perm], include_in_schema=False)
 def clear_login_logs(
     session: SessionDep,
     before_date: datetime | None = None,

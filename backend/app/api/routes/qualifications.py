@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from pydantic import BaseModel
 
-from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
+from app.api.deps import CurrentUser, SessionDep, require_permission
 from app.crud.qualification import (
     create_qualification,
     delete_qualification,
@@ -36,11 +36,11 @@ from app.services.excel_image_extractor import (
 )
 from app.services.operation_log import log_operation
 
-router = APIRouter(
-    prefix="/qualifications",
-    tags=["qualifications"],
-    dependencies=[Depends(get_current_active_superuser)],
-)
+router = APIRouter(prefix="/qualifications", tags=["qualifications"])
+
+read_perm = Depends(require_permission("qualification:read"))
+write_perm = Depends(require_permission("qualification:write"))
+import_perm = Depends(require_permission("qualification:import"))
 
 _QUALIFICATION_HEADER_TO_FIELD = {
     "企业名称": "enterprise_name",
@@ -130,7 +130,7 @@ _QUALIFICATION_HEADERS = [
 ]
 
 
-@router.get("/template")
+@router.get("/template", dependencies=[import_perm])
 def download_qualification_template() -> Any:
     from openpyxl.styles import Font
     from PIL import Image, ImageDraw
@@ -235,7 +235,7 @@ def download_qualification_template() -> Any:
     )
 
 
-@router.post("/import/preview")
+@router.post("/import/preview", dependencies=[import_perm])
 def preview_qualifications_import(file: UploadFile = File(...)) -> Any:
     """解析 Excel 前 5 行数据并返回预览，供导入前核对表头与数据。"""
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
@@ -289,7 +289,7 @@ def preview_qualifications_import(file: UploadFile = File(...)) -> Any:
     }
 
 
-@router.post("/import")
+@router.post("/import", dependencies=[import_perm])
 def import_qualifications(*, session: SessionDep, file: UploadFile = File(...)) -> Any:
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
@@ -516,7 +516,7 @@ class ImportErrorReport(BaseModel):
     errors: list[dict]
 
 
-@router.post("/import/error-report")
+@router.post("/import/error-report", dependencies=[import_perm])
 def download_import_error_report(body: ImportErrorReport) -> Any:
     """Generate an Excel file highlighting import errors."""
     from openpyxl.styles import Font, PatternFill
@@ -552,7 +552,7 @@ def download_import_error_report(body: ImportErrorReport) -> Any:
     )
 
 
-@router.post("/batch-by-signatures", response_model=BatchSignatureResponse)
+@router.post("/batch-by-signatures", dependencies=[write_perm], response_model=BatchSignatureResponse)
 def batch_by_signatures(*, session: SessionDep, body: BatchSignatureRequest) -> Any:
     qualified, unmatched = get_qualifications_by_signatures(
         session=session, signatures=body.signatures
@@ -563,8 +563,8 @@ def batch_by_signatures(*, session: SessionDep, body: BatchSignatureRequest) -> 
     )
 
 
-@router.get("", response_model=QualificationInfosPublic)
-@router.get("/", include_in_schema=False, response_model=QualificationInfosPublic)
+@router.get("", dependencies=[read_perm], response_model=QualificationInfosPublic)
+@router.get("/", dependencies=[read_perm], include_in_schema=False, response_model=QualificationInfosPublic)
 def read_qualifications(
     session: SessionDep,
     page: int = Query(1, ge=1),
@@ -589,8 +589,8 @@ def read_qualifications(
     )
 
 
-@router.post("", response_model=QualificationInfoPublic)
-@router.post("/", include_in_schema=False, response_model=QualificationInfoPublic)
+@router.post("", dependencies=[write_perm], response_model=QualificationInfoPublic)
+@router.post("/", dependencies=[write_perm], include_in_schema=False, response_model=QualificationInfoPublic)
 def create_qualification_endpoint(
     *,
     session: SessionDep,
@@ -610,7 +610,7 @@ def create_qualification_endpoint(
     return result
 
 
-@router.get("/{id}", response_model=QualificationInfoPublic)
+@router.get("/{id}", dependencies=[read_perm], response_model=QualificationInfoPublic)
 def read_qualification(*, session: SessionDep, id: uuid.UUID) -> Any:
     db_obj = get_qualification(session=session, id=id)
     if not db_obj:
@@ -618,7 +618,7 @@ def read_qualification(*, session: SessionDep, id: uuid.UUID) -> Any:
     return db_obj
 
 
-@router.patch("/{id}", response_model=QualificationInfoPublic)
+@router.patch("/{id}", dependencies=[write_perm], response_model=QualificationInfoPublic)
 def update_qualification_endpoint(
     *,
     session: SessionDep,
@@ -642,7 +642,7 @@ def update_qualification_endpoint(
     return result
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", dependencies=[write_perm])
 def delete_qualification_endpoint(
     *, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request
 ) -> Message:

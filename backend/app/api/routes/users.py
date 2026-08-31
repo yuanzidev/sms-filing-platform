@@ -13,7 +13,8 @@ from app import crud
 from app.api.deps import (
     CurrentUser,
     SessionDep,
-    get_current_active_superuser,
+    get_user_permissions,
+    require_permission,
 )
 from app.core.config import settings
 from app.core.security import get_password_hash, verify_password
@@ -35,16 +36,19 @@ from app.utils import generate_new_account_email, send_email
 
 router = APIRouter(prefix="/users", tags=["users"])
 
+read_perm = Depends(require_permission("user:read"))
+write_perm = Depends(require_permission("user:write"))
+
 
 @router.get(
     "",
-    dependencies=[Depends(get_current_active_superuser)],
+    dependencies=[read_perm],
     response_model=UsersPublic,
 )
 @router.get(
     "/",
     include_in_schema=False,
-    dependencies=[Depends(get_current_active_superuser)],
+    dependencies=[read_perm],
     response_model=UsersPublic,
 )
 def read_users(
@@ -78,10 +82,10 @@ def read_users(
 
 
 @router.post(
-    "", dependencies=[Depends(get_current_active_superuser)], response_model=UserPublic
+    "", dependencies=[write_perm], response_model=UserPublic
 )
 @router.post(
-    "/", dependencies=[Depends(get_current_active_superuser)], response_model=UserPublic, include_in_schema=False
+    "/", dependencies=[write_perm], response_model=UserPublic, include_in_schema=False
 )
 def create_user(*, session: SessionDep, user_in: UserCreate) -> Any:
     """
@@ -157,6 +161,17 @@ def read_user_me(current_user: CurrentUser) -> Any:
     return current_user
 
 
+@router.get("/me/permissions")
+def read_my_permissions(current_user: CurrentUser) -> Any:
+    """
+    获取当前用户的权限点列表（前端菜单/按钮显隐依据）
+    """
+    return {
+        "permissions": get_user_permissions(current_user),
+        "is_superuser": current_user.is_superuser,
+    }
+
+
 @router.delete("/me", response_model=Message)
 def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
     """
@@ -164,11 +179,11 @@ def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
     """
     if current_user.is_superuser:
         raise HTTPException(
-            status_code=403, detail="Super users are not allowed to delete themselves"
+            status_code=403, detail="超级用户不能删除自己"
         )
     session.delete(current_user)
     session.commit()
-    return Message(message="User deleted successfully")
+    return Message(message="用户删除成功")
 
 
 @router.post("/signup", response_model=UserPublic)
@@ -194,27 +209,28 @@ def read_user_by_id(
     """
     Get a specific user by id.
     """
-    user = crud.get_user_by_id(session=session, user_id=user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="用户不存在")
-    if user == current_user:
-        return user
-    if not current_user.is_superuser:
+    if user_id != current_user.id and "user:read" not in get_user_permissions(
+        current_user
+    ):
         raise HTTPException(
             status_code=403,
             detail="The user doesn't have enough privileges",
         )
+    user = crud.get_user_by_id(session=session, user_id=user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
     return user
 
 
 @router.patch(
     "/{user_id}",
-    dependencies=[Depends(get_current_active_superuser)],
+    dependencies=[write_perm],
     response_model=UserPublic,
 )
 def update_user(
     *,
     session: SessionDep,
+    current_user: CurrentUser,
     user_id: uuid.UUID,
     user_in: UserUpdate,
 ) -> Any:
@@ -228,6 +244,13 @@ def update_user(
             status_code=404,
             detail="The user with this id does not exist in the system",
         )
+    # 超级用户身份的授予/撤销仅超级用户可操作
+    user_update_data = user_in.model_dump(exclude_unset=True)
+    if "is_superuser" in user_update_data and not current_user.is_superuser:
+        raise HTTPException(
+            status_code=403,
+            detail="只有超级用户可以修改超级用户标识",
+        )
     if user_in.email:
         existing_user = crud.get_user_by_email(session=session, email=user_in.email)
         if existing_user and existing_user.id != user_id:
@@ -239,7 +262,7 @@ def update_user(
     return db_user
 
 
-@router.delete("/{user_id}", dependencies=[Depends(get_current_active_superuser)])
+@router.delete("/{user_id}", dependencies=[write_perm])
 def delete_user(
     session: SessionDep, current_user: CurrentUser, user_id: uuid.UUID
 ) -> Message:
@@ -257,7 +280,7 @@ def delete_user(
     return Message(message="用户删除成功")
 
 
-@router.patch("/{user_id}/reset-password", dependencies=[Depends(get_current_active_superuser)])
+@router.patch("/{user_id}/reset-password", dependencies=[write_perm])
 def reset_user_password(
     session: SessionDep, user_id: uuid.UUID, password_data: ResetPassword
 ) -> Message:
@@ -279,7 +302,7 @@ class UserStatusUpdate(SQLModel):
     status: UserStatus
 
 
-@router.patch("/{user_id}/status", dependencies=[Depends(get_current_active_superuser)])
+@router.patch("/{user_id}/status", dependencies=[write_perm])
 def update_user_status(
     session: SessionDep, user_id: uuid.UUID, body: UserStatusUpdate
 ) -> Message:
@@ -296,7 +319,7 @@ def update_user_status(
     return Message(message=f"用户状态已更新为 {body.status.value}")
 
 
-@router.patch("/{user_id}/enable", dependencies=[Depends(get_current_active_superuser)])
+@router.patch("/{user_id}/enable", dependencies=[write_perm])
 def enable_user(session: SessionDep, user_id: uuid.UUID) -> Message:
     """
     启用用户
@@ -312,7 +335,7 @@ def enable_user(session: SessionDep, user_id: uuid.UUID) -> Message:
     return Message(message="用户已启用")
 
 
-@router.patch("/{user_id}/disable", dependencies=[Depends(get_current_active_superuser)])
+@router.patch("/{user_id}/disable", dependencies=[write_perm])
 def disable_user(session: SessionDep, user_id: uuid.UUID) -> Message:
     """
     禁用用户

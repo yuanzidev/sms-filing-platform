@@ -7,13 +7,13 @@ from datetime import date, datetime
 from typing import Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from sqlmodel import select
 
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import CurrentUser, SessionDep, require_permission
 from app.core.storage import get_storage
 from app.crud.export_group import get_export_group
 from app.crud.filing_sub_port_usage import (
@@ -50,6 +50,10 @@ from app.services.sub_port_allocator import (
 )
 
 router = APIRouter(prefix="/filing-tasks", tags=["filing-tasks"])
+
+read_perm = Depends(require_permission("filing:read"))
+write_perm = Depends(require_permission("filing:write"))
+export_perm = Depends(require_permission("filing:export"))
 
 
 def get_field_value(
@@ -479,10 +483,9 @@ def _task_to_detail(session, task) -> FilingTaskDetail:
     )
 
 
-@router.get("/sub-port-availability")
+@router.get("/sub-port-availability", dependencies=[read_perm])
 def check_sub_port_availability(
     session: SessionDep,
-    _current_user: CurrentUser,
     main_port_numbers: str = Query(...),
     range_start: int = Query(...),
     range_end: int = Query(...),
@@ -514,11 +517,10 @@ def check_sub_port_availability(
     return result
 
 
-@router.get("", response_model=FilingTasksPublic)
-@router.get("/", include_in_schema=False, response_model=FilingTasksPublic)
+@router.get("", dependencies=[read_perm], response_model=FilingTasksPublic)
+@router.get("/", dependencies=[read_perm], include_in_schema=False, response_model=FilingTasksPublic)
 def read_tasks(
     session: SessionDep,
-    _current_user: CurrentUser,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     start_date: date | None = None,
@@ -538,7 +540,7 @@ def read_tasks(
     return FilingTasksPublic(data=data, total=total, page=page, page_size=page_size)
 
 
-@router.get("/{id}", response_model=FilingTaskDetail)
+@router.get("/{id}", dependencies=[read_perm], response_model=FilingTaskDetail)
 def read_task(*, session: SessionDep, id: uuid.UUID) -> Any:
     task = get_filing_task(session=session, id=id)
     if not task:
@@ -546,8 +548,8 @@ def read_task(*, session: SessionDep, id: uuid.UUID) -> Any:
     return _task_to_detail(session, task)
 
 
-@router.post("", response_model=FilingTaskDetail)
-@router.post("/", include_in_schema=False, response_model=FilingTaskDetail)
+@router.post("", dependencies=[write_perm], response_model=FilingTaskDetail)
+@router.post("/", dependencies=[write_perm], include_in_schema=False, response_model=FilingTaskDetail)
 def create_task(
     *,
     session: SessionDep,
@@ -730,7 +732,7 @@ def create_task(
     return _task_to_detail(session, task)
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", dependencies=[write_perm])
 def delete_task(
     *, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request
 ) -> Message:
@@ -759,7 +761,7 @@ def delete_task(
     return Message(message="报备任务删除成功")
 
 
-@router.get("/{id}/download")
+@router.get("/{id}/download", dependencies=[export_perm])
 def download_filing_task(*, session: SessionDep, id: uuid.UUID) -> Any:
     task = get_filing_task(session=session, id=id)
     if not task:
@@ -791,7 +793,7 @@ def download_filing_task(*, session: SessionDep, id: uuid.UUID) -> Any:
     )
 
 
-@router.post("/{id}/regenerate")
+@router.post("/{id}/regenerate", dependencies=[write_perm])
 def regenerate_filing_task(
     *, session: SessionDep, id: uuid.UUID, current_user: CurrentUser, request: Request
 ) -> Any:

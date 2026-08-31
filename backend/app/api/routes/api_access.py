@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.deps import SessionDep, get_current_active_superuser
+from app.api.deps import SessionDep, require_permission
 from app.crud.api_access import (
     create_api_access_config,
     delete_api_access_config,
@@ -20,27 +20,26 @@ from app.models import (
     Message,
 )
 
-router = APIRouter(
-    prefix="/api-access",
-    tags=["api-access"],
-    dependencies=[Depends(get_current_active_superuser)],
-)
+router = APIRouter(prefix="/api-access", tags=["api-access"])
+
+read_perm = Depends(require_permission("api_access:read"))
+write_perm = Depends(require_permission("api_access:write"))
 
 
-@router.get("", response_model=ApiAccessConfigsPublic)
-@router.get("/", include_in_schema=False, response_model=ApiAccessConfigsPublic)
+@router.get("", dependencies=[read_perm], response_model=ApiAccessConfigsPublic)
+@router.get("/", dependencies=[read_perm], include_in_schema=False, response_model=ApiAccessConfigsPublic)
 def read_api_access_configs(session: SessionDep) -> Any:
     configs = list_api_access_configs(session=session)
     return ApiAccessConfigsPublic(data=configs, count=len(configs))
 
 
-@router.post("", response_model=ApiAccessConfigPublic)
-@router.post("/", include_in_schema=False, response_model=ApiAccessConfigPublic)
+@router.post("", dependencies=[write_perm], response_model=ApiAccessConfigPublic)
+@router.post("/", dependencies=[write_perm], include_in_schema=False, response_model=ApiAccessConfigPublic)
 def create_api_endpoint(*, session: SessionDep, create: ApiAccessConfigCreate) -> Any:
     return create_api_access_config(session=session, create=create)
 
 
-@router.get("/{id}", response_model=ApiAccessConfigPublic)
+@router.get("/{id}", dependencies=[read_perm], response_model=ApiAccessConfigPublic)
 def read_api_access_config(*, session: SessionDep, id: uuid.UUID) -> Any:
     db_obj = get_api_access_config(session=session, id=id)
     if not db_obj:
@@ -48,7 +47,7 @@ def read_api_access_config(*, session: SessionDep, id: uuid.UUID) -> Any:
     return db_obj
 
 
-@router.patch("/{id}", response_model=ApiAccessConfigPublic)
+@router.patch("/{id}", dependencies=[write_perm], response_model=ApiAccessConfigPublic)
 def update_api_endpoint(*, session: SessionDep, id: uuid.UUID, update: ApiAccessConfigUpdate) -> Any:
     db_obj = get_api_access_config(session=session, id=id)
     if not db_obj:
@@ -56,7 +55,7 @@ def update_api_endpoint(*, session: SessionDep, id: uuid.UUID, update: ApiAccess
     return update_api_access_config(session=session, db_obj=db_obj, update=update)
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", dependencies=[write_perm])
 def delete_api_endpoint(*, session: SessionDep, id: uuid.UUID) -> Message:
     db_obj = get_api_access_config(session=session, id=id)
     if not db_obj:
@@ -65,7 +64,7 @@ def delete_api_endpoint(*, session: SessionDep, id: uuid.UUID) -> Message:
     return Message(message="API接入配置删除成功")
 
 
-@router.get("/{id}/data")
+@router.get("/{id}/data", dependencies=[read_perm])
 def read_api_access_data(
     *, session: SessionDep, id: uuid.UUID,
     page: int = Query(1, ge=1),
