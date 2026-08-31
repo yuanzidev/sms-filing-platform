@@ -34,6 +34,7 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
+import { usePermissions } from '@/hooks/use-permissions'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ActionIconButton } from '@/components/shared/action-icon-button'
@@ -86,6 +87,7 @@ export function FilingManagementPage() {
   const [detailId, setDetailId] = useState<string | null>(null)
   const [regenerating, setRegenerating] = useState<string | null>(null)
   const queryClient = useQueryClient()
+  const { has } = usePermissions()
 
   const filters = {
     page,
@@ -201,25 +203,29 @@ export function FilingManagementPage() {
               tone='view'
               onClick={() => setDetailId(row.original.id)}
             />
-            <ActionIconButton
-              label='下载'
-              icon='download'
-              tone='download'
-              disabled={regenerating === row.original.id}
-              onClick={() => handleDownload(row.original.id)}
-            />
-            <ActionIconButton
-              label='删除'
-              icon='delete'
-              tone='delete'
-              onClick={() => setDeleteId(row.original.id)}
-            />
+            {has('filing:export') && (
+              <ActionIconButton
+                label='下载'
+                icon='download'
+                tone='download'
+                disabled={regenerating === row.original.id}
+                onClick={() => handleDownload(row.original.id)}
+              />
+            )}
+            {has('filing:write') && (
+              <ActionIconButton
+                label='删除'
+                icon='delete'
+                tone='delete'
+                onClick={() => setDeleteId(row.original.id)}
+              />
+            )}
           </div>
         ),
       },
     ],
     // handleDownload 依赖 tasks，随列表刷新重新生成闭包，避免下载时拿不到最新任务数据
-    [handleDownload, regenerating]
+    [handleDownload, regenerating, has]
   )
 
   return (
@@ -250,12 +256,14 @@ export function FilingManagementPage() {
               <RefreshCw className='mr-2 h-4 w-4' />
               刷新
             </Button>
-            <Button asChild>
-              <Link to='/filing-management/create'>
-                <Plus className='mr-2 h-4 w-4' />
-                新建报备
-              </Link>
-            </Button>
+            {has('filing:write') && (
+              <Button asChild>
+                <Link to='/filing-management/create'>
+                  <Plus className='mr-2 h-4 w-4' />
+                  新建报备
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -414,7 +422,7 @@ export function FilingManagementPage() {
                     )}
                   </div>
                 </div>
-                {taskDetail.download_url && (
+                {taskDetail.download_url && has('filing:export') && (
                   <Button
                     className='w-full'
                     onClick={() =>

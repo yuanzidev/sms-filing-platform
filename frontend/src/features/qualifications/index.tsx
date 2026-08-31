@@ -35,6 +35,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
+import { usePermissions } from '@/hooks/use-permissions'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ActionIconButton } from '@/components/shared/action-icon-button'
@@ -70,6 +71,7 @@ export function QualificationsPage() {
     sms_signature?: string
   }>({})
   const queryClient = useQueryClient()
+  const { has } = usePermissions()
 
   const { data, isLoading } = useQuery({
     queryKey: [
@@ -174,29 +176,33 @@ export function QualificationsPage() {
                 setDetailTarget(row.original)
               }}
             />
-            <ActionIconButton
-              label='编辑'
-              icon='edit'
-              tone='edit'
-              onClick={() => {
-                setSelected(row.original)
-                setDialogOpen(true)
-              }}
-            />
-            <ActionIconButton
-              label='删除'
-              icon='delete'
-              tone='delete'
-              onClick={() => {
-                setToDelete(row.original)
-                setDeleteDialogOpen(true)
-              }}
-            />
+            {has('qualification:write') && (
+              <ActionIconButton
+                label='编辑'
+                icon='edit'
+                tone='edit'
+                onClick={() => {
+                  setSelected(row.original)
+                  setDialogOpen(true)
+                }}
+              />
+            )}
+            {has('qualification:write') && (
+              <ActionIconButton
+                label='删除'
+                icon='delete'
+                tone='delete'
+                onClick={() => {
+                  setToDelete(row.original)
+                  setDeleteDialogOpen(true)
+                }}
+              />
+            )}
           </div>
         ),
       },
     ],
-    []
+    [has]
   )
 
   return (
@@ -218,27 +224,33 @@ export function QualificationsPage() {
             </p>
           </div>
           <div className='flex space-x-2'>
-            <Button
-              onClick={() => {
-                setSelected(undefined)
-                setDialogOpen(true)
-              }}
-            >
-              <Plus className='mr-2 h-4 w-4' />
-              新建资质
-            </Button>
-            <Button variant='outline' onClick={() => setImportDialogOpen(true)}>
-              <Upload className='mr-2 h-4 w-4' />
-              导入数据
-            </Button>
-            <Button
-              variant='outline'
-              onClick={() => downloadQualificationTemplate()}
-            >
-              <Download className='mr-2 h-4 w-4' />
-              下载模板
-            </Button>
-            {selectedCount > 0 && (
+            {has('qualification:write') && (
+              <Button
+                onClick={() => {
+                  setSelected(undefined)
+                  setDialogOpen(true)
+                }}
+              >
+                <Plus className='mr-2 h-4 w-4' />
+                新建资质
+              </Button>
+            )}
+            {has('qualification:import') && (
+              <>
+                <Button variant='outline' onClick={() => setImportDialogOpen(true)}>
+                  <Upload className='mr-2 h-4 w-4' />
+                  导入数据
+                </Button>
+                <Button
+                  variant='outline'
+                  onClick={() => downloadQualificationTemplate()}
+                >
+                  <Download className='mr-2 h-4 w-4' />
+                  下载模板
+                </Button>
+              </>
+            )}
+            {has('qualification:write') && selectedCount > 0 && (
               <Button variant='destructive' onClick={handleBatchDelete}>
                 <Trash2 className='mr-2 h-4 w-4' />
                 删除 ({selectedCount})

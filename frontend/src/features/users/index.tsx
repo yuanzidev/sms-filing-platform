@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
+import { usePermissions } from '@/hooks/use-permissions'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
@@ -35,6 +36,7 @@ export function UsersPage() {
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const queryClient = useQueryClient()
+  const { has } = usePermissions()
 
   const { data, isLoading } = useQuery({
     queryKey: ['users'],
@@ -103,10 +105,12 @@ export function UsersPage() {
               <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               刷新
             </Button>
-            <Button onClick={() => { setSelectedUser(undefined); setDialogOpen(true) }}>
-              <Plus className="mr-2 h-4 w-4" />
-              新建用户
-            </Button>
+            {has('user:write') && (
+              <Button onClick={() => { setSelectedUser(undefined); setDialogOpen(true) }}>
+                <Plus className="mr-2 h-4 w-4" />
+                新建用户
+              </Button>
+            )}
           </div>
         </div>
 
@@ -119,7 +123,7 @@ export function UsersPage() {
               onEnable: (id) => enableMutation.mutate(id),
               onDisable: (id) => disableMutation.mutate(id),
               onResetPassword: (user) => { setSelectedUser(user); setPasswordDialogOpen(true) },
-            })}
+            }, { canWrite: has('user:write') })}
           />
         </div>
       </Main>

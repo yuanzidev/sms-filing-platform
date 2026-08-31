@@ -30,6 +30,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
+import { usePermissions } from '@/hooks/use-permissions'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ActionIconButton } from '@/components/shared/action-icon-button'
@@ -43,6 +44,7 @@ export function ExportGroupsPage() {
   const [toDelete, setToDelete] = useState<ExportGroup | undefined>()
   const [importOpen, setImportOpen] = useState(false)
   const queryClient = useQueryClient()
+  const { has } = usePermissions()
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['export-groups'],
@@ -135,21 +137,27 @@ export function ExportGroupsPage() {
             </p>
           </div>
           <div className='flex space-x-2'>
-            <Button variant='outline' onClick={() => setImportOpen(true)}>
-              导入字段组
-            </Button>
-            <Button variant='outline' onClick={handleDownloadTemplate}>
-              下载字段编码表
-            </Button>
-            <Button
-              onClick={() => {
-                setSelected(undefined)
-                setDialogOpen(true)
-              }}
-            >
-              <Plus className='mr-2 h-4 w-4' />
-              新建字段组
-            </Button>
+            {has('export_group:import') && (
+              <>
+                <Button variant='outline' onClick={() => setImportOpen(true)}>
+                  导入字段组
+                </Button>
+                <Button variant='outline' onClick={handleDownloadTemplate}>
+                  下载字段编码表
+                </Button>
+              </>
+            )}
+            {has('export_group:write') && (
+              <Button
+                onClick={() => {
+                  setSelected(undefined)
+                  setDialogOpen(true)
+                }}
+              >
+                <Plus className='mr-2 h-4 w-4' />
+                新建字段组
+              </Button>
+            )}
             <Button
               variant='outline'
               onClick={() =>
@@ -180,15 +188,17 @@ export function ExportGroupsPage() {
             title='暂无一键导出字段组'
             description='创建字段组后，可以复用同一套导出字段和排序规则。'
             action={
-              <Button
-                onClick={() => {
-                  setSelected(undefined)
-                  setDialogOpen(true)
-                }}
-              >
-                <Plus className='mr-2 h-4 w-4' />
-                创建第一个字段组
-              </Button>
+              has('export_group:write') && (
+                <Button
+                  onClick={() => {
+                    setSelected(undefined)
+                    setDialogOpen(true)
+                  }}
+                >
+                  <Plus className='mr-2 h-4 w-4' />
+                  创建第一个字段组
+                </Button>
+              )
             }
           />
         ) : (
@@ -199,27 +209,33 @@ export function ExportGroupsPage() {
                   <div className='flex items-start justify-between'>
                     <CardTitle className='text-base'>{group.name}</CardTitle>
                     <div className='flex gap-1'>
-                      <ActionIconButton
-                        label='导出'
-                        icon='download'
-                        tone='download'
-                        onClick={() => handleExport(group.id)}
-                      />
-                      <ActionIconButton
-                        label='编辑'
-                        icon='edit'
-                        tone='edit'
-                        onClick={() => {
-                          setSelected(group)
-                          setDialogOpen(true)
-                        }}
-                      />
-                      <ActionIconButton
-                        label='删除'
-                        icon='delete'
-                        tone='delete'
-                        onClick={() => setToDelete(group)}
-                      />
+                      {has('export_group:export') && (
+                        <ActionIconButton
+                          label='导出'
+                          icon='download'
+                          tone='download'
+                          onClick={() => handleExport(group.id)}
+                        />
+                      )}
+                      {has('export_group:write') && (
+                        <ActionIconButton
+                          label='编辑'
+                          icon='edit'
+                          tone='edit'
+                          onClick={() => {
+                            setSelected(group)
+                            setDialogOpen(true)
+                          }}
+                        />
+                      )}
+                      {has('export_group:write') && (
+                        <ActionIconButton
+                          label='删除'
+                          icon='delete'
+                          tone='delete'
+                          onClick={() => setToDelete(group)}
+                        />
+                      )}
                     </div>
                   </div>
                 </CardHeader>

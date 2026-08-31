@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/card'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
+import { usePermissions } from '@/hooks/use-permissions'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ActionIconButton } from '@/components/shared/action-icon-button'
@@ -44,6 +45,7 @@ import { ThemeSwitch } from '@/components/theme-switch'
 export function LoginLogsPage() {
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
   const queryClient = useQueryClient()
+  const { has } = usePermissions()
 
   const { data, isLoading } = useQuery({
     queryKey: ['login-logs'],
@@ -120,14 +122,16 @@ export function LoginLogsPage() {
               />
               刷新
             </Button>
-            <Button
-              variant='destructive'
-              onClick={() => setClearDialogOpen(true)}
-              disabled={logs.length === 0}
-            >
-              <Trash2 className='mr-2 h-4 w-4' />
-              清理日志
-            </Button>
+            {has('log:write') && (
+              <Button
+                variant='destructive'
+                onClick={() => setClearDialogOpen(true)}
+                disabled={logs.length === 0}
+              >
+                <Trash2 className='mr-2 h-4 w-4' />
+                清理日志
+              </Button>
+            )}
           </div>
         </div>
 
@@ -141,12 +145,14 @@ export function LoginLogsPage() {
                     <CardTitle className='text-lg'>{log.username}</CardTitle>
                     {getStatusBadge(log.status)}
                   </div>
-                  <ActionIconButton
-                    label='删除'
-                    icon='delete'
-                    tone='delete'
-                    onClick={() => deleteMutation.mutate(log.id)}
-                  />
+                  {has('log:write') && (
+                    <ActionIconButton
+                      label='删除'
+                      icon='delete'
+                      tone='delete'
+                      onClick={() => deleteMutation.mutate(log.id)}
+                    />
+                  )}
                 </div>
                 <CardDescription>
                   登录时间: {formatCN(log.login_time, { withSeconds: true })}

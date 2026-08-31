@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type ColumnDef, type RowSelectionState } from '@tanstack/react-table'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
+import { usePermissions } from '@/hooks/use-permissions'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
@@ -93,6 +94,7 @@ function getFieldLabel(name: string): string {
 
 export function FilingCreatePage() {
   const navigate = useNavigate()
+  const { has } = usePermissions()
   const [step, setStep] = useState<Step>(1)
 
   // Step 1 state
@@ -400,6 +402,25 @@ export function FilingCreatePage() {
         },
         onError: () => toast.error('创建报备任务失败'),
       },
+    )
+  }
+
+  if (!has('filing:write')) {
+    return (
+      <>
+        <Header fixed>
+          <Search />
+          <div className='ml-auto flex items-center space-x-4'>
+            <ThemeSwitch />
+            <ProfileDropdown />
+          </div>
+        </Header>
+        <Main>
+          <p className='text-muted-foreground py-16 text-center text-sm'>
+            没有创建报备任务的权限，请联系管理员分配
+          </p>
+        </Main>
+      </>
     )
   }
 

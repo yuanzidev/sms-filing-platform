@@ -30,11 +30,20 @@ interface ColumnActions {
   onResetPassword: (user: User) => void
 }
 
+interface ColumnOptions {
+  /** 是否拥有 user:write 权限，无权限时隐藏操作列 */
+  canWrite: boolean
+}
+
 /**
  * 用户表格列定义
  * 定义用户列表的显示列和操作
  */
-export const columns = (actions: ColumnActions): ColumnDef<User>[] => [
+export const columns = (
+  actions: ColumnActions,
+  options: ColumnOptions
+): ColumnDef<User>[] => {
+  const all: ColumnDef<User>[] = [
   {
     id: 'select',
     header: ({ table }) => (
@@ -222,4 +231,7 @@ export const columns = (actions: ColumnActions): ColumnDef<User>[] => [
       )
     },
   },
-]
+  ]
+  if (!options.canWrite) return all.filter((col) => col.id !== 'actions')
+  return all
+}

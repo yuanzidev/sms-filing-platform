@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/select'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
+import { usePermissions } from '@/hooks/use-permissions'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ActionIconButton } from '@/components/shared/action-icon-button'
@@ -75,6 +76,7 @@ export function SubPortLibraryPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [deleteListDialogOpen, setDeleteListDialogOpen] = useState(false)
   const queryClient = useQueryClient()
+  const { has } = usePermissions()
 
   const groupsQuery = useQuery({
     queryKey: ['export-groups'],
@@ -193,30 +195,34 @@ export function SubPortLibraryPage() {
         header: '操作',
         cell: ({ row }) => (
           <div className='flex items-center gap-1'>
-            <ActionIconButton
-              label='编辑'
-              icon='edit'
-              tone='edit'
-              onClick={() => {
-                setEditing(row.original)
-                setDialogOpen(true)
-              }}
-            />
-            <ActionIconButton
-              label='删除'
-              icon='delete'
-              tone='delete'
-              onClick={() => {
-                setToDelete(row.original)
-                setDeleteDialogOpen(true)
-              }}
-            />
+            {has('sub_port:write') && (
+              <ActionIconButton
+                label='编辑'
+                icon='edit'
+                tone='edit'
+                onClick={() => {
+                  setEditing(row.original)
+                  setDialogOpen(true)
+                }}
+              />
+            )}
+            {has('sub_port:write') && (
+              <ActionIconButton
+                label='删除'
+                icon='delete'
+                tone='delete'
+                onClick={() => {
+                  setToDelete(row.original)
+                  setDeleteDialogOpen(true)
+                }}
+              />
+            )}
           </div>
         ),
       },
     ]
     return [...base, ...dynamic, ...tail]
-  }, [sortedFields])
+  }, [sortedFields, has])
 
   if (groupsQuery.isLoading) {
     return (
@@ -277,31 +283,37 @@ export function SubPortLibraryPage() {
             </p>
           </div>
           <div className='flex space-x-2'>
-            <Button
-              onClick={() => {
-                setEditing(undefined)
-                setDialogOpen(true)
-              }}
-            >
-              <Plus className='mr-2 h-4 w-4' />
-              新增子端口
-            </Button>
-            <Button variant='outline' onClick={() => setImportDialogOpen(true)}>
-              <Upload className='mr-2 h-4 w-4' />
-              导入数据
-            </Button>
-            <Button
-              variant='outline'
-              onClick={() => downloadSubPortTemplate(selectedGroup.id)}
-            >
-              <Download className='mr-2 h-4 w-4' />
-              下载模板
-            </Button>
-            <Button variant='outline' onClick={() => setDeleteListDialogOpen(true)}>
-              <FileX className='mr-2 h-4 w-4' />
-              导入删除清单
-            </Button>
-            {selectedCount > 0 && (
+            {has('sub_port:write') && (
+              <Button
+                onClick={() => {
+                  setEditing(undefined)
+                  setDialogOpen(true)
+                }}
+              >
+                <Plus className='mr-2 h-4 w-4' />
+                新增子端口
+              </Button>
+            )}
+            {has('sub_port:import') && (
+              <>
+                <Button variant='outline' onClick={() => setImportDialogOpen(true)}>
+                  <Upload className='mr-2 h-4 w-4' />
+                  导入数据
+                </Button>
+                <Button
+                  variant='outline'
+                  onClick={() => downloadSubPortTemplate(selectedGroup.id)}
+                >
+                  <Download className='mr-2 h-4 w-4' />
+                  下载模板
+                </Button>
+                <Button variant='outline' onClick={() => setDeleteListDialogOpen(true)}>
+                  <FileX className='mr-2 h-4 w-4' />
+                  导入删除清单
+                </Button>
+              </>
+            )}
+            {has('sub_port:write') && selectedCount > 0 && (
               <Button
                 variant='destructive'
                 onClick={() => batchDeleteMutation.mutate(selectedIds)}

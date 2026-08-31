@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/select'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
+import { usePermissions } from '@/hooks/use-permissions'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { Input } from '@/components/ui/input'
@@ -73,6 +74,7 @@ export function PortInfoPage() {
   const [portTypeFilter, setPortTypeFilter] = useState('__all__')
   const [mainPortFilter, setMainPortFilter] = useState('')
   const queryClient = useQueryClient()
+  const { has } = usePermissions()
 
   const filters = {
     page,
@@ -211,29 +213,33 @@ export function PortInfoPage() {
                 setDetailTarget(row.original)
               }}
             />
-            <ActionIconButton
-              label='编辑'
-              icon='edit'
-              tone='edit'
-              onClick={() => {
-                setSelected(row.original)
-                setDialogOpen(true)
-              }}
-            />
-            <ActionIconButton
-              label='删除'
-              icon='delete'
-              tone='delete'
-              onClick={() => {
-                setToDelete(row.original)
-                setDeleteDialogOpen(true)
-              }}
-            />
+            {has('port:write') && (
+              <ActionIconButton
+                label='编辑'
+                icon='edit'
+                tone='edit'
+                onClick={() => {
+                  setSelected(row.original)
+                  setDialogOpen(true)
+                }}
+              />
+            )}
+            {has('port:write') && (
+              <ActionIconButton
+                label='删除'
+                icon='delete'
+                tone='delete'
+                onClick={() => {
+                  setToDelete(row.original)
+                  setDeleteDialogOpen(true)
+                }}
+              />
+            )}
           </div>
         ),
       },
     ],
-    []
+    [has]
   )
 
   return (
@@ -255,27 +261,33 @@ export function PortInfoPage() {
             </p>
           </div>
           <div className='flex space-x-2'>
-            <Button
-              onClick={() => {
-                setSelected(undefined)
-                setDialogOpen(true)
-              }}
-            >
-              <Plus className='mr-2 h-4 w-4' />
-              新建端口信息
-            </Button>
-            <Button variant='outline' onClick={() => setImportDialogOpen(true)}>
-              <Upload className='mr-2 h-4 w-4' />
-              导入数据
-            </Button>
-            <Button
-              variant='outline'
-              onClick={() => downloadPortInfoTemplate()}
-            >
-              <Download className='mr-2 h-4 w-4' />
-              下载模板
-            </Button>
-            {selectedCount > 0 && (
+            {has('port:write') && (
+              <Button
+                onClick={() => {
+                  setSelected(undefined)
+                  setDialogOpen(true)
+                }}
+              >
+                <Plus className='mr-2 h-4 w-4' />
+                新建端口信息
+              </Button>
+            )}
+            {has('port:import') && (
+              <>
+                <Button variant='outline' onClick={() => setImportDialogOpen(true)}>
+                  <Upload className='mr-2 h-4 w-4' />
+                  导入数据
+                </Button>
+                <Button
+                  variant='outline'
+                  onClick={() => downloadPortInfoTemplate()}
+                >
+                  <Download className='mr-2 h-4 w-4' />
+                  下载模板
+                </Button>
+              </>
+            )}
+            {has('port:write') && selectedCount > 0 && (
               <Button variant='destructive' onClick={handleBatchDelete}>
                 <Trash2 className='mr-2 h-4 w-4' />
                 删除 ({selectedCount})
