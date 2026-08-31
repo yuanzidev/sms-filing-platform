@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, RefreshCw, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { getRoles, deleteRole, type Role } from '@/lib/api/roles'
+import { getPermissionCatalog } from '@/lib/api/permissions'
+import { usePermissions } from '@/hooks/use-permissions'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,11 +39,21 @@ export function RolesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [roleToDelete, setRoleToDelete] = useState<Role | undefined>()
   const queryClient = useQueryClient()
+  const { has } = usePermissions()
 
   const { data, isLoading } = useQuery({
     queryKey: ['roles'],
     queryFn: () => getRoles(),
   })
+
+  // 权限点编码 → 中文标签映射，用于卡片徽标展示
+  const { data: catalog } = useQuery({
+    queryKey: ['permission-catalog'],
+    queryFn: getPermissionCatalog,
+  })
+  const permissionLabelMap = new Map(
+    (catalog ?? []).flatMap((g) => g.permissions.map((p) => [p.code, p.label]))
+  )
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteRole(id),
@@ -87,15 +99,17 @@ export function RolesPage() {
               />
               刷新
             </Button>
-            <Button
-              onClick={() => {
-                setSelectedRole(undefined)
-                setDialogOpen(true)
-              }}
-            >
-              <Plus className='mr-2 h-4 w-4' />
-              新建角色
-            </Button>
+            {has('role:write') && (
+              <Button
+                onClick={() => {
+                  setSelectedRole(undefined)
+                  setDialogOpen(true)
+                }}
+              >
+                <Plus className='mr-2 h-4 w-4' />
+                新建角色
+              </Button>
+            )}
           </div>
         </div>
 
@@ -106,24 +120,28 @@ export function RolesPage() {
                 <div className='flex items-center justify-between'>
                   <CardTitle className='text-lg'>{role.name}</CardTitle>
                   <div className='flex space-x-1'>
-                    <ActionIconButton
-                      label='编辑'
-                      icon='edit'
-                      tone='edit'
-                      onClick={() => {
-                        setSelectedRole(role)
-                        setDialogOpen(true)
-                      }}
-                    />
-                    <ActionIconButton
-                      label='删除'
-                      icon='delete'
-                      tone='delete'
-                      onClick={() => {
-                        setRoleToDelete(role)
-                        setDeleteDialogOpen(true)
-                      }}
-                    />
+                    {has('role:write') && (
+                      <ActionIconButton
+                        label='编辑'
+                        icon='edit'
+                        tone='edit'
+                        onClick={() => {
+                          setSelectedRole(role)
+                          setDialogOpen(true)
+                        }}
+                      />
+                    )}
+                    {has('role:write') && (
+                      <ActionIconButton
+                        label='删除'
+                        icon='delete'
+                        tone='delete'
+                        onClick={() => {
+                          setRoleToDelete(role)
+                          setDeleteDialogOpen(true)
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
                 <CardDescription>
@@ -148,7 +166,7 @@ export function RolesPage() {
                             variant='secondary'
                             className='text-xs'
                           >
-                            {p}
+                            {permissionLabelMap.get(p) ?? p}
                           </Badge>
                         ))
                       ) : (
@@ -169,15 +187,17 @@ export function RolesPage() {
             title='暂无角色数据'
             description='创建角色后，可以为不同岗位配置功能权限。'
             action={
-              <Button
-                onClick={() => {
-                  setSelectedRole(undefined)
-                  setDialogOpen(true)
-                }}
-              >
-                <Plus className='mr-2 h-4 w-4' />
-                新建角色
-              </Button>
+              has('role:write') && (
+                <Button
+                  onClick={() => {
+                    setSelectedRole(undefined)
+                    setDialogOpen(true)
+                  }}
+                >
+                  <Plus className='mr-2 h-4 w-4' />
+                  新建角色
+                </Button>
+              )
             }
           />
         )}

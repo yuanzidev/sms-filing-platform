@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -25,6 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { createRole, updateRole } from '@/lib/api/roles'
 import type { Role } from '@/lib/api/roles'
+import { getPermissionCatalog } from '@/lib/api/permissions'
 
 /**
  * 角色表单验证模式
@@ -33,7 +34,6 @@ const roleFormSchema = z.object({
     name: z.string().min(2, '角色名称至少2个字符'),
     description: z.string().optional(),
     permissions: z.array(z.string()),
-    host_permissions: z.array(z.string()),
 })
 
 type RoleFormData = z.infer<typeof roleFormSchema>
@@ -80,31 +80,19 @@ export function RoleDialog({ open, onOpenChange, role, onSuccess }: RoleDialogPr
             name: role.name,
             description: role.description || '',
             permissions: role.permissions || [],
-            host_permissions: role.host_permissions || [],
         } : {
             name: '',
             description: '',
             permissions: [],
-            host_permissions: [],
         },
     })
 
-    // 预定义的权限选项
-    const permissionOptions = [
-        { id: 'user:read', label: '查看用户' },
-        { id: 'user:write', label: '管理用户' },
-        { id: 'role:read', label: '查看角色' },
-        { id: 'role:write', label: '管理角色' },
-        { id: 'log:read', label: '查看日志' },
-        { id: 'system:admin', label: '系统管理' },
-    ]
-
-    const hostPermissionOptions = [
-        { id: 'host:read', label: '查看主机' },
-        { id: 'host:write', label: '管理主机' },
-        { id: 'host:execute', label: '执行命令' },
-        { id: 'host:backup', label: '备份恢复' },
-    ]
+    // 权限目录：按模块分组渲染复选框
+    const { data: catalog } = useQuery({
+        queryKey: ['permission-catalog'],
+        queryFn: getPermissionCatalog,
+        enabled: open,
+    })
 
     // 表单提交处理
     const onSubmit = (data: RoleFormData) => {
@@ -125,14 +113,12 @@ export function RoleDialog({ open, onOpenChange, role, onSuccess }: RoleDialogPr
                     name: role.name,
                     description: role.description || '',
                     permissions: role.permissions || [],
-                    host_permissions: role.host_permissions || [],
                 })
             } else {
                 form.reset({
                     name: '',
                     description: '',
                     permissions: [],
-                    host_permissions: [],
                 })
             }
         }
@@ -185,99 +171,60 @@ export function RoleDialog({ open, onOpenChange, role, onSuccess }: RoleDialogPr
                             )}
                         />
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                                control={form.control}
-                                name="permissions"
-                                render={() => (
-                                    <FormItem>
-                                        <FormLabel>功能权限</FormLabel>
-                                        <div className="space-y-2">
-                                            {permissionOptions.map((permission) => (
-                                                <FormField
-                                                    key={permission.id}
-                                                    control={form.control}
-                                                    name="permissions"
-                                                    render={({ field }) => {
-                                                        return (
-                                                            <FormItem
-                                                                key={permission.id}
-                                                                className="flex flex-row items-start space-x-3 space-y-0"
-                                                            >
-                                                                <FormControl>
-                                                                    <Checkbox
-                                                                        checked={field.value?.includes(permission.id)}
-                                                                        onCheckedChange={(checked) => {
-                                                                            return checked
-                                                                                ? field.onChange([...field.value, permission.id])
-                                                                                : field.onChange(
-                                                                                    field.value?.filter(
-                                                                                        (value) => value !== permission.id
-                                                                                    )
-                                                                                )
-                                                                        }}
-                                                                    />
-                                                                </FormControl>
-                                                                <FormLabel className="text-sm font-normal">
-                                                                    {permission.label}
-                                                                </FormLabel>
-                                                            </FormItem>
-                                                        )
-                                                    }}
-                                                />
-                                            ))}
-                                        </div>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <FormField
-                                control={form.control}
-                                name="host_permissions"
-                                render={() => (
-                                    <FormItem>
-                                        <FormLabel>主机权限</FormLabel>
-                                        <div className="space-y-2">
-                                            {hostPermissionOptions.map((permission) => (
-                                                <FormField
-                                                    key={permission.id}
-                                                    control={form.control}
-                                                    name="host_permissions"
-                                                    render={({ field }) => {
-                                                        return (
-                                                            <FormItem
-                                                                key={permission.id}
-                                                                className="flex flex-row items-start space-x-3 space-y-0"
-                                                            >
-                                                                <FormControl>
-                                                                    <Checkbox
-                                                                        checked={field.value?.includes(permission.id)}
-                                                                        onCheckedChange={(checked) => {
-                                                                            return checked
-                                                                                ? field.onChange([...field.value, permission.id])
-                                                                                : field.onChange(
-                                                                                    field.value?.filter(
-                                                                                        (value) => value !== permission.id
-                                                                                    )
-                                                                                )
-                                                                        }}
-                                                                    />
-                                                                </FormControl>
-                                                                <FormLabel className="text-sm font-normal">
-                                                                    {permission.label}
-                                                                </FormLabel>
-                                                            </FormItem>
-                                                        )
-                                                    }}
-                                                />
-                                            ))}
-                                        </div>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
+                        <FormField
+                            control={form.control}
+                            name="permissions"
+                            render={() => (
+                                <FormItem>
+                                    <FormLabel>功能权限</FormLabel>
+                                    <div className="space-y-4">
+                                        {catalog?.map((group) => (
+                                            <div key={group.module} className="space-y-2">
+                                                <div className="text-sm font-medium text-muted-foreground">
+                                                    {group.label}
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {group.permissions.map((permission) => (
+                                                        <FormField
+                                                            key={permission.code}
+                                                            control={form.control}
+                                                            name="permissions"
+                                                            render={({ field }) => {
+                                                                return (
+                                                                    <FormItem
+                                                                        key={permission.code}
+                                                                        className="flex flex-row items-start space-x-3 space-y-0"
+                                                                    >
+                                                                        <FormControl>
+                                                                            <Checkbox
+                                                                                checked={field.value?.includes(permission.code)}
+                                                                                onCheckedChange={(checked) => {
+                                                                                    return checked
+                                                                                        ? field.onChange([...field.value, permission.code])
+                                                                                        : field.onChange(
+                                                                                            field.value?.filter(
+                                                                                                (value) => value !== permission.code
+                                                                                            )
+                                                                                        )
+                                                                                }}
+                                                                            />
+                                                                        </FormControl>
+                                                                        <FormLabel className="text-sm font-normal">
+                                                                            {permission.label}
+                                                                        </FormLabel>
+                                                                    </FormItem>
+                                                                )
+                                                            }}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
                         <DialogFooter>
                             <Button
