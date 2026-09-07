@@ -12,15 +12,17 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
-  getQualifications,
+  batchDeleteQualifications,
   deleteQualification,
-  downloadQualificationTemplate,
   downloadQualificationImportErrorReport,
+  downloadQualificationTemplate,
+  getQualifications,
   importQualifications,
   previewQualificationsImport,
 } from '@/lib/api/qualifications'
 import type { QualificationInfo } from '@/lib/api/types'
 import { formatCN } from '@/lib/time'
+import { usePermissions } from '@/hooks/use-permissions'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +37,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
-import { usePermissions } from '@/hooks/use-permissions'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ActionIconButton } from '@/components/shared/action-icon-button'
@@ -52,6 +53,7 @@ export function QualificationsPage() {
   const [selected, setSelected] = useState<QualificationInfo | undefined>()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false)
   const [toDelete, setToDelete] = useState<QualificationInfo | undefined>()
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [detailTarget, setDetailTarget] = useState<
@@ -86,7 +88,8 @@ export function QualificationsPage() {
     setAppliedFilters({
       enterprise_name: searchInputs.enterprise_name.trim() || undefined,
       cert_number: searchInputs.cert_number.trim() || undefined,
-      identity_cert_number: searchInputs.identity_cert_number.trim() || undefined,
+      identity_cert_number:
+        searchInputs.identity_cert_number.trim() || undefined,
       sms_signature: searchInputs.sms_signature.trim() || undefined,
     })
     setPage(1)
@@ -117,23 +120,25 @@ export function QualificationsPage() {
   const qualifications = data?.data ?? []
   const total = data?.total ?? 0
 
-  const selectedIds = Object.keys(rowSelection)
+  const selectedIds = useMemo(
+    () =>
+      Object.entries(rowSelection)
+        .filter(([, selected]) => selected)
+        .map(([id]) => id),
+    [rowSelection]
+  )
   const selectedCount = selectedIds.length
 
-  const handleBatchDelete = async () => {
-    try {
-      await Promise.all(
-        selectedIds.map((idx) =>
-          deleteQualification(qualifications[Number(idx)]?.id)
-        )
-      )
-      toast.success(`已删除 ${selectedCount} 条记录`)
+  const batchDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => batchDeleteQualifications(ids),
+    onSuccess: (result) => {
+      toast.success(`已删除 ${result.deleted_count} 条记录`)
       setRowSelection({})
+      setBatchDeleteDialogOpen(false)
       queryClient.invalidateQueries({ queryKey: ['qualifications'] })
-    } catch {
-      toast.error('批量删除失败')
-    }
-  }
+    },
+    onError: () => toast.error('批量删除失败'),
+  })
 
   const columns = useMemo<ColumnDef<QualificationInfo>[]>(
     () => [
@@ -237,7 +242,10 @@ export function QualificationsPage() {
             )}
             {has('qualification:import') && (
               <>
-                <Button variant='outline' onClick={() => setImportDialogOpen(true)}>
+                <Button
+                  variant='outline'
+                  onClick={() => setImportDialogOpen(true)}
+                >
                   <Upload className='mr-2 h-4 w-4' />
                   导入数据
                 </Button>
@@ -251,7 +259,11 @@ export function QualificationsPage() {
               </>
             )}
             {has('qualification:write') && selectedCount > 0 && (
-              <Button variant='destructive' onClick={handleBatchDelete}>
+              <Button
+                variant='destructive'
+                onClick={() => setBatchDeleteDialogOpen(true)}
+                disabled={batchDeleteMutation.isPending}
+              >
                 <Trash2 className='mr-2 h-4 w-4' />
                 删除 ({selectedCount})
               </Button>
@@ -281,7 +293,10 @@ export function QualificationsPage() {
                 placeholder='搜索签名'
                 value={searchInputs.sms_signature}
                 onChange={(e) =>
-                  setSearchInputs((s) => ({ ...s, sms_signature: e.target.value }))
+                  setSearchInputs((s) => ({
+                    ...s,
+                    sms_signature: e.target.value,
+                  }))
                 }
                 className='w-56 pl-8'
                 onKeyDown={(e) => {
@@ -368,7 +383,9 @@ export function QualificationsPage() {
           total={total}
           onPageChange={setPage}
           enableRowSelection
+          rowSelection={rowSelection}
           onRowSelectionChange={setRowSelection}
+          getRowId={(row) => row.id}
         />
       </Main>
 
@@ -416,6 +433,29 @@ export function QualificationsPage() {
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => toDelete && deleteMutation.mutate(toDelete.id)}
+              className='bg-red-600 hover:bg-red-700'
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={batchDeleteDialogOpen}
+        onOpenChange={setBatchDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认批量删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除已选的 {selectedCount} 条资质吗？此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => batchDeleteMutation.mutate(selectedIds)}
               className='bg-red-600 hover:bg-red-700'
             >
               删除

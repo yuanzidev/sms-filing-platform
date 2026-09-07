@@ -169,6 +169,51 @@ def test_create_filing_task_rejects_empty_port_ids(
     assert "至少选择一个端口" in r.json()["detail"]
 
 
+def test_create_filing_task_qualification_only_allows_empty_port_ids(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    qual_id = _create_qualification(client, superuser_token_headers, name="仅资质企业")
+    r = client.post(
+        f"{settings.API_V1_STR}/export-groups",
+        headers=superuser_token_headers,
+        json={
+            "name": "仅资质导出组",
+            "fields": [
+                {"field_name": "enterprise_name", "field_label": "企业名称", "sort_order": 1},
+                {"field_name": "sms_signature", "field_label": "短信签名", "sort_order": 2},
+            ],
+        },
+    )
+    assert r.status_code == 200, r.text
+    group_id = r.json()["id"]
+
+    r = client.post(
+        f"{settings.API_V1_STR}/filing-tasks",
+        headers=superuser_token_headers,
+        json={
+            "qualification_ids": [qual_id],
+            "port_ids": [],
+            "export_group_id": group_id,
+            "allocation_mode": "qualification_only",
+            "auto_allocate_sub_ports": False,
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["port_count"] == 0
+    assert body["port_ids"] == []
+
+    r2 = client.get(
+        f"{settings.API_V1_STR}/filing-tasks/{body['id']}/download",
+        headers=superuser_token_headers,
+    )
+    assert r2.status_code == 200
+    wb = load_workbook(BytesIO(r2.content))
+    ws = wb.active
+    assert ws.max_row == 2
+    assert ws.cell(row=2, column=1).value == "仅资质企业"
+
+
 def test_create_filing_task_rejects_invalid_port_ids(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
@@ -294,3 +339,25 @@ def test_regenerate_unknown_task_returns_404(
         headers=superuser_token_headers,
     )
     assert r.status_code == 404
+
+
+def test_batch_delete_filing_tasks(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    first = _create_task(client, superuser_token_headers)
+    second = _create_task(client, superuser_token_headers)
+
+    r = client.post(
+        f"{settings.API_V1_STR}/filing-tasks/batch-delete",
+        headers=superuser_token_headers,
+        json={"ids": [first["id"], second["id"]]},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["deleted_count"] == 2
+
+    for task in (first, second):
+        get_r = client.get(
+            f"{settings.API_V1_STR}/filing-tasks/{task['id']}",
+            headers=superuser_token_headers,
+        )
+        assert get_r.status_code == 404

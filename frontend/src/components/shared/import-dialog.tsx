@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
+import { Upload, Download } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -9,8 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Upload, Download } from 'lucide-react'
-import { toast } from 'sonner'
+import { Input } from '@/components/ui/input'
 
 export interface ImportErrorItem {
   row: number
@@ -26,6 +26,8 @@ export interface ImportResult {
   error_count: number
   errors: ImportErrorItem[]
   message?: string
+  skipped_count?: number
+  skipped_rows?: number[]
   warnings?: string[]
   unrecognized_headers?: string[]
 }
@@ -84,7 +86,9 @@ function getImportErrorDetail(err: unknown, fallback: string) {
     return fallback
   }
   if (Array.isArray(detail)) {
-    return detail.map((d) => getMessageFromDetail(d) || JSON.stringify(d)).join('；')
+    return detail
+      .map((d) => getMessageFromDetail(d) || JSON.stringify(d))
+      .join('；')
   }
   const message = getMessageFromDetail(detail)
   if (message) {
@@ -108,7 +112,9 @@ export function ImportDialog({
   const [error, setError] = useState<string | null>(null)
   const [importErrors, setImportErrors] = useState<ImportErrorItem[]>([])
   const [unrecognizedHeaders, setUnrecognizedHeaders] = useState<string[]>([])
-  const [previewData, setPreviewData] = useState<ImportPreviewResult | null>(null)
+  const [previewData, setPreviewData] = useState<ImportPreviewResult | null>(
+    null
+  )
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -151,9 +157,17 @@ export function ImportDialog({
       setUnrecognizedHeaders(result.unrecognized_headers ?? [])
       if (result.errors && result.errors.length > 0) {
         setImportErrors(result.errors)
-        toast.error(`导入完成：成功 ${result.success_count} 条，失败 ${result.error_count} 条`)
+        toast.error(
+          `导入完成：成功 ${result.success_count} 条，失败 ${result.error_count} 条，跳过 ${result.skipped_count ?? 0} 条`
+        )
       } else {
-        toast.success(result.message || '导入成功')
+        const skippedCount = result.skipped_count ?? 0
+        toast.success(
+          result.message ||
+            (skippedCount > 0
+              ? `导入成功，新增 ${result.success_count} 条，重复跳过 ${skippedCount} 条`
+              : '导入成功')
+        )
         onOpenChange(false)
         setFile(null)
         onSuccess()
@@ -181,7 +195,7 @@ export function ImportDialog({
   // 取未识别表头之外的列标题与行值一一对应
   const previewColumns = previewData
     ? (previewData.headers ?? []).filter(
-        (h) => h && !(previewData.unrecognized_headers ?? []).includes(h),
+        (h) => h && !(previewData.unrecognized_headers ?? []).includes(h)
       )
     : []
   const previewRowValues = previewData
@@ -205,67 +219,68 @@ export function ImportDialog({
           <DialogDescription>
             还没有模板？{' '}
             <button
-              type="button"
-              className="text-primary underline underline-offset-2 hover:text-primary/80"
+              type='button'
+              className='text-primary hover:text-primary/80 underline underline-offset-2'
               onClick={onDownloadTemplate}
             >
-              <Download className="mr-1 inline-block h-3 w-3" />
+              <Download className='mr-1 inline-block h-3 w-3' />
               下载模板
             </button>
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="rounded-lg border-2 border-dashed p-6 text-center">
-            <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
-            <p className="mt-2 text-sm text-muted-foreground">
+        <div className='space-y-4'>
+          <div className='rounded-lg border-2 border-dashed p-6 text-center'>
+            <Upload className='text-muted-foreground mx-auto h-8 w-8' />
+            <p className='text-muted-foreground mt-2 text-sm'>
               选择 Excel 文件（.xlsx 或 .xls），单文件不超过 500MB
             </p>
-            <div className="mt-3">
+            <div className='mt-3'>
               <Input
                 ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls"
+                type='file'
+                accept='.xlsx,.xls'
                 onChange={handleFileChange}
-                className="hidden"
-                id="import-file-input"
+                className='hidden'
+                id='import-file-input'
               />
               <Button
-                variant="outline"
-                size="sm"
+                variant='outline'
+                size='sm'
                 onClick={() => fileInputRef.current?.click()}
               >
                 选择文件
               </Button>
             </div>
-            {file && (
-              <p className="mt-2 text-sm text-primary">{file.name}</p>
-            )}
+            {file && <p className='text-primary mt-2 text-sm'>{file.name}</p>}
           </div>
 
           {error && (
-            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+            <div className='bg-destructive/10 text-destructive rounded-md p-3 text-sm'>
               {error}
             </div>
           )}
 
           {previewError && (
-            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+            <div className='bg-destructive/10 text-destructive rounded-md p-3 text-sm'>
               {previewError}
             </div>
           )}
 
           {unrecognizedHeaders.length > 0 && (
-            <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-700">
+            <div className='rounded-md bg-amber-50 p-3 text-sm text-amber-700'>
               以下表头未被识别，导入时将被忽略：
-              <span className="font-medium"> {unrecognizedHeaders.join('、')}</span>
+              <span className='font-medium'>
+                {' '}
+                {unrecognizedHeaders.join('、')}
+              </span>
             </div>
           )}
 
           {previewData && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium">
+            <div className='space-y-2'>
+              <div className='flex items-center justify-between'>
+                <h4 className='text-sm font-medium'>
                   数据预览（共 {previewData.total_data_rows} 行，显示前{' '}
                   {previewRowValues.length} 行）
                 </h4>
@@ -285,7 +300,7 @@ export function ImportDialog({
                   <thead>
                     <tr className='bg-muted'>
                       {previewColumns.map((h, i) => (
-                        <th key={i} className='whitespace-nowrap p-1 text-left'>
+                        <th key={i} className='p-1 text-left whitespace-nowrap'>
                           {h}
                         </th>
                       ))}
@@ -312,34 +327,40 @@ export function ImportDialog({
           )}
 
           {importErrors.length > 0 && (
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium">导入错误详情</h4>
+            <div className='mt-4 space-y-2'>
+              <div className='flex items-center justify-between'>
+                <h4 className='text-sm font-medium'>导入错误详情</h4>
                 {onDownloadErrorReport && (
-                  <Button variant="outline" size="sm" onClick={handleDownloadErrorReport}>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={handleDownloadErrorReport}
+                  >
                     下载错误报告
                   </Button>
                 )}
               </div>
-              <div className="max-h-48 overflow-auto rounded border">
-                <table className="w-full text-xs">
+              <div className='max-h-48 overflow-auto rounded border'>
+                <table className='w-full text-xs'>
                   <thead>
-                    <tr className="bg-muted">
-                      <th className="p-1 text-left">行号</th>
-                      <th className="p-1 text-left">字段</th>
-                      <th className="p-1 text-left">值</th>
-                      <th className="p-1 text-left">原因</th>
-                      <th className="p-1 text-left">建议</th>
+                    <tr className='bg-muted'>
+                      <th className='p-1 text-left'>行号</th>
+                      <th className='p-1 text-left'>字段</th>
+                      <th className='p-1 text-left'>值</th>
+                      <th className='p-1 text-left'>原因</th>
+                      <th className='p-1 text-left'>建议</th>
                     </tr>
                   </thead>
                   <tbody>
                     {importErrors.map((err, i) => (
-                      <tr key={i} className="border-t">
-                        <td className="p-1">{err.row}</td>
-                        <td className="p-1">{err.field}</td>
-                        <td className="max-w-[100px] truncate p-1">{err.value}</td>
-                        <td className="p-1 text-red-600">{err.reason}</td>
-                        <td className="p-1">{err.suggestion}</td>
+                      <tr key={i} className='border-t'>
+                        <td className='p-1'>{err.row}</td>
+                        <td className='p-1'>{err.field}</td>
+                        <td className='max-w-[100px] truncate p-1'>
+                          {err.value}
+                        </td>
+                        <td className='p-1 text-red-600'>{err.reason}</td>
+                        <td className='p-1'>{err.suggestion}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -350,11 +371,19 @@ export function ImportDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+          <Button
+            variant='outline'
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
             取消
           </Button>
           {onPreview && (
-            <Button variant="outline" onClick={handlePreview} disabled={!file || loading}>
+            <Button
+              variant='outline'
+              onClick={handlePreview}
+              disabled={!file || loading}
+            >
               {previewLoading ? '预览中...' : '预览数据'}
             </Button>
           )}

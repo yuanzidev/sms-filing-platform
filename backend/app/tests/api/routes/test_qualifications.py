@@ -1,4 +1,6 @@
 """Tests for qualifications API: updated field schema."""
+import uuid
+
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
@@ -73,6 +75,7 @@ def test_template_has_required_headers(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
     from io import BytesIO
+
     from openpyxl import load_workbook
 
     r = client.get(
@@ -92,6 +95,7 @@ def test_template_has_required_headers(
 
 def _build_xlsx(headers: list[str], rows: list[list]) -> bytes:
     from io import BytesIO
+
     from openpyxl import Workbook
 
     wb = Workbook()
@@ -102,6 +106,10 @@ def _build_xlsx(headers: list[str], rows: list[list]) -> bytes:
     buf = BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+def _unique_marker() -> str:
+    return uuid.uuid4().hex[:8]
 
 
 def test_import_rejects_missing_enterprise_name(
@@ -126,8 +134,9 @@ def test_import_succeeds_without_legal_rep_columns(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
     """法人证件列完全缺失时仍可导入（法人字段选填）"""
+    marker = _unique_marker()
     headers = ["企业名称", "短信签名"]
-    rows = [["测试企业C", "测试签名"]]
+    rows = [[f"测试企业C-{marker}", f"测试签名-{marker}"]]
     data = _build_xlsx(headers, rows)
 
     files = {"file": ("test.xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
@@ -143,10 +152,11 @@ def test_import_succeeds_without_legal_rep_columns(
 def test_import_success_with_required_fields(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
+    marker = _unique_marker()
     headers = [
         "企业名称", "法人证件类型", "法人证件号码", "法人证件地址",
     ]
-    rows = [["测试企业B", "身份证", "110101199001011234", "北京市朝阳区XX路1号"]]
+    rows = [[f"测试企业B-{marker}", "身份证", f"11010119900101{marker}", "北京市朝阳区XX路1号"]]
     data = _build_xlsx(headers, rows)
 
     files = {"file": ("test.xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
@@ -163,6 +173,7 @@ def test_template_column_order_matches_new_spec(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
     from io import BytesIO
+
     from openpyxl import load_workbook
 
     r = client.get(
@@ -177,26 +188,30 @@ def test_template_column_order_matches_new_spec(
     assert headers[17] == "法人姓名", f"col18 应为「法人姓名」，实际：{headers[17]}"
     assert headers[21] == "法人身份证正面", f"col22 应为「法人身份证正面」，实际：{headers[21]}"
     assert headers[22] == "法人身份证反面", f"col23 应为「法人身份证反面」，实际：{headers[22]}"
-    assert headers[36] == "引流链接", f"col37 应为「引流链接」，实际：{headers[36]}"
-    assert headers[41] == "签名举证附件", f"col42 应为「签名举证附件」，实际：{headers[41]}"
-    assert headers[42] == "引流号码举证附件", f"col43 应为「引流号码举证附件」，实际：{headers[42]}"
-    assert headers[43] == "引流链接举证", f"col44 应为「引流链接举证」，实际：{headers[43]}"
+    assert headers[36] == "引流短链", f"col37 应为「引流短链」，实际：{headers[36]}"
+    assert headers[37] == "引流长链", f"col38 应为「引流长链」，实际：{headers[37]}"
+    assert headers[38] == "商标唯一性举证", f"col39 应为「商标唯一性举证」，实际：{headers[38]}"
+    assert headers[43] == "签名举证附件", f"col44 应为「签名举证附件」，实际：{headers[43]}"
+    assert headers[44] == "引流号码举证附件", f"col45 应为「引流号码举证附件」，实际：{headers[44]}"
+    assert headers[45] == "引流链接举证", f"col46 应为「引流链接举证」，实际：{headers[45]}"
     # 旧名不应存在
     assert "链接地址" not in headers
     assert "经办人身份证正面" not in headers
     assert "经办人身份证反面" not in headers
     assert "引流举证附件" not in headers
     # 总列数
-    assert len([h for h in headers if h]) == 45
+    assert len([h for h in headers if h]) == 47
 
 
 def test_import_accepts_renamed_link_address_header(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
+    marker = _unique_marker()
+    enterprise_name = f"测试企业链接-{marker}"
     headers = [
         "企业名称", "法人证件类型", "法人证件号码", "法人证件地址", "引流链接", "短信签名",
     ]
-    rows = [["测试企业链接", "身份证", "110101199001011234", "北京市朝阳区XX路1号", "https://example.com", "【测试签名】"]]
+    rows = [[enterprise_name, "身份证", f"11010119900101{marker}", "北京市朝阳区XX路1号", f"https://example.com/{marker}", f"【测试签名{marker}】"]]
     data = _build_xlsx(headers, rows)
 
     files = {"file": ("test.xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
@@ -211,12 +226,41 @@ def test_import_accepts_renamed_link_address_header(
     list_r = client.get(
         f"{settings.API_V1_STR}/qualifications",
         headers=superuser_token_headers,
-        params={"enterprise_name": "测试企业链接"},
+        params={"enterprise_name": enterprise_name},
     )
     assert list_r.status_code == 200
     item = list_r.json()["data"][0]
-    assert item["link_address"] == "https://example.com"
-    assert item["sms_signature"] == "【测试签名】"
+    assert item["link_address"] == f"https://example.com/{marker}"
+    assert item["sms_signature"] == f"【测试签名{marker}】"
+
+
+def test_import_accepts_short_and_long_link_headers(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    enterprise_name = f"测试企业短长链-{marker}"
+    headers = ["企业名称", "引流短链", "引流长链", "短信签名"]
+    rows = [[enterprise_name, f"https://t.example/{marker}", f"https://example.com/long/{marker}", f"签名短长链-{marker}"]]
+    data = _build_xlsx(headers, rows)
+
+    files = {"file": ("test.xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/import",
+        headers=superuser_token_headers,
+        files=files,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["success_count"] == 1
+
+    list_r = client.get(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        params={"enterprise_name": enterprise_name},
+    )
+    assert list_r.status_code == 200
+    item = list_r.json()["data"][0]
+    assert item["link_address"] == f"https://t.example/{marker}"
+    assert item["diversion_long_link"] == f"https://example.com/long/{marker}"
 
 
 def test_import_qualifications_with_empty_legal_fields(
@@ -224,16 +268,18 @@ def test_import_qualifications_with_empty_legal_fields(
 ) -> None:
     """法人证件类型/号码/地址为空可导入"""
     from io import BytesIO
+
     from openpyxl import Workbook
 
+    marker = _unique_marker()
     wb = Workbook()
     ws = wb.active
     headers = ["企业名称", "法人证件类型", "法人证件号码", "法人证件地址", "短信签名"]
     for col_idx, h in enumerate(headers, 1):
         ws.cell(row=1, column=col_idx, value=h)
     # 法人字段留空
-    ws.cell(row=2, column=1, value="测试企业")
-    ws.cell(row=2, column=5, value="测试签名")
+    ws.cell(row=2, column=1, value=f"测试企业-{marker}")
+    ws.cell(row=2, column=5, value=f"测试签名-{marker}")
 
     buf = BytesIO()
     wb.save(buf)
@@ -253,6 +299,7 @@ def test_qualification_template_notes_mention_optional_legal(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
     from io import BytesIO
+
     from openpyxl import load_workbook
 
     r = client.get(
@@ -271,6 +318,7 @@ def test_template_signature_example_has_no_brackets(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
     from io import BytesIO
+
     from openpyxl import load_workbook
 
     r = client.get(
@@ -288,11 +336,13 @@ def test_import_collects_all_errors_and_writes_valid_rows(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
     """混合文件：错误行收集所有错误，有效行批量写入"""
+    marker = _unique_marker()
+    valid_enterprise_name = f"测试企业有效行-{marker}"
     headers = ["企业名称", "是否签名校验", "短信签名"]
     rows = [
         ["", "是", "签名A"],            # 行2：企业名称为空
         ["测试企业错误行", "也许", "签名B"],  # 行3：布尔字段值无效
-        ["测试企业有效行", "是", "签名C"],    # 行4：有效
+        [valid_enterprise_name, "是", f"签名C-{marker}"],    # 行4：有效
         ["", "", ""],                   # 行5：空行跳过
     ]
     data = _build_xlsx(headers, rows)
@@ -314,7 +364,7 @@ def test_import_collects_all_errors_and_writes_valid_rows(
     list_r = client.get(
         f"{settings.API_V1_STR}/qualifications",
         headers=superuser_token_headers,
-        params={"enterprise_name": "测试企业有效行"},
+        params={"enterprise_name": valid_enterprise_name},
     )
     assert list_r.status_code == 200
     assert list_r.json()["total"] >= 1
@@ -324,6 +374,7 @@ def test_import_returns_error_report_xlsx(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
     from io import BytesIO
+
     from openpyxl import load_workbook
 
     errors = [
@@ -343,6 +394,104 @@ def test_import_returns_error_report_xlsx(
     assert ws.cell(row=1, column=1).value == "行号"
     assert ws.cell(row=2, column=2).value == "企业名称"
     assert ws.cell(row=3, column=5).value == "请填写「是」或「否」"
+
+
+def test_batch_delete_qualifications(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    ids = []
+    for idx in range(2):
+        r = client.post(
+            f"{settings.API_V1_STR}/qualifications",
+            headers=superuser_token_headers,
+            json={
+                "enterprise_name": f"批量删除资质-{marker}-{idx}",
+                "sms_signature": f"批量删除签名-{marker}-{idx}",
+            },
+        )
+        assert r.status_code == 200, r.text
+        ids.append(r.json()["id"])
+
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/batch-delete",
+        headers=superuser_token_headers,
+        json={"ids": ids},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["deleted_count"] == 2
+
+    for qualification_id in ids:
+        get_r = client.get(
+            f"{settings.API_V1_STR}/qualifications/{qualification_id}",
+            headers=superuser_token_headers,
+        )
+        assert get_r.status_code == 404
+
+
+def test_import_skips_duplicate_qualification_rows(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    headers = [
+        "企业名称",
+        "单位证件号码",
+        "单位证件类型",
+        "经办人姓名",
+        "经办人证件类型",
+        "经办人证件号码",
+        "责任人姓名",
+        "责任人证件类型",
+        "责任人证件号码",
+        "法人姓名",
+        "法人证件类型",
+        "法人证件号码",
+        "短信签名",
+        "签名类型/来源",
+        "引流短链",
+        "引流号码",
+    ]
+    row = [
+        f"重复导入企业-{marker}",
+        f"91330100DUP{marker}",
+        "营业执照",
+        "经办人A",
+        "身份证",
+        f"11010119900101{marker}1",
+        "责任人A",
+        "身份证",
+        f"11010119900101{marker}2",
+        "法人A",
+        "身份证",
+        f"11010119900101{marker}3",
+        f"重复签名-{marker}",
+        "自营签名",
+        f"https://t.example/{marker}",
+        f"138{marker}",
+    ]
+    data = _build_xlsx(headers, [row, row])
+    files = {"file": ("test.xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/import",
+        headers=superuser_token_headers,
+        files=files,
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["success_count"] == 1
+    assert body["skipped_count"] == 1
+    assert body["skipped_rows"] == [3]
+
+    r2 = client.post(
+        f"{settings.API_V1_STR}/qualifications/import",
+        headers=superuser_token_headers,
+        files={"file": ("test.xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert r2.status_code == 200, r2.text
+    body2 = r2.json()
+    assert body2["success_count"] == 0
+    assert body2["skipped_count"] == 2
 
 
 

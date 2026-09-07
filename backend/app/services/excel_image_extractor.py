@@ -76,7 +76,6 @@ def extract_cell_images_from_xlsx(
     # Parse cellimages.xml → {name: rId}
     name_to_rid: dict[str, str] = {}
     if "xl/cellimages.xml" in zf.namelist():
-        ns_s = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
         ns_a = "http://schemas.openxmlformats.org/drawingml/2006/main"
         ns_r = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
         try:
@@ -297,8 +296,10 @@ def upload_import_images(
             image_errors.append(
                 {
                     "row": img.row_index,
-                    "column": img.field_name or "未知",
+                    "field": img.field_name or "未知",
+                    "value": "",
                     "reason": f"行索引 {img.row_index} 超出数据范围",
+                    "suggestion": "请检查图片所在行是否对应有效数据行",
                 }
             )
             continue
@@ -310,7 +311,8 @@ def upload_import_images(
                 image_errors.append(
                     {
                         "row": img.row_index + 2,
-                        "column": img.field_name or "",
+                        "field": img.field_name or "",
+                        "value": img.original_name,
                         "reason": f"不支持的图片格式: {pil_img.format}",
                         "suggestion": f"支持的格式: {', '.join(ALLOWED_FORMATS)}",
                     }
@@ -320,8 +322,10 @@ def upload_import_images(
             image_errors.append(
                 {
                     "row": img.row_index + 2,
-                    "column": img.field_name or "",
+                    "field": img.field_name or "",
+                    "value": img.original_name,
                     "reason": "图片文件损坏或无法解析",
+                    "suggestion": "请替换为可正常打开的图片文件",
                 }
             )
             continue
@@ -332,7 +336,8 @@ def upload_import_images(
             image_errors.append(
                 {
                     "row": img.row_index + 2,
-                    "column": img.field_name or "",
+                    "field": img.field_name or "",
+                    "value": img.original_name,
                     "reason": f"图片过大({size_mb:.1f}MB)",
                     "suggestion": "请压缩到 10MB 以内",
                 }
@@ -455,16 +460,16 @@ def _build_cellimages_xml(image_ids: dict[str, str]) -> str:
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
         f'<cellImages xmlns="{ci_ns}" xmlns:a="{a_ns}" xmlns:r="{r_ns}">',
     ]
-    for cell_ref, image_id in image_ids.items():
+    for _cell_ref, image_id in image_ids.items():
         lines.extend(
             [
-                f"<cellImage>",
-                f"<pic>",
+                "<cellImage>",
+                "<pic>",
                 f'<nvPicPr><cNvPr name="{image_id}"/></nvPicPr>',
                 f'<blipFill><a:blip r:embed="rId_{image_id}"/>',
-                f"<a:stretch><a:fillRect/></a:stretch></blipFill>",
-                f"</pic>",
-                f"</cellImage>",
+                "<a:stretch><a:fillRect/></a:stretch></blipFill>",
+                "</pic>",
+                "</cellImage>",
             ]
         )
     lines.append("</cellImages>")
@@ -476,7 +481,7 @@ def _build_cellimages_rels(image_ids: dict[str, str]) -> str:
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
     ]
-    for i, (cell_ref, image_id) in enumerate(image_ids.items(), 1):
+    for i, (_cell_ref, image_id) in enumerate(image_ids.items(), 1):
         ext = "png"
         lines.append(
             f'<Relationship Id="rId_{image_id}" '
@@ -525,7 +530,7 @@ def _inject_dispimg_formulas(sheet_xml: str, image_ids: dict[str, str]) -> str:
         m = re.match(r"^([A-Z]+)(\d+)$", cell_ref)
         if not m:
             continue
-        col_letter, row_num = m.group(1), m.group(2)
+        row_num = m.group(2)
 
         # Find or create the row
         row_el = None

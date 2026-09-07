@@ -1,6 +1,9 @@
 """Tests for export field registry."""
 from app.services.export_field_registry import (
-    REGISTRY, all_fields, get_field, field_map, field_source,
+    REGISTRY,
+    field_map,
+    field_source,
+    get_field,
 )
 
 
@@ -15,7 +18,8 @@ def test_field_map_contains_signature_type():
     assert fm.get("sms_signature") == "短信签名"
     assert fm.get("specific_usage") == "具体用途"
     assert fm.get("diversion_number") == "引流号码"
-    assert fm.get("link_address") == "引流链接"
+    assert fm.get("link_address") == "引流短链"
+    assert fm.get("diversion_long_link") == "引流长链"
 
 
 def test_field_source_dispatch():
@@ -45,6 +49,7 @@ def test_proof_image_fields_in_registry():
     assert fm.get("signature_proof") == "签名举证附件"
     assert fm.get("diversion_number_proof") == "引流号码举证附件"
     assert fm.get("diversion_link_proof") == "引流链接举证"
+    assert fm.get("trademark_uniqueness_proof") == "商标唯一性举证"
     assert fm.get("handler_scene_photo") == "经办人现场照片"
 
 

@@ -54,6 +54,7 @@ export interface QualificationInfo {
   diversion_number_usage: string | null
   diversion_content: string | null
   link_address: string | null
+  diversion_long_link: string | null
   link_type: string | null
   created_at: string
   updated_at: string
@@ -309,14 +310,18 @@ export interface FilingTasksResponse {
 
 export interface CreateFilingTaskRequest {
   qualification_ids: string[]
-  port_ids: string[]
+  port_ids?: string[]
   export_group_id: string
   group_by_field?: string | null
   task_name?: string
   auto_allocate_sub_ports?: boolean
   sub_port_range_start?: number
   sub_port_range_end?: number
-  allocation_mode?: 'random' | 'sequential' | 'fixed_suffix'
+  allocation_mode?:
+    | 'random'
+    | 'sequential'
+    | 'fixed_suffix'
+    | 'qualification_only'
   fixed_suffix?: string
 }
 
@@ -349,7 +354,7 @@ export interface ExportGroupsResponse {
 export interface SubPortGenerationRule {
   id: string
   name: string
-  mode: 'random' | 'sequential' | 'fixed_suffix'
+  mode: 'random' | 'sequential' | 'fixed_suffix' | 'qualification_only'
   config: Record<string, unknown>
   carrier: string | null
   is_active: boolean

@@ -1,10 +1,10 @@
 """Regression tests for filing task export — all selected fields must appear in Excel."""
 
 import hashlib
-from io import BytesIO
-from typing import Generator
 import uuid
 import zipfile
+from collections.abc import Generator
+from io import BytesIO
 
 import pytest
 from fastapi.testclient import TestClient
@@ -254,7 +254,7 @@ def test_filing_task_download_embeds_qualification_and_port_images(
     assert drawing_files
 
 
-def test_filing_task_image_columns_show_no_image_when_attachment_missing(
+def test_filing_task_image_columns_are_blank_when_attachment_missing(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
     qual_id = _create_qualification(client, superuser_token_headers, "无图片企业")
@@ -294,8 +294,8 @@ def test_filing_task_image_columns_show_no_image_when_attachment_missing(
 
     wb = load_workbook(BytesIO(r.content))
     ws = wb.active
-    assert ws.cell(row=2, column=1).value == "[无图片]"
-    assert ws.cell(row=2, column=2).value == "[无图片]"
+    assert ws.cell(row=2, column=1).value is None
+    assert ws.cell(row=2, column=2).value is None
 
 
 def test_create_filing_task_with_auto_sub_ports(

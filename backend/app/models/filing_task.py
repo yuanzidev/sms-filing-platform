@@ -41,7 +41,7 @@ class FilingTask(FilingTaskBase, table=True):
 class FilingTaskCreate(SQLModel):
     task_name: str | None = None  # auto-generated if not provided
     qualification_ids: list[uuid.UUID]
-    port_ids: list[uuid.UUID]
+    port_ids: list[uuid.UUID] = Field(default_factory=list)
     export_group_id: uuid.UUID
     group_by_field: str | None = None
     # 自动分配子端口号模式

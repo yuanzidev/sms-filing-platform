@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { XIcon, ZoomIn } from 'lucide-react'
 import {
   getQualification,
   getQualificationAttachments,
@@ -14,7 +15,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { XIcon, ZoomIn } from 'lucide-react'
 
 interface Props {
   open: boolean
@@ -33,7 +33,13 @@ function FieldRow({ label, value }: { label: string; value: unknown }) {
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}) {
   return (
     <div>
       <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>{title}</h4>
@@ -75,6 +81,7 @@ export function QualificationDetailDialog({
     { name: '签名举证附件', match: '签名举证附件' },
     { name: '引流号码举证附件', match: '引流号码举证附件' },
     { name: '引流链接举证', match: '引流链接举证' },
+    { name: '商标唯一性举证', match: '商标唯一性举证' },
     { name: '经办人现场照片', match: '经办人现场照片' },
   ]
 
@@ -82,13 +89,19 @@ export function QualificationDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className='flex max-h-[92vh] w-[calc(100vw-4rem)] max-w-[1200px] sm:max-w-[1200px] flex-col gap-0 overflow-hidden p-0'
+        className='flex max-h-[92vh] w-[calc(100vw-4rem)] max-w-[1200px] flex-col gap-0 overflow-hidden p-0 sm:max-w-[1200px]'
       >
         <DialogHeader className='shrink-0 border-b px-6 py-3'>
           <div className='flex items-start justify-between gap-4'>
             <DialogTitle>资质详情 — {d.enterprise_name}</DialogTitle>
             <DialogClose asChild>
-              <Button type='button' variant='ghost' size='icon' className='-mt-1 -mr-2 size-8 shrink-0' aria-label='关闭'>
+              <Button
+                type='button'
+                variant='ghost'
+                size='icon'
+                className='-mt-1 -mr-2 size-8 shrink-0'
+                aria-label='关闭'
+              >
                 <XIcon className='h-4 w-4' />
               </Button>
             </DialogClose>
@@ -113,16 +126,31 @@ export function QualificationDetailDialog({
                 </Section>
 
                 <Section title='法人信息'>
-                  <FieldRow label='法人姓名' value={d.legal_representative_name} />
-                  <FieldRow label='法人证件类型' value={d.legal_representative_cert_type} />
-                  <FieldRow label='法人证件号码' value={d.legal_representative_cert_number} />
-                  <FieldRow label='法人证件地址' value={d.legal_representative_cert_address} />
+                  <FieldRow
+                    label='法人姓名'
+                    value={d.legal_representative_name}
+                  />
+                  <FieldRow
+                    label='法人证件类型'
+                    value={d.legal_representative_cert_type}
+                  />
+                  <FieldRow
+                    label='法人证件号码'
+                    value={d.legal_representative_cert_number}
+                  />
+                  <FieldRow
+                    label='法人证件地址'
+                    value={d.legal_representative_cert_address}
+                  />
                 </Section>
 
                 <Section title='责任人信息'>
                   <FieldRow label='姓名' value={d.responsible_name} />
                   <FieldRow label='证件类型' value={d.responsible_cert_type} />
-                  <FieldRow label='证件号码' value={d.responsible_cert_number} />
+                  <FieldRow
+                    label='证件号码'
+                    value={d.responsible_cert_number}
+                  />
                   <FieldRow label='手机号' value={d.responsible_phone} />
                   <FieldRow label='地址' value={d.responsible_address} />
                 </Section>
@@ -138,12 +166,27 @@ export function QualificationDetailDialog({
                 <Section title='签名与模板'>
                   <FieldRow label='短信签名' value={d.sms_signature} />
                   <FieldRow label='签名类型' value={d.signature_type} />
-                  <FieldRow label='签名是否已认证' value={d.signature_verified} />
-                  <FieldRow label='是否网关签名' value={d.is_gateway_signature} />
+                  <FieldRow
+                    label='签名是否已认证'
+                    value={d.signature_verified}
+                  />
+                  <FieldRow
+                    label='是否网关签名'
+                    value={d.is_gateway_signature}
+                  />
                   <FieldRow label='模板内容' value={d.sms_template_content} />
-                  <FieldRow label='模板是否有变量' value={d.template_has_variable} />
-                  <FieldRow label='模板参数类型' value={d.template_param_type} />
-                  <FieldRow label='模板参数长度' value={d.template_param_length} />
+                  <FieldRow
+                    label='模板是否有变量'
+                    value={d.template_has_variable}
+                  />
+                  <FieldRow
+                    label='模板参数类型'
+                    value={d.template_param_type}
+                  />
+                  <FieldRow
+                    label='模板参数长度'
+                    value={d.template_param_length}
+                  />
                 </Section>
 
                 <Section title='业务信息'>
@@ -155,42 +198,63 @@ export function QualificationDetailDialog({
 
                 <Section title='引流信息'>
                   <FieldRow label='引流号码' value={d.diversion_number} />
-                  <FieldRow label='引流号码类型' value={d.diversion_number_type} />
-                  <FieldRow label='引流号码用途' value={d.diversion_number_usage} />
+                  <FieldRow
+                    label='引流号码类型'
+                    value={d.diversion_number_type}
+                  />
+                  <FieldRow
+                    label='引流号码用途'
+                    value={d.diversion_number_usage}
+                  />
                   <FieldRow label='引流内容' value={d.diversion_content} />
-                  <FieldRow label='引流链接' value={d.link_address} />
+                  <FieldRow label='引流短链' value={d.link_address} />
+                  <FieldRow label='引流长链' value={d.diversion_long_link} />
                   <FieldRow label='链接类型' value={d.link_type} />
                 </Section>
               </div>
 
               <div>
-                <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>附件图片</h4>
+                <h4 className='mb-2 border-b pb-1 text-sm font-semibold'>
+                  附件图片
+                </h4>
                 <div className='grid grid-cols-2 gap-4 md:grid-cols-4'>
                   {imageFields.map((field) => {
-                    const matched = imageAttachments.filter((a) => a.field_name === field.match)
+                    const matched = imageAttachments.filter(
+                      (a) => a.field_name === field.match
+                    )
                     return (
                       <div key={field.name} className='space-y-1'>
-                        <span className='text-muted-foreground text-xs'>{field.name}</span>
+                        <span className='text-muted-foreground text-xs'>
+                          {field.name}
+                        </span>
                         {matched.length > 0 ? (
                           matched.map((a) => (
                             <div key={a.id} className='rounded border p-1'>
-                              <div className='relative group cursor-pointer' onClick={() => setLightboxSrc(getImageUrl(a.id))}>
+                              <div
+                                className='group relative cursor-pointer'
+                                onClick={() =>
+                                  setLightboxSrc(getImageUrl(a.id))
+                                }
+                              >
                                 <img
                                   src={getImageUrl(a.id)}
                                   alt={field.name}
                                   className='bg-muted h-32 w-full rounded object-contain'
                                 />
-                                <div className='absolute inset-0 flex items-center justify-center rounded bg-black/0 group-hover:bg-black/30 transition-colors'>
-                                  <ZoomIn className='h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
+                                <div className='absolute inset-0 flex items-center justify-center rounded bg-black/0 transition-colors group-hover:bg-black/30'>
+                                  <ZoomIn className='h-6 w-6 text-white opacity-0 transition-opacity group-hover:opacity-100' />
                                 </div>
                               </div>
                               <div className='text-muted-foreground mt-1 text-xs'>
-                                {a.original_name} ({(a.file_size / 1024).toFixed(1)}KB)
+                                {a.original_name} (
+                                {(a.file_size / 1024).toFixed(1)}KB)
                               </div>
                             </div>
                           ))
                         ) : (
-                          <div className='text-muted-foreground flex h-20 items-center justify-center rounded border border-dashed text-xs'>暂无</div>
+                          <div className='text-muted-foreground flex h-20 items-center justify-center rounded border border-dashed text-xs'>
+                            暂无
+                          </div>
                         )}
                       </div>
                     )
@@ -202,21 +266,29 @@ export function QualificationDetailDialog({
         </div>
 
         <div className='flex shrink-0 justify-end border-t px-6 py-3'>
-          <Button variant='outline' onClick={() => onOpenChange(false)}>关闭</Button>
+          <Button variant='outline' onClick={() => onOpenChange(false)}>
+            关闭
+          </Button>
         </div>
       </DialogContent>
 
       {/* 图片全屏查看 — 在 Dialog 内部渲染但 z-[9999] 高于 overlay */}
       {lightboxSrc && (
         <div
-          className='fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 cursor-pointer'
-          onClick={(e) => { e.stopPropagation(); setLightboxSrc(null) }}
+          className='fixed inset-0 z-[9999] flex cursor-pointer items-center justify-center bg-black/80'
+          onClick={(e) => {
+            e.stopPropagation()
+            setLightboxSrc(null)
+          }}
         >
           <Button
             variant='ghost'
             size='icon'
             className='absolute top-4 right-4 text-white hover:bg-white/20'
-            onClick={(e) => { e.stopPropagation(); setLightboxSrc(null) }}
+            onClick={(e) => {
+              e.stopPropagation()
+              setLightboxSrc(null)
+            }}
           >
             <XIcon className='h-6 w-6' />
           </Button>

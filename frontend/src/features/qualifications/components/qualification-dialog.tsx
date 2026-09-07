@@ -1,8 +1,23 @@
 import { useState, useRef, useEffect } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Upload, X, ChevronDown } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  createQualification,
+  updateQualification,
+  uploadQualificationImage,
+} from '@/lib/api/qualifications'
+import type { QualificationInfo } from '@/lib/api/types'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import {
   Dialog,
   DialogContent,
@@ -20,7 +35,6 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -28,16 +42,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
-import { toast } from 'sonner'
-import { Upload, X, ChevronDown } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { createQualification, updateQualification, uploadQualificationImage } from '@/lib/api/qualifications'
-import type { QualificationInfo } from '@/lib/api/types'
 
 const IMAGE_FIELDS = [
   { name: 'cert_image', label: '单位证件图片' },
@@ -49,6 +53,7 @@ const IMAGE_FIELDS = [
   { name: 'handler_photo', label: '经办人现场照片' },
   { name: 'diversion_proof_image', label: '引流号码举证附件' },
   { name: 'diversion_link_proof_image', label: '引流链接举证' },
+  { name: 'trademark_uniqueness_proof_image', label: '商标唯一性举证' },
 ]
 
 const PANEL_KEYS = [
@@ -108,6 +113,7 @@ const formSchema = z.object({
   diversion_number_usage: z.string().optional(),
   diversion_content: z.string().optional(),
   link_address: z.string().optional(),
+  diversion_long_link: z.string().optional(),
   link_type: z.string().optional(),
 })
 
@@ -136,7 +142,12 @@ interface Props {
   onSuccess: () => void
 }
 
-export function QualificationDialog({ open, onOpenChange, qualification, onSuccess }: Props) {
+export function QualificationDialog({
+  open,
+  onOpenChange,
+  qualification,
+  onSuccess,
+}: Props) {
   const queryClient = useQueryClient()
   const [uploading, setUploading] = useState(false)
 
@@ -146,15 +157,20 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   // Collapsible panel state
-  const [openPanels, setOpenPanels] = useState<Record<PanelKey, boolean>>(
-    () => makeDefaultOpenMap(!qualification),
+  const [openPanels, setOpenPanels] = useState<Record<PanelKey, boolean>>(() =>
+    makeDefaultOpenMap(!qualification)
   )
 
   // ── Mutations ───────────────────────────────────────────────
 
   const createMutation = useMutation({
     mutationFn: (data: FormData) => {
-      const { signature_verified, is_gateway_signature, template_has_variable, ...rest } = data
+      const {
+        signature_verified,
+        is_gateway_signature,
+        template_has_variable,
+        ...rest
+      } = data
       const apiData: Partial<QualificationInfo> = {
         ...rest,
         signature_verified: strToBool(signature_verified),
@@ -170,9 +186,13 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
       if (Object.keys(imageFiles).length > 0) {
         setUploading(true)
         for (const [fieldKey, file] of Object.entries(imageFiles)) {
-          const fieldDef = IMAGE_FIELDS.find(f => f.name === fieldKey)
+          const fieldDef = IMAGE_FIELDS.find((f) => f.name === fieldKey)
           try {
-            await uploadQualificationImage(id, file, fieldDef?.label || fieldKey)
+            await uploadQualificationImage(
+              id,
+              file,
+              fieldDef?.label || fieldKey
+            )
           } catch {
             toast.error(`${fieldDef?.label || fieldKey} 上传失败`)
           }
@@ -190,7 +210,12 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: FormData }) => {
-      const { signature_verified, is_gateway_signature, template_has_variable, ...rest } = data
+      const {
+        signature_verified,
+        is_gateway_signature,
+        template_has_variable,
+        ...rest
+      } = data
       const apiData: Partial<QualificationInfo> = {
         ...rest,
         signature_verified: strToBool(signature_verified),
@@ -204,9 +229,13 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
       if (Object.keys(imageFiles).length > 0) {
         setUploading(true)
         for (const [fieldKey, file] of Object.entries(imageFiles)) {
-          const fieldDef = IMAGE_FIELDS.find(f => f.name === fieldKey)
+          const fieldDef = IMAGE_FIELDS.find((f) => f.name === fieldKey)
           try {
-            await uploadQualificationImage(variables.id, file, fieldDef?.label || fieldKey)
+            await uploadQualificationImage(
+              variables.id,
+              file,
+              fieldDef?.label || fieldKey
+            )
           } catch {
             toast.error(`${fieldDef?.label || fieldKey} 上传失败`)
           }
@@ -225,7 +254,7 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
   // ── Image handlers ──────────────────────────────────────────
 
   const cleanupImages = () => {
-    setImagePreviews(prev => {
+    setImagePreviews((prev) => {
       for (const url of Object.values(prev)) {
         URL.revokeObjectURL(url)
       }
@@ -234,25 +263,26 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
     setImageFiles({})
   }
 
-  const handleImageSelect = (fieldKey: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setImageFiles(prev => ({ ...prev, [fieldKey]: file }))
-    const url = URL.createObjectURL(file)
-    setImagePreviews(prev => {
-      const old = prev[fieldKey]
-      if (old) URL.revokeObjectURL(old)
-      return { ...prev, [fieldKey]: url }
-    })
-  }
+  const handleImageSelect =
+    (fieldKey: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (!file) return
+      setImageFiles((prev) => ({ ...prev, [fieldKey]: file }))
+      const url = URL.createObjectURL(file)
+      setImagePreviews((prev) => {
+        const old = prev[fieldKey]
+        if (old) URL.revokeObjectURL(old)
+        return { ...prev, [fieldKey]: url }
+      })
+    }
 
   const handleRemoveImage = (fieldKey: string) => () => {
-    setImageFiles(prev => {
+    setImageFiles((prev) => {
       const next = { ...prev }
       delete next[fieldKey]
       return next
     })
-    setImagePreviews(prev => {
+    setImagePreviews((prev) => {
       const next = { ...prev }
       if (next[fieldKey]) URL.revokeObjectURL(next[fieldKey])
       delete next[fieldKey]
@@ -268,10 +298,14 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
         cert_type: qualification.cert_type || '',
         cert_number: qualification.cert_number || '',
         app_platform_name: qualification.app_platform_name || '',
-        legal_representative_name: qualification.legal_representative_name || '',
-        legal_representative_cert_type: qualification.legal_representative_cert_type || '',
-        legal_representative_cert_number: qualification.legal_representative_cert_number || '',
-        legal_representative_cert_address: qualification.legal_representative_cert_address || '',
+        legal_representative_name:
+          qualification.legal_representative_name || '',
+        legal_representative_cert_type:
+          qualification.legal_representative_cert_type || '',
+        legal_representative_cert_number:
+          qualification.legal_representative_cert_number || '',
+        legal_representative_cert_address:
+          qualification.legal_representative_cert_address || '',
         responsible_name: qualification.responsible_name || '',
         responsible_cert_type: qualification.responsible_cert_type || '',
         responsible_cert_number: qualification.responsible_cert_number || '',
@@ -299,6 +333,7 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
         diversion_number_usage: qualification.diversion_number_usage || '',
         diversion_content: qualification.diversion_content || '',
         link_address: qualification.link_address || '',
+        diversion_long_link: qualification.diversion_long_link || '',
         link_type: qualification.link_type || '',
       }
     : {
@@ -337,6 +372,7 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
         diversion_number_usage: '',
         diversion_content: '',
         link_address: '',
+        diversion_long_link: '',
         link_type: '',
       }
 
@@ -365,7 +401,8 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
     onOpenChange(newOpen)
   }
 
-  const isPending = createMutation.isPending || updateMutation.isPending || uploading
+  const isPending =
+    createMutation.isPending || updateMutation.isPending || uploading
 
   // ── Collapsible panel helper ────────────────────────────────
 
@@ -381,21 +418,21 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
     return (
       <Collapsible
         open={openPanels[panelKey]}
-        onOpenChange={(open) => setOpenPanels(prev => ({ ...prev, [panelKey]: open }))}
-        className="border-t pt-4"
+        onOpenChange={(open) =>
+          setOpenPanels((prev) => ({ ...prev, [panelKey]: open }))
+        }
+        className='border-t pt-4'
       >
-        <CollapsibleTrigger className="flex w-full items-center justify-between cursor-pointer group">
-          <h3 className="text-sm font-semibold">{title}</h3>
+        <CollapsibleTrigger className='group flex w-full cursor-pointer items-center justify-between'>
+          <h3 className='text-sm font-semibold'>{title}</h3>
           <ChevronDown
             className={cn(
-              'h-4 w-4 text-muted-foreground transition-transform duration-200',
-              openPanels[panelKey] && 'rotate-180',
+              'text-muted-foreground h-4 w-4 transition-transform duration-200',
+              openPanels[panelKey] && 'rotate-180'
             )}
           />
         </CollapsibleTrigger>
-        <CollapsibleContent className="pt-3">
-          {children}
-        </CollapsibleContent>
+        <CollapsibleContent className='pt-3'>{children}</CollapsibleContent>
       </Collapsible>
     )
   }
@@ -404,8 +441,8 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[700px]">
-        <DialogHeader className="shrink-0 border-b px-6 py-4 pr-12">
+      <DialogContent className='flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[700px]'>
+        <DialogHeader className='shrink-0 border-b px-6 py-4 pr-12'>
           <DialogTitle>{qualification ? '编辑资质' : '新建资质'}</DialogTitle>
           <DialogDescription>
             {qualification ? '修改企业资质信息' : '创建新的企业资质信息'}
@@ -413,595 +450,747 @@ export function QualificationDialog({ open, onOpenChange, qualification, onSucce
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
-            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-6 py-4">
-
-            {/* ── 企业信息 ──────────────────────────────────── */}
-            <Panel panelKey="enterprise" title="企业信息">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="enterprise_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>企业名称 *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="企业全称" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="cert_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>证件类型</FormLabel>
-                      <FormControl>
-                        <Input placeholder="如: 营业执照" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="cert_number"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>证件号码</FormLabel>
-                      <FormControl>
-                        <Input placeholder="统一社会信用代码" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="app_platform_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>应用/平台名称</FormLabel>
-                      <FormControl>
-                        <Input placeholder="应用或平台名称" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </Panel>
-
-            {/* ── 法人信息 ──────────────────────────────────── */}
-            <Panel panelKey="legal" title="法人信息">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="legal_representative_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>法人姓名</FormLabel>
-                      <FormControl>
-                        <Input placeholder="法人代表姓名" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="legal_representative_cert_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>法人证件类型</FormLabel>
-                      <FormControl>
-                        <Input placeholder="如: 身份证" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="legal_representative_cert_number"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>法人证件号码</FormLabel>
-                      <FormControl>
-                        <Input placeholder="法人证件号码" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="legal_representative_cert_address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>法人证件地址</FormLabel>
-                      <FormControl>
-                        <Input placeholder="法人证件地址" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </Panel>
-
-            {/* ── 责任人信息 ────────────────────────────────── */}
-            <Panel panelKey="responsible" title="责任人信息">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="responsible_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>姓名</FormLabel>
-                      <FormControl>
-                        <Input placeholder="责任人姓名" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="responsible_cert_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>证件类型</FormLabel>
-                      <FormControl>
-                        <Input placeholder="如: 身份证" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="responsible_cert_number"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>证件号码</FormLabel>
-                      <FormControl>
-                        <Input placeholder="责任人证件号" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="responsible_address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>地址</FormLabel>
-                      <FormControl>
-                        <Input placeholder="责任人地址" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="responsible_phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>联系电话</FormLabel>
-                      <FormControl>
-                        <Input placeholder="手机号码" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </Panel>
-
-            {/* ── 经办人信息 ────────────────────────────────── */}
-            <Panel panelKey="handler" title="经办人信息">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="handler_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>姓名</FormLabel>
-                      <FormControl>
-                        <Input placeholder="经办人姓名" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="handler_cert_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>证件类型</FormLabel>
-                      <FormControl>
-                        <Input placeholder="如: 身份证" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="handler_cert_number"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>证件号码</FormLabel>
-                      <FormControl>
-                        <Input placeholder="经办人证件号" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="handler_address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>地址</FormLabel>
-                      <FormControl>
-                        <Input placeholder="经办人地址" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="handler_phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>联系电话</FormLabel>
-                      <FormControl>
-                        <Input placeholder="手机号码" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </Panel>
-
-            {/* ── 签名与模板 ────────────────────────────────── */}
-            <Panel panelKey="signature_template" title="签名与模板">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="sms_signature"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>短信签名</FormLabel>
-                      <FormControl>
-                        <Input placeholder="报备用短信签名" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="signature_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>签名类型</FormLabel>
-                      <FormControl>
-                        <Input placeholder="签名类型" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="signature_verified"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>签名核验</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className='flex min-h-0 flex-1 flex-col'
+          >
+            <div className='min-h-0 flex-1 space-y-1 overflow-y-auto px-6 py-4'>
+              {/* ── 企业信息 ──────────────────────────────────── */}
+              <Panel panelKey='enterprise' title='企业信息'>
+                <div className='grid grid-cols-2 gap-4'>
+                  <FormField
+                    control={form.control}
+                    name='enterprise_name'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>企业名称 *</FormLabel>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="请选择" />
-                          </SelectTrigger>
+                          <Input placeholder='企业全称' {...field} />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="true">是</SelectItem>
-                          <SelectItem value="false">否</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="is_gateway_signature"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>是否网关签名</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="请选择" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="true">是</SelectItem>
-                          <SelectItem value="false">否</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="sms_template_content"
-                  render={({ field }) => (
-                    <FormItem className="col-span-2">
-                      <FormLabel>短信模板内容</FormLabel>
-                      <FormControl>
-                        <Input placeholder="模板内容" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="template_has_variable"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>模板含变量</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="请选择" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="true">是</SelectItem>
-                          <SelectItem value="false">否</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="template_param_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>参数类型</FormLabel>
-                      <FormControl>
-                        <Input placeholder="参数类型" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="template_param_length"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>参数长度</FormLabel>
-                      <FormControl>
-                        <Input placeholder="参数长度" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </Panel>
-
-            {/* ── 业务信息 ──────────────────────────────────── */}
-            <Panel panelKey="business" title="业务信息">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="business_attribute"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>业务属性</FormLabel>
-                      <FormControl>
-                        <Input placeholder="业务属性" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="business_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>业务类型</FormLabel>
-                      <FormControl>
-                        <Input placeholder="业务类型" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="business_subtype"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>业务子类</FormLabel>
-                      <FormControl>
-                        <Input placeholder="业务子类" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="specific_usage"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>具体用途</FormLabel>
-                      <FormControl>
-                        <Input placeholder="具体用途说明" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </Panel>
-
-            {/* ── 引流信息 ──────────────────────────────────── */}
-            <Panel panelKey="diversion" title="引流信息">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="diversion_number"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>引流号码</FormLabel>
-                      <FormControl>
-                        <Input placeholder="引流号码" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="diversion_number_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>号码类型</FormLabel>
-                      <FormControl>
-                        <Input placeholder="号码类型" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="diversion_number_usage"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>引流用途</FormLabel>
-                      <FormControl>
-                        <Input placeholder="引流用途说明" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="diversion_content"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>引流内容</FormLabel>
-                      <FormControl>
-                        <Input placeholder="引流内容" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="link_address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>引流链接</FormLabel>
-                      <FormControl>
-                        <Input placeholder="链接 URL" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="link_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>链接类型</FormLabel>
-                      <FormControl>
-                        <Input placeholder="链接类型" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </Panel>
-
-            {/* ── 证件图片 ──────────────────────────────────── */}
-            <Panel panelKey="images" title="证件图片">
-              <div className="grid grid-cols-2 gap-4">
-                {IMAGE_FIELDS.map((field) => (
-                  <div key={field.name}>
-                    <FormLabel className="mb-1 block">{field.label}</FormLabel>
-                    {imagePreviews[field.name] ? (
-                      <div className="relative rounded border overflow-hidden">
-                        <img
-                          src={imagePreviews[field.name]}
-                          alt={field.label}
-                          className="h-32 w-full object-contain bg-muted"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute top-1 right-1 h-6 w-6 bg-background/80 hover:bg-background"
-                          onClick={handleRemoveImage(field.name)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div
-                        className="flex h-32 cursor-pointer flex-col items-center justify-center rounded border-2 border-dashed border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50"
-                        onClick={() => fileRefs.current[field.name]?.click()}
-                      >
-                        <Upload className="h-5 w-5 mb-1" />
-                        <span className="text-xs">上传图片</span>
-                      </div>
+                        <FormMessage />
+                      </FormItem>
                     )}
-                    <input
-                      ref={(el) => { fileRefs.current[field.name] = el }}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageSelect(field.name)}
-                      className="hidden"
-                    />
-                  </div>
-                ))}
-              </div>
-            </Panel>
+                  />
+                  <FormField
+                    control={form.control}
+                    name='cert_type'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>证件类型</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='如: 营业执照'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='cert_number'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>证件号码</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='统一社会信用代码'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='app_platform_name'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>应用/平台名称</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='应用或平台名称'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </Panel>
 
+              {/* ── 法人信息 ──────────────────────────────────── */}
+              <Panel panelKey='legal' title='法人信息'>
+                <div className='grid grid-cols-2 gap-4'>
+                  <FormField
+                    control={form.control}
+                    name='legal_representative_name'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>法人姓名</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='法人代表姓名'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='legal_representative_cert_type'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>法人证件类型</FormLabel>
+                        <FormControl>
+                          <Input placeholder='如: 身份证' {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='legal_representative_cert_number'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>法人证件号码</FormLabel>
+                        <FormControl>
+                          <Input placeholder='法人证件号码' {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='legal_representative_cert_address'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>法人证件地址</FormLabel>
+                        <FormControl>
+                          <Input placeholder='法人证件地址' {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </Panel>
+
+              {/* ── 责任人信息 ────────────────────────────────── */}
+              <Panel panelKey='responsible' title='责任人信息'>
+                <div className='grid grid-cols-2 gap-4'>
+                  <FormField
+                    control={form.control}
+                    name='responsible_name'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>姓名</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='责任人姓名'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='responsible_cert_type'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>证件类型</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='如: 身份证'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='responsible_cert_number'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>证件号码</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='责任人证件号'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='responsible_address'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>地址</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='责任人地址'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='responsible_phone'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>联系电话</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='手机号码'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </Panel>
+
+              {/* ── 经办人信息 ────────────────────────────────── */}
+              <Panel panelKey='handler' title='经办人信息'>
+                <div className='grid grid-cols-2 gap-4'>
+                  <FormField
+                    control={form.control}
+                    name='handler_name'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>姓名</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='经办人姓名'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='handler_cert_type'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>证件类型</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='如: 身份证'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='handler_cert_number'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>证件号码</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='经办人证件号'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='handler_address'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>地址</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='经办人地址'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='handler_phone'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>联系电话</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='手机号码'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </Panel>
+
+              {/* ── 签名与模板 ────────────────────────────────── */}
+              <Panel panelKey='signature_template' title='签名与模板'>
+                <div className='grid grid-cols-2 gap-4'>
+                  <FormField
+                    control={form.control}
+                    name='sms_signature'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>短信签名</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='报备用短信签名'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='signature_type'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>签名类型</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='签名类型'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='signature_verified'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>签名核验</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value || ''}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder='请选择' />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value='true'>是</SelectItem>
+                            <SelectItem value='false'>否</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='is_gateway_signature'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>是否网关签名</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value || ''}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder='请选择' />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value='true'>是</SelectItem>
+                            <SelectItem value='false'>否</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='sms_template_content'
+                    render={({ field }) => (
+                      <FormItem className='col-span-2'>
+                        <FormLabel>短信模板内容</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='模板内容'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='template_has_variable'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>模板含变量</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value || ''}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder='请选择' />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value='true'>是</SelectItem>
+                            <SelectItem value='false'>否</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='template_param_type'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>参数类型</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='参数类型'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='template_param_length'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>参数长度</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='参数长度'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </Panel>
+
+              {/* ── 业务信息 ──────────────────────────────────── */}
+              <Panel panelKey='business' title='业务信息'>
+                <div className='grid grid-cols-2 gap-4'>
+                  <FormField
+                    control={form.control}
+                    name='business_attribute'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>业务属性</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='业务属性'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='business_type'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>业务类型</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='业务类型'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='business_subtype'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>业务子类</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='业务子类'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='specific_usage'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>具体用途</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='具体用途说明'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </Panel>
+
+              {/* ── 引流信息 ──────────────────────────────────── */}
+              <Panel panelKey='diversion' title='引流信息'>
+                <div className='grid grid-cols-2 gap-4'>
+                  <FormField
+                    control={form.control}
+                    name='diversion_number'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>引流号码</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='引流号码'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='diversion_number_type'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>号码类型</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='号码类型'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='diversion_number_usage'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>引流用途</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='引流用途说明'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='diversion_content'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>引流内容</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='引流内容'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='link_address'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>引流短链</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='短链 URL'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='diversion_long_link'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>引流长链</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='长链 URL'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='link_type'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>链接类型</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='链接类型'
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </Panel>
+
+              {/* ── 证件图片 ──────────────────────────────────── */}
+              <Panel panelKey='images' title='证件图片'>
+                <div className='grid grid-cols-2 gap-4'>
+                  {IMAGE_FIELDS.map((field) => (
+                    <div key={field.name}>
+                      <FormLabel className='mb-1 block'>
+                        {field.label}
+                      </FormLabel>
+                      {imagePreviews[field.name] ? (
+                        <div className='relative overflow-hidden rounded border'>
+                          <img
+                            src={imagePreviews[field.name]}
+                            alt={field.label}
+                            className='bg-muted h-32 w-full object-contain'
+                          />
+                          <Button
+                            type='button'
+                            variant='ghost'
+                            size='icon'
+                            className='bg-background/80 hover:bg-background absolute top-1 right-1 h-6 w-6'
+                            onClick={handleRemoveImage(field.name)}
+                          >
+                            <X className='h-3 w-3' />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div
+                          className='border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 flex h-32 cursor-pointer flex-col items-center justify-center rounded border-2 border-dashed'
+                          onClick={() => fileRefs.current[field.name]?.click()}
+                        >
+                          <Upload className='mb-1 h-5 w-5' />
+                          <span className='text-xs'>上传图片</span>
+                        </div>
+                      )}
+                      <input
+                        ref={(el) => {
+                          fileRefs.current[field.name] = el
+                        }}
+                        type='file'
+                        accept='image/*'
+                        onChange={handleImageSelect(field.name)}
+                        className='hidden'
+                      />
+                    </div>
+                  ))}
+                </div>
+              </Panel>
             </div>
 
-            <DialogFooter className="shrink-0 px-6 py-4">
-              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isPending}>
+            <DialogFooter className='shrink-0 px-6 py-4'>
+              <Button
+                type='button'
+                variant='outline'
+                onClick={() => handleOpenChange(false)}
+                disabled={isPending}
+              >
                 取消
               </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? '处理中...' : (qualification ? '更新' : '创建')}
+              <Button type='submit' disabled={isPending}>
+                {isPending ? '处理中...' : qualification ? '更新' : '创建'}
               </Button>
             </DialogFooter>
           </form>

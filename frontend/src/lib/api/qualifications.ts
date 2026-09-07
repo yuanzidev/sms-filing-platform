@@ -1,5 +1,10 @@
 import api from '../api'
-import type { BatchSignatureResponse, QualificationInfo, QualificationListResponse, FileAttachmentPublic } from './types'
+import type {
+  BatchSignatureResponse,
+  QualificationInfo,
+  QualificationListResponse,
+  FileAttachmentPublic,
+} from './types'
 
 export const getQualifications = async (params?: {
   page?: number
@@ -13,20 +18,26 @@ export const getQualifications = async (params?: {
   return response.data
 }
 
-export const getQualification = async (id: string): Promise<QualificationInfo> => {
+export const getQualification = async (
+  id: string
+): Promise<QualificationInfo> => {
   const response = await api.get(`/api/v1/qualifications/${id}`)
   return response.data
 }
 
-export const getQualificationAttachments = async (id: string): Promise<FileAttachmentPublic[]> => {
-  const response = await api.get('/api/v1/files', { params: { entity_type: 'qualification_info', entity_id: id } })
+export const getQualificationAttachments = async (
+  id: string
+): Promise<FileAttachmentPublic[]> => {
+  const response = await api.get('/api/v1/files', {
+    params: { entity_type: 'qualification_info', entity_id: id },
+  })
   return response.data
 }
 
 export const uploadQualificationImage = async (
   entityId: string,
   file: File,
-  fieldName: string,
+  fieldName: string
 ): Promise<FileAttachmentPublic> => {
   const formData = new FormData()
   formData.append('file', file)
@@ -37,18 +48,34 @@ export const uploadQualificationImage = async (
   return response.data
 }
 
-export const createQualification = async (data: Partial<QualificationInfo>): Promise<QualificationInfo> => {
+export const createQualification = async (
+  data: Partial<QualificationInfo>
+): Promise<QualificationInfo> => {
   const response = await api.post('/api/v1/qualifications', data)
   return response.data
 }
 
-export const updateQualification = async (id: string, data: Partial<QualificationInfo>): Promise<QualificationInfo> => {
+export const updateQualification = async (
+  id: string,
+  data: Partial<QualificationInfo>
+): Promise<QualificationInfo> => {
   const response = await api.patch(`/api/v1/qualifications/${id}`, data)
   return response.data
 }
 
-export const deleteQualification = async (id: string): Promise<{ message: string }> => {
+export const deleteQualification = async (
+  id: string
+): Promise<{ message: string }> => {
   const response = await api.delete(`/api/v1/qualifications/${id}`)
+  return response.data
+}
+
+export const batchDeleteQualifications = async (
+  ids: string[]
+): Promise<{ deleted_count: number }> => {
+  const response = await api.post('/api/v1/qualifications/batch-delete', {
+    ids,
+  })
   return response.data
 }
 
@@ -79,6 +106,8 @@ export interface ImportResult {
   success_count: number
   error_count: number
   errors: ImportErrorItem[]
+  skipped_count?: number
+  skipped_rows?: number[]
   warnings?: string[]
   unrecognized_headers?: string[]
 }
@@ -90,24 +119,45 @@ export interface ImportPreviewResult {
   total_data_rows: number
 }
 
-export const importQualifications = async (file: File): Promise<ImportResult> => {
+// 导入/预览需上传完整 Excel（可能含大量图片，几十 MB），10 秒全局超时不够，单独放宽
+const IMPORT_TIMEOUT = 5 * 60 * 1000
+
+export const importQualifications = async (
+  file: File
+): Promise<ImportResult> => {
   const formData = new FormData()
   formData.append('file', file)
-  const response = await api.post('/api/v1/qualifications/import', formData)
-  return response.data
-}
-
-export const previewQualificationsImport = async (file: File): Promise<ImportPreviewResult> => {
-  const formData = new FormData()
-  formData.append('file', file)
-  const response = await api.post('/api/v1/qualifications/import/preview', formData)
-  return response.data
-}
-
-export const downloadQualificationImportErrorReport = async (errors: ImportErrorItem[]): Promise<void> => {
-  const response = await api.post('/api/v1/qualifications/import/error-report', { errors }, {
-    responseType: 'blob',
+  const response = await api.post('/api/v1/qualifications/import', formData, {
+    timeout: IMPORT_TIMEOUT,
   })
+  return response.data
+}
+
+export const previewQualificationsImport = async (
+  file: File
+): Promise<ImportPreviewResult> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  const response = await api.post(
+    '/api/v1/qualifications/import/preview',
+    formData,
+    {
+      timeout: IMPORT_TIMEOUT,
+    }
+  )
+  return response.data
+}
+
+export const downloadQualificationImportErrorReport = async (
+  errors: ImportErrorItem[]
+): Promise<void> => {
+  const response = await api.post(
+    '/api/v1/qualifications/import/error-report',
+    { errors },
+    {
+      responseType: 'blob',
+    }
+  )
   const url = window.URL.createObjectURL(new Blob([response.data]))
   const link = document.createElement('a')
   link.href = url
@@ -119,8 +169,11 @@ export const downloadQualificationImportErrorReport = async (errors: ImportError
 }
 
 export const getQualificationsBySignatures = async (
-  signatures: string[],
+  signatures: string[]
 ): Promise<BatchSignatureResponse> => {
-  const response = await api.post('/api/v1/qualifications/batch-by-signatures', { signatures })
+  const response = await api.post(
+    '/api/v1/qualifications/batch-by-signatures',
+    { signatures }
+  )
   return response.data
 }

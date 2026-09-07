@@ -9,6 +9,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import {
   Table,
@@ -48,9 +49,12 @@ export function DataTable<TData, TValue>({
   getRowId,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([])
-  const [internalRowSelection, setInternalRowSelection] = useState<RowSelectionState>({})
+  const [internalRowSelection, setInternalRowSelection] =
+    useState<RowSelectionState>({})
   const [pageInput, setPageInput] = useState(String(page))
   const effectiveRowSelection = rowSelection ?? internalRowSelection
+  const shouldRenderSelectionColumn =
+    !!enableRowSelection && !columns.some((column) => column.id === 'select')
 
   const table = useReactTable({
     data,
@@ -97,6 +101,9 @@ export function DataTable<TData, TValue>({
     }
   }
 
+  const visibleColumnCount =
+    columns.length + (shouldRenderSelectionColumn ? 1 : 0)
+
   return (
     <div className='space-y-4'>
       <div className='bg-card overflow-hidden rounded-lg border shadow-sm shadow-slate-950/5'>
@@ -104,6 +111,23 @@ export function DataTable<TData, TValue>({
           <TableHeader className='bg-muted/50'>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
+                {shouldRenderSelectionColumn && (
+                  <TableHead className='h-11 w-10 px-3'>
+                    <Checkbox
+                      checked={
+                        table.getIsAllPageRowsSelected()
+                          ? true
+                          : table.getIsSomePageRowsSelected()
+                            ? 'indeterminate'
+                            : false
+                      }
+                      onCheckedChange={(value) =>
+                        table.toggleAllPageRowsSelected(!!value)
+                      }
+                      aria-label='选择全部'
+                    />
+                  </TableHead>
+                )}
                 {headerGroup.headers.map((header) => (
                   <TableHead key={header.id} className='h-11 px-3'>
                     {header.isPlaceholder
@@ -125,6 +149,15 @@ export function DataTable<TData, TValue>({
                   data-state={row.getIsSelected() && 'selected'}
                   className='hover:bg-primary/5 data-[state=selected]:bg-primary/10'
                 >
+                  {shouldRenderSelectionColumn && (
+                    <TableCell className='w-10 px-3 py-3'>
+                      <Checkbox
+                        checked={row.getIsSelected()}
+                        onCheckedChange={(value) => row.toggleSelected(!!value)}
+                        aria-label='选择行'
+                      />
+                    </TableCell>
+                  )}
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className='px-3 py-3'>
                       {flexRender(
@@ -138,7 +171,7 @@ export function DataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={visibleColumnCount}
                   className='h-32 text-center'
                 >
                   <EmptyState
@@ -187,11 +220,7 @@ export function DataTable<TData, TValue>({
               className='h-8 w-20'
             />
             <span className='text-muted-foreground text-sm'>页</span>
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={goToPage}
-            >
+            <Button variant='outline' size='sm' onClick={goToPage}>
               跳转
             </Button>
           </div>

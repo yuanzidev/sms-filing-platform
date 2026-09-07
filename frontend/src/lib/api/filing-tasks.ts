@@ -1,5 +1,9 @@
 import api from '../api'
-import type { FilingTask, FilingTasksResponse, CreateFilingTaskRequest } from './types'
+import type {
+  FilingTask,
+  FilingTasksResponse,
+  CreateFilingTaskRequest,
+} from './types'
 
 /**
  * 报备任务查询参数
@@ -15,7 +19,9 @@ export interface FilingTaskFilters {
 /**
  * 获取报备任务列表
  */
-export const getFilingTasks = async (params?: FilingTaskFilters): Promise<FilingTasksResponse> => {
+export const getFilingTasks = async (
+  params?: FilingTaskFilters
+): Promise<FilingTasksResponse> => {
   const response = await api.get('/api/v1/filing-tasks', { params })
   return response.data
 }
@@ -31,7 +37,9 @@ export const getFilingTask = async (id: string): Promise<FilingTask> => {
 /**
  * 创建报备任务
  */
-export const createFilingTask = async (data: CreateFilingTaskRequest): Promise<FilingTask> => {
+export const createFilingTask = async (
+  data: CreateFilingTaskRequest
+): Promise<FilingTask> => {
   const response = await api.post('/api/v1/filing-tasks', data)
   return response.data
 }
@@ -39,8 +47,17 @@ export const createFilingTask = async (data: CreateFilingTaskRequest): Promise<F
 /**
  * 删除报备任务
  */
-export const deleteFilingTask = async (id: string): Promise<{ message: string }> => {
+export const deleteFilingTask = async (
+  id: string
+): Promise<{ message: string }> => {
   const response = await api.delete(`/api/v1/filing-tasks/${id}`)
+  return response.data
+}
+
+export const batchDeleteFilingTasks = async (
+  ids: string[]
+): Promise<{ deleted_count: number }> => {
+  const response = await api.post('/api/v1/filing-tasks/batch-delete', { ids })
   return response.data
 }
 
@@ -55,13 +72,17 @@ export async function regenerateFilingTask(id: string): Promise<void> {
  * 下载报备任务文件（blob，后端代理 MinIO）
  * 文件名优先从后端 Content-Disposition 响应头提取，其次使用传入 name，兜底 export.xlsx
  */
-export const downloadFilingTaskFile = async (id: string, name?: string): Promise<void> => {
+export const downloadFilingTaskFile = async (
+  id: string,
+  name?: string
+): Promise<void> => {
   const response = await api.get(`/api/v1/filing-tasks/${id}/download`, {
     responseType: 'blob',
   })
   // 从 Content-Disposition 响应头提取 filename
   let filename = name || 'export.xlsx'
-  const disposition = (response.headers as Record<string, string>)['content-disposition'] || ''
+  const disposition =
+    (response.headers as Record<string, string>)['content-disposition'] || ''
   const match = disposition.match(/filename\*?=(?:UTF-8'')?(.+?)(?:;|$)/i)
   if (match) {
     filename = decodeURIComponent(match[1].trim())

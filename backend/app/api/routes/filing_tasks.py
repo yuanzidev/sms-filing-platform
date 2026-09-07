@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from pydantic import BaseModel
 from sqlmodel import select
 
 from app.api.deps import CurrentUser, SessionDep, require_permission
@@ -56,9 +57,13 @@ write_perm = Depends(require_permission("filing:write"))
 export_perm = Depends(require_permission("filing:export"))
 
 
+class FilingTaskBatchDelete(BaseModel):
+    ids: list[uuid.UUID]
+
+
 def get_field_value(
     qualification: QualificationInfo,
-    port: PortInfo,
+    port: PortInfo | None,
     field_name: str,
     allocated_sub_port: str | None = None,
 ) -> str:
@@ -66,10 +71,14 @@ def get_field_value(
     if field_name == "sub_port_number" and allocated_sub_port is not None:
         return allocated_sub_port
     if field_name == "port_sub_extension":
+        if port is None:
+            return ""
         if allocated_sub_port is not None:
             return allocated_sub_port
         return getattr(port, "sub_port_number", "") or ""
     if field_name == "port_full_number":
+        if port is None:
+            return ""
         mpn = getattr(port, "main_port_number", "") or ""
         sub = (
             allocated_sub_port
@@ -87,6 +96,8 @@ def get_field_value(
         "port_enterprise_name": "enterprise_name",
     }
     if source == "port":
+        if port is None:
+            return ""
         attr = _PORT_ALIAS.get(field_name, field_name)
         value = getattr(port, attr, "")
     elif source == "qualification":
@@ -98,7 +109,7 @@ def get_field_value(
         return ""
     if isinstance(value, bool):
         return "是" if value else "否"
-    if isinstance(value, (date, datetime)):
+    if isinstance(value, date | datetime):
         return value.isoformat()
     return str(value)
 
@@ -162,7 +173,7 @@ def generate_excel(
         cell.border = thin_border
 
     # Build rows: Cartesian product (auto 模式下仅主端口行，附带分配的子端口号)
-    rows: list[tuple[QualificationInfo, PortInfo, str | None]]
+    rows: list[tuple[QualificationInfo, PortInfo | None, str | None]]
     if auto_allocate_sub_ports:
         main_port_dict: dict[str, PortInfo] = {}
         for p in ports:
@@ -173,6 +184,8 @@ def generate_excel(
             for q in qualifications
             for mpn in main_port_dict
         ]
+    elif not ports:
+        rows = [(q, None, None) for q in qualifications]
     else:
         rows = [(q, p, None) for q in qualifications for p in ports]
 
@@ -198,7 +211,7 @@ def generate_excel(
         for col_idx, field_name in enumerate(col_names, 1):
             value = get_field_value(q, p, field_name, allocated_sub)
             if field_name in img_col_map:
-                value = "[无图片]"
+                value = ""
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
             cell.border = thin_border
 
@@ -208,7 +221,7 @@ def generate_excel(
             source = field_source(field_name)
             if source == "image_qualification":
                 image_bytes = qual_images.get(q.id, {}).get(field_name)
-            elif source == "image_port":
+            elif source == "image_port" and p is not None:
                 image_bytes = port_images.get(p.id, {}).get(field_name)
             if image_bytes:
                 cell = ws.cell(row=row_idx, column=col_idx)
@@ -287,7 +300,13 @@ _CN_TO_LOGICAL_IMG = {
     "签名举证附件": "signature_proof",
     "引流号码举证附件": "diversion_number_proof",
     "引流链接举证": "diversion_link_proof",
+    "商标唯一性举证": "trademark_uniqueness_proof",
     "经办人现场照片": "handler_scene_photo",
+    "signature_proof_image": "signature_proof",
+    "diversion_proof_image": "diversion_number_proof",
+    "diversion_link_proof_image": "diversion_link_proof",
+    "trademark_uniqueness_proof_image": "trademark_uniqueness_proof",
+    "handler_photo": "handler_scene_photo",
 }
 
 _LOGICAL_IMG_FIELDS = {f.name for f in REGISTRY if f.source.startswith("image")}
@@ -299,9 +318,10 @@ _QUALIFICATION_IMAGE_COL_TO_LOGICAL = {
     17: "handler_scene_photo",
     22: "handler_id_front",
     23: "handler_id_back",
-    42: "signature_proof",
-    43: "diversion_number_proof",
-    44: "diversion_link_proof",
+    39: "trademark_uniqueness_proof",
+    44: "signature_proof",
+    45: "diversion_number_proof",
+    46: "diversion_link_proof",
 }
 _PORT_IMAGE_COL_TO_LOGICAL = {
     26: "auth_image",
@@ -578,17 +598,21 @@ def create_task(
     if not qualifications:
         raise HTTPException(status_code=404, detail="未找到匹配的资质信息")
 
+    qualification_only = create.allocation_mode == "qualification_only"
+
     # 3. Load ports by explicit IDs
-    if not create.port_ids:
+    if not create.port_ids and not qualification_only:
         raise HTTPException(status_code=400, detail="至少选择一个端口")
 
-    selected_ports = list(
-        session.exec(
-            select(PortInfo).where(PortInfo.id.in_(create.port_ids))  # type: ignore
-        ).all()
-    )
-    if len(selected_ports) != len(create.port_ids):
-        raise HTTPException(status_code=400, detail="部分端口ID无效")
+    selected_ports: list[PortInfo] = []
+    if create.port_ids and not qualification_only:
+        selected_ports = list(
+            session.exec(
+                select(PortInfo).where(PortInfo.id.in_(create.port_ids))  # type: ignore
+            ).all()
+        )
+        if len(selected_ports) != len(create.port_ids):
+            raise HTTPException(status_code=400, detail="部分端口ID无效")
     selected_port_ids = [p.id for p in selected_ports]
 
     # 4. Create task record first (so we have an ID)
@@ -605,7 +629,7 @@ def create_task(
 
     # 5.5 自动分配子端口号（可选）
     allocated_sub_ports: dict[tuple[uuid.UUID, str], str] = {}
-    auto_allocate = create.auto_allocate_sub_ports
+    auto_allocate = create.auto_allocate_sub_ports and not qualification_only
 
     if auto_allocate:
         try:
@@ -759,6 +783,35 @@ def delete_task(
         target=target,
     )
     return Message(message="报备任务删除成功")
+
+
+@router.post("/batch-delete", dependencies=[write_perm])
+def batch_delete_tasks(
+    *, session: SessionDep, body: FilingTaskBatchDelete, current_user: CurrentUser, request: Request
+) -> Any:
+    deleted_count = 0
+    storage = get_storage()
+    for task_id in body.ids:
+        task = get_filing_task(session=session, id=task_id)
+        if not task:
+            continue
+        if task.file_path:
+            try:
+                storage.delete(task.file_path)
+            except Exception:
+                pass
+        target = task.task_name
+        delete_filing_task(session=session, db_obj=task)
+        log_operation(
+            session=session,
+            user=current_user,
+            user_ip=request.client.host if request.client else "",
+            module="filing_tasks",
+            action="batch_delete",
+            target=target,
+        )
+        deleted_count += 1
+    return {"deleted_count": deleted_count}
 
 
 @router.get("/{id}/download", dependencies=[export_perm])

@@ -1,17 +1,25 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { type ColumnDef } from '@tanstack/react-table'
-import { Download, Plus, RefreshCw, Search as SearchIcon } from 'lucide-react'
+import { type ColumnDef, type RowSelectionState } from '@tanstack/react-table'
+import {
+  Download,
+  Plus,
+  RefreshCw,
+  Search as SearchIcon,
+  Trash2,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import {
   getFilingTasks,
   deleteFilingTask,
+  batchDeleteFilingTasks,
   downloadFilingTaskFile,
   regenerateFilingTask,
 } from '@/lib/api/filing-tasks'
 import type { FilingTask } from '@/lib/api/types'
 import { formatCN } from '@/lib/time'
+import { usePermissions } from '@/hooks/use-permissions'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,7 +42,6 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
-import { usePermissions } from '@/hooks/use-permissions'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ActionIconButton } from '@/components/shared/action-icon-button'
@@ -84,8 +91,10 @@ export function FilingManagementPage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
   const [regenerating, setRegenerating] = useState<string | null>(null)
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const queryClient = useQueryClient()
   const { has } = usePermissions()
 
@@ -104,6 +113,14 @@ export function FilingManagementPage() {
 
   const tasks = useMemo(() => data?.data ?? [], [data])
   const total = data?.total ?? 0
+  const selectedIds = useMemo(
+    () =>
+      Object.entries(rowSelection)
+        .filter(([, selected]) => selected)
+        .map(([id]) => id),
+    [rowSelection]
+  )
+  const selectedCount = selectedIds.length
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteFilingTask(id),
@@ -115,6 +132,17 @@ export function FilingManagementPage() {
     onError: () => toast.error('删除失败'),
   })
 
+  const batchDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => batchDeleteFilingTasks(ids),
+    onSuccess: (result) => {
+      toast.success(`已删除 ${result.deleted_count} 条报备任务`)
+      setRowSelection({})
+      setBatchDeleteOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['filing-tasks'] })
+    },
+    onError: () => toast.error('批量删除失败'),
+  })
+
   const { data: taskDetail, isLoading: detailLoading } = useQuery({
     queryKey: ['filing-task-detail', detailId],
     queryFn: () =>
@@ -122,18 +150,21 @@ export function FilingManagementPage() {
     enabled: !!detailId,
   })
 
-  const handleRegenerate = useCallback(async (id: string) => {
-    setRegenerating(id)
-    try {
-      await regenerateFilingTask(id)
-      toast.success('文件已重新生成，可以下载了')
-      queryClient.invalidateQueries({ queryKey: ['filing-tasks'] })
-    } catch {
-      toast.error('重新生成失败')
-    } finally {
-      setRegenerating(null)
-    }
-  }, [queryClient])
+  const handleRegenerate = useCallback(
+    async (id: string) => {
+      setRegenerating(id)
+      try {
+        await regenerateFilingTask(id)
+        toast.success('文件已重新生成，可以下载了')
+        queryClient.invalidateQueries({ queryKey: ['filing-tasks'] })
+      } catch {
+        toast.error('重新生成失败')
+      } finally {
+        setRegenerating(null)
+      }
+    },
+    [queryClient]
+  )
 
   const handleDownload = useCallback(
     async (id: string) => {
@@ -264,6 +295,16 @@ export function FilingManagementPage() {
                 </Link>
               </Button>
             )}
+            {has('filing:write') && selectedCount > 0 && (
+              <Button
+                variant='destructive'
+                onClick={() => setBatchDeleteOpen(true)}
+                disabled={batchDeleteMutation.isPending}
+              >
+                <Trash2 className='mr-2 h-4 w-4' />
+                删除 ({selectedCount})
+              </Button>
+            )}
           </div>
         </div>
 
@@ -317,6 +358,10 @@ export function FilingManagementPage() {
           pageSize={PAGE_SIZE}
           total={total}
           onPageChange={setPage}
+          enableRowSelection
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
+          getRowId={(row) => row.id}
         />
 
         <Dialog
@@ -374,22 +419,34 @@ export function FilingManagementPage() {
                   <div className='flex items-center justify-between'>
                     <span className='font-medium'>资质明细</span>
                     <span className='text-muted-foreground'>
-                      {taskDetail.qualifications?.length ?? 0} / {taskDetail.qualification_count}
+                      {taskDetail.qualifications?.length ?? 0} /{' '}
+                      {taskDetail.qualification_count}
                     </span>
                   </div>
                   <div className='max-h-44 space-y-2 overflow-auto rounded-md border p-2'>
                     {taskDetail.qualifications?.length ? (
                       taskDetail.qualifications.map((qualification) => (
-                        <div key={qualification.id} className='rounded-md bg-muted/60 p-2'>
-                          <div className='font-medium'>{qualification.enterprise_name}</div>
-                          <div className='mt-1 grid grid-cols-2 gap-2 text-xs text-muted-foreground'>
-                            <span>签名：{qualification.sms_signature || '-'}</span>
-                            <span>单位证件号：{qualification.cert_number || '-'}</span>
+                        <div
+                          key={qualification.id}
+                          className='bg-muted/60 rounded-md p-2'
+                        >
+                          <div className='font-medium'>
+                            {qualification.enterprise_name}
+                          </div>
+                          <div className='text-muted-foreground mt-1 grid grid-cols-2 gap-2 text-xs'>
+                            <span>
+                              签名：{qualification.sms_signature || '-'}
+                            </span>
+                            <span>
+                              单位证件号：{qualification.cert_number || '-'}
+                            </span>
                           </div>
                         </div>
                       ))
                     ) : (
-                      <div className='py-4 text-center text-muted-foreground'>暂无资质明细</div>
+                      <div className='text-muted-foreground py-4 text-center'>
+                        暂无资质明细
+                      </div>
                     )}
                   </div>
                 </div>
@@ -403,22 +460,29 @@ export function FilingManagementPage() {
                   <div className='max-h-44 space-y-2 overflow-auto rounded-md border p-2'>
                     {taskDetail.ports?.length ? (
                       taskDetail.ports.map((port) => (
-                        <div key={port.id} className='rounded-md bg-muted/60 p-2'>
+                        <div
+                          key={port.id}
+                          className='bg-muted/60 rounded-md p-2'
+                        >
                           <div className='flex flex-wrap items-center gap-x-3 gap-y-1 font-medium'>
                             <span>{port.main_port_number}</span>
                             <span className='text-muted-foreground'>
                               子端口：{port.sub_port_number || '-'}
                             </span>
                           </div>
-                          <div className='mt-1 grid grid-cols-2 gap-2 text-xs text-muted-foreground'>
+                          <div className='text-muted-foreground mt-1 grid grid-cols-2 gap-2 text-xs'>
                             <span>运营商：{port.carrier}</span>
                             <span>端口类型：{port.port_type}</span>
-                            <span className='col-span-2'>备案公司：{port.enterprise_name}</span>
+                            <span className='col-span-2'>
+                              备案公司：{port.enterprise_name}
+                            </span>
                           </div>
                         </div>
                       ))
                     ) : (
-                      <div className='py-4 text-center text-muted-foreground'>暂无端口明细</div>
+                      <div className='text-muted-foreground py-4 text-center'>
+                        暂无端口明细
+                      </div>
                     )}
                   </div>
                 </div>
@@ -453,6 +517,26 @@ export function FilingManagementPage() {
               <AlertDialogCancel>取消</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+              >
+                删除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={batchDeleteOpen} onOpenChange={setBatchDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认批量删除</AlertDialogTitle>
+              <AlertDialogDescription>
+                确定要删除已选的 {selectedCount}{' '}
+                条报备任务吗？此操作不可撤销，对应的导出文件也将被删除。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => batchDeleteMutation.mutate(selectedIds)}
               >
                 删除
               </AlertDialogAction>

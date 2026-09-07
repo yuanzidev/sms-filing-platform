@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Upl
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from pydantic import BaseModel
+from sqlmodel import select
 
 from app.api.deps import CurrentUser, SessionDep, require_permission
 from app.crud.qualification import (
@@ -78,6 +79,8 @@ _QUALIFICATION_HEADER_TO_FIELD = {
     "引流号码用途": "diversion_number_usage",
     "引流内容": "diversion_content",
     "引流链接": "link_address",
+    "引流短链": "link_address",
+    "引流长链": "diversion_long_link",
     "链接类型": "link_type",
 }
 
@@ -118,7 +121,9 @@ _QUALIFICATION_HEADERS = [
     "业务细类",
     "具体用途",
     "引流号码",
-    "引流链接",
+    "引流短链",
+    "引流长链",
+    "商标唯一性举证",
     "引流号码类型",
     "引流号码用途",
     "引流内容",
@@ -134,6 +139,7 @@ _QUALIFICATION_HEADERS = [
 def download_qualification_template() -> Any:
     from openpyxl.styles import Font
     from PIL import Image, ImageDraw
+
     from app.services.excel_image_extractor import inject_cell_images
 
     wb = Workbook()
@@ -180,7 +186,9 @@ def download_qualification_template() -> Any:
         "登录验证",  # 业务细类
         "用户登录验证",  # 具体用途
         "13800000000",  # 引流号码
-        "https://example.com",  # 引流链接
+        "https://t.example.com/a1b2",  # 引流短链
+        "https://example.com/campaign/detail?source=sms",  # 引流长链
+        "",  # 商标唯一性举证
         "手机号",  # 引流号码类型
         "业务联系",  # 引流号码用途
         "欢迎使用我们的服务",  # 引流内容
@@ -206,7 +214,7 @@ def download_qualification_template() -> Any:
         "6. 系统会自动提取每行单元格内嵌的图片，并与对应字段关联",
         "7. 支持的图片格式：PNG、JPEG、GIF、BMP、WEBP，单张不超过 10MB",
         "8. 法人证件类型/号码/地址：选填；运营商报备强依赖时再填",
-        "9. 支持图片的列：单位证件图片、责任人身份证正面/反面、法人身份证正面/反面、签名举证附件、引流号码举证附件、引流链接举证、经办人现场照片；图片文件建议小于 10MB，支持 PNG、JPEG 格式",
+        "9. 支持图片的列：单位证件图片、责任人身份证正面/反面、法人身份证正面/反面、签名举证附件、引流号码举证附件、引流链接举证、商标唯一性举证、经办人现场照片；图片文件建议小于 10MB，支持 PNG、JPEG 格式",
     ]
     for i, note in enumerate(notes, 2):
         instructions.cell(row=i, column=1, value=note)
@@ -222,8 +230,8 @@ def download_qualification_template() -> Any:
     img_buf = io.BytesIO()
     sample_img.save(img_buf, format="PNG")
 
-    # 签名举证附件 is column 42 (1-based) = "AP2"
-    cell_images = {"AP2": img_buf.getvalue()}
+    # 签名举证附件 is column 44 (1-based) = "AR2"
+    cell_images = {"AR2": img_buf.getvalue()}
     xlsx_bytes = inject_cell_images(xlsx_bytes, cell_images)
 
     return StreamingResponse(
@@ -233,6 +241,49 @@ def download_qualification_template() -> Any:
             "Content-Disposition": f"attachment; filename*=UTF-8''{quote('资质导入模板_v2.xlsx')}"
         },
     )
+
+
+_QUALIFICATION_DEDUP_FIELDS = [
+    "enterprise_name",
+    "cert_number",
+    "cert_type",
+    "legal_representative_name",
+    "legal_representative_cert_type",
+    "legal_representative_cert_number",
+    "legal_representative_cert_address",
+    "responsible_name",
+    "responsible_cert_type",
+    "responsible_cert_number",
+    "responsible_address",
+    "responsible_phone",
+    "handler_name",
+    "handler_cert_type",
+    "handler_cert_number",
+    "handler_address",
+    "handler_phone",
+    "sms_signature",
+    "signature_type",
+    "link_address",
+    "diversion_long_link",
+    "diversion_number",
+]
+
+
+def _dedup_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "1" if value else "0"
+    return str(value).strip()
+
+
+def _qualification_dedup_key(obj: QualificationInfo) -> tuple[str, ...]:
+    return tuple(_dedup_value(getattr(obj, field, None)) for field in _QUALIFICATION_DEDUP_FIELDS)
+
+
+def _load_existing_qualification_keys(session: SessionDep) -> set[tuple[str, ...]]:
+    existing = session.exec(select(QualificationInfo)).all()
+    return {_qualification_dedup_key(item) for item in existing}
 
 
 @router.post("/import/preview", dependencies=[import_perm])
@@ -342,13 +393,13 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...)) 
         if all(c is None or str(c).strip() == "" for c in row):
             continue
 
-        def cell(col_name: str) -> str | None:
+        def cell(col_name: str, row_values: tuple[Any, ...] = row) -> str | None:
             if col_name not in col_map:
                 return None
             idx = col_map[col_name]
-            if idx >= len(row):
+            if idx >= len(row_values):
                 return None
-            v = row[idx]
+            v = row_values[idx]
             if v is None or str(v).strip() == "":
                 return None
             return str(v).strip()
@@ -445,25 +496,46 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...)) 
                     diversion_number_usage=cell("diversion_number_usage"),
                     diversion_content=cell("diversion_content"),
                     link_address=cell("link_address"),
+                    diversion_long_link=cell("diversion_long_link"),
                     link_type=cell("link_type"),
                 )
             )
             data_row_indices.append(row_idx)
 
-    # Phase 2: If no valid rows, return all errors
-    if not objects and errors:
+    # Phase 2: de-duplicate rows against existing data and earlier valid rows in this file.
+    skipped_rows: list[int] = []
+    if objects:
+        existing_keys = _load_existing_qualification_keys(session)
+        seen_keys: set[tuple[str, ...]] = set()
+        deduped_objects: list[QualificationInfo] = []
+        deduped_row_indices: list[int] = []
+        for obj, row_idx in zip(objects, data_row_indices, strict=True):
+            key = _qualification_dedup_key(obj)
+            if key in existing_keys or key in seen_keys:
+                skipped_rows.append(row_idx)
+                continue
+            seen_keys.add(key)
+            deduped_objects.append(obj)
+            deduped_row_indices.append(row_idx)
+        objects = deduped_objects
+        data_row_indices = deduped_row_indices
+
+    # Phase 3: If no valid rows need writing, return collected errors/skips.
+    if not objects and (errors or skipped_rows):
         return {
-            "total": len(objects) + len({e["row"] for e in errors}),
+            "total": len({e["row"] for e in errors}) + len(skipped_rows),
             "success_count": 0,
             "error_count": len(errors),
             "errors": errors,
+            "skipped_count": len(skipped_rows),
+            "skipped_rows": skipped_rows,
             "unrecognized_headers": unrecognized_headers,
         }
 
     if not objects:
         raise HTTPException(status_code=400, detail="文件中没有有效数据")
 
-    # Phase 3: Write valid rows + extract images with fixed indices
+    # Phase 4: Write valid rows + extract images with fixed indices
     session.add_all(objects)
     session.flush()
 
@@ -507,6 +579,8 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...)) 
         "success_count": len(objects),
         "error_count": len(errors),
         "errors": errors,
+        "skipped_count": len(skipped_rows),
+        "skipped_rows": skipped_rows,
         "warnings": warnings,
         "unrecognized_headers": unrecognized_headers,
     }
@@ -514,6 +588,10 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...)) 
 
 class ImportErrorReport(BaseModel):
     errors: list[dict]
+
+
+class QualificationBatchDelete(BaseModel):
+    ids: list[uuid.UUID]
 
 
 @router.post("/import/error-report", dependencies=[import_perm])
@@ -640,6 +718,33 @@ def update_qualification_endpoint(
         target=result.enterprise_name or str(id),
     )
     return result
+
+
+@router.post("/batch-delete", dependencies=[write_perm])
+def batch_delete_qualifications(
+    *,
+    session: SessionDep,
+    body: QualificationBatchDelete,
+    current_user: CurrentUser,
+    request: Request,
+) -> Any:
+    deleted_count = 0
+    for qualification_id in body.ids:
+        db_obj = get_qualification(session=session, id=qualification_id)
+        if not db_obj:
+            continue
+        target = db_obj.enterprise_name or str(qualification_id)
+        delete_qualification(session=session, db_obj=db_obj)
+        log_operation(
+            session=session,
+            user=current_user,
+            user_ip=request.client.host if request.client else "",
+            module="qualifications",
+            action="batch_delete",
+            target=target,
+        )
+        deleted_count += 1
+    return {"deleted_count": deleted_count}
 
 
 @router.delete("/{id}", dependencies=[write_perm])
