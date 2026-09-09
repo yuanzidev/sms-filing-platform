@@ -18,6 +18,7 @@ def test_field_map_contains_signature_type():
     assert fm.get("sms_signature") == "短信签名"
     assert fm.get("specific_usage") == "具体用途"
     assert fm.get("diversion_number") == "引流号码"
+    assert fm.get("diversion_short_link") == "引流短链"
     assert fm.get("link_address") == "引流短链"
     assert fm.get("diversion_long_link") == "引流长链"
 
@@ -50,6 +51,7 @@ def test_proof_image_fields_in_registry():
     assert fm.get("diversion_number_proof") == "引流号码举证附件"
     assert fm.get("diversion_link_proof") == "引流链接举证"
     assert fm.get("trademark_uniqueness_proof") == "商标唯一性举证"
+    assert fm.get("other_proof") == "其他证明图片"
     assert fm.get("handler_scene_photo") == "经办人现场照片"
 
 

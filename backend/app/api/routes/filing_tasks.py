@@ -301,11 +301,13 @@ _CN_TO_LOGICAL_IMG = {
     "引流号码举证附件": "diversion_number_proof",
     "引流链接举证": "diversion_link_proof",
     "商标唯一性举证": "trademark_uniqueness_proof",
+    "其他证明图片": "other_proof",
     "经办人现场照片": "handler_scene_photo",
     "signature_proof_image": "signature_proof",
     "diversion_proof_image": "diversion_number_proof",
     "diversion_link_proof_image": "diversion_link_proof",
     "trademark_uniqueness_proof_image": "trademark_uniqueness_proof",
+    "other_proof_image": "other_proof",
     "handler_photo": "handler_scene_photo",
 }
 
@@ -319,9 +321,10 @@ _QUALIFICATION_IMAGE_COL_TO_LOGICAL = {
     22: "handler_id_front",
     23: "handler_id_back",
     39: "trademark_uniqueness_proof",
-    44: "signature_proof",
-    45: "diversion_number_proof",
-    46: "diversion_link_proof",
+    40: "other_proof",
+    45: "signature_proof",
+    46: "diversion_number_proof",
+    47: "diversion_link_proof",
 }
 _PORT_IMAGE_COL_TO_LOGICAL = {
     26: "auth_image",

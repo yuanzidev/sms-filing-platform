@@ -78,8 +78,8 @@ _QUALIFICATION_HEADER_TO_FIELD = {
     "引流号码类型": "diversion_number_type",
     "引流号码用途": "diversion_number_usage",
     "引流内容": "diversion_content",
-    "引流链接": "link_address",
-    "引流短链": "link_address",
+    "引流链接": "diversion_short_link",
+    "引流短链": "diversion_short_link",
     "引流长链": "diversion_long_link",
     "链接类型": "link_type",
 }
@@ -124,6 +124,7 @@ _QUALIFICATION_HEADERS = [
     "引流短链",
     "引流长链",
     "商标唯一性举证",
+    "其他证明图片",
     "引流号码类型",
     "引流号码用途",
     "引流内容",
@@ -133,6 +134,20 @@ _QUALIFICATION_HEADERS = [
     "引流链接举证",
     "APP/平台名称",
 ]
+
+_QUALIFICATION_IMAGE_HEADERS = {
+    "单位证件图片",
+    "责任人身份证正面",
+    "责任人身份证反面",
+    "经办人现场照片",
+    "法人身份证正面",
+    "法人身份证反面",
+    "商标唯一性举证",
+    "其他证明图片",
+    "签名举证附件",
+    "引流号码举证附件",
+    "引流链接举证",
+}
 
 
 @router.get("/template", dependencies=[import_perm])
@@ -189,6 +204,7 @@ def download_qualification_template() -> Any:
         "https://t.example.com/a1b2",  # 引流短链
         "https://example.com/campaign/detail?source=sms",  # 引流长链
         "",  # 商标唯一性举证
+        "",  # 其他证明图片
         "手机号",  # 引流号码类型
         "业务联系",  # 引流号码用途
         "欢迎使用我们的服务",  # 引流内容
@@ -214,7 +230,7 @@ def download_qualification_template() -> Any:
         "6. 系统会自动提取每行单元格内嵌的图片，并与对应字段关联",
         "7. 支持的图片格式：PNG、JPEG、GIF、BMP、WEBP，单张不超过 10MB",
         "8. 法人证件类型/号码/地址：选填；运营商报备强依赖时再填",
-        "9. 支持图片的列：单位证件图片、责任人身份证正面/反面、法人身份证正面/反面、签名举证附件、引流号码举证附件、引流链接举证、商标唯一性举证、经办人现场照片；图片文件建议小于 10MB，支持 PNG、JPEG 格式",
+        "9. 支持图片的列：单位证件图片、责任人身份证正面/反面、法人身份证正面/反面、签名举证附件、引流号码举证附件、引流链接举证、商标唯一性举证、其他证明图片、经办人现场照片；图片文件建议小于 10MB，支持 PNG、JPEG 格式",
     ]
     for i, note in enumerate(notes, 2):
         instructions.cell(row=i, column=1, value=note)
@@ -263,10 +279,27 @@ _QUALIFICATION_DEDUP_FIELDS = [
     "handler_phone",
     "sms_signature",
     "signature_type",
-    "link_address",
+    "diversion_short_link",
     "diversion_long_link",
     "diversion_number",
 ]
+
+
+def _sync_diversion_short_link(obj: Any) -> None:
+    """Keep the legacy link_address column and the explicit short-link column aligned."""
+    short_link = getattr(obj, "diversion_short_link", None)
+    legacy_link = getattr(obj, "link_address", None)
+    fields_set = getattr(obj, "model_fields_set", set())
+    if "diversion_short_link" in fields_set:
+        obj.link_address = short_link
+        return
+    if "link_address" in fields_set:
+        obj.diversion_short_link = legacy_link
+        return
+    if short_link and not legacy_link:
+        obj.link_address = short_link
+    elif legacy_link and not short_link:
+        obj.diversion_short_link = legacy_link
 
 
 def _dedup_value(value: Any) -> str:
@@ -311,7 +344,10 @@ def preview_qualifications_import(file: UploadFile = File(...)) -> Any:
     unrecognized = [
         h
         for h in header_row
-        if h and h not in header_to_field and h not in ("", "None")
+        if h
+        and h not in header_to_field
+        and h not in _QUALIFICATION_IMAGE_HEADERS
+        and h not in ("", "None")
     ]
 
     preview_rows = []
@@ -369,7 +405,10 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...)) 
     unrecognized_headers = [
         h
         for h in header_row
-        if h and h not in header_to_field and h not in ("", "None")
+        if h
+        and h not in header_to_field
+        and h not in _QUALIFICATION_IMAGE_HEADERS
+        and h not in ("", "None")
     ]
 
     missing = [
@@ -495,7 +534,8 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...)) 
                     diversion_number_type=cell("diversion_number_type"),
                     diversion_number_usage=cell("diversion_number_usage"),
                     diversion_content=cell("diversion_content"),
-                    link_address=cell("link_address"),
+                    link_address=cell("diversion_short_link"),
+                    diversion_short_link=cell("diversion_short_link"),
                     diversion_long_link=cell("diversion_long_link"),
                     link_type=cell("link_type"),
                 )
@@ -676,6 +716,7 @@ def create_qualification_endpoint(
     current_user: CurrentUser,
     request: Request,
 ) -> Any:
+    _sync_diversion_short_link(create)
     result = create_qualification(session=session, create=create)
     log_operation(
         session=session,
@@ -708,6 +749,7 @@ def update_qualification_endpoint(
     db_obj = get_qualification(session=session, id=id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="资质信息不存在")
+    _sync_diversion_short_link(update)
     result = update_qualification(session=session, db_obj=db_obj, update=update)
     log_operation(
         session=session,

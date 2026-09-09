@@ -96,9 +96,11 @@ const FIELD_LABEL_MAP: Record<string, string> = {
   handler_cert_type: '经办人证件类型',
   handler_cert_number: '经办人证件号码',
   handler_phone: '经办人手机号',
+  diversion_short_link: '引流短链',
   link_address: '引流短链',
   diversion_long_link: '引流长链',
   trademark_uniqueness_proof: '商标唯一性举证',
+  other_proof: '其他证明图片',
 }
 
 function getFieldLabel(name: string): string {

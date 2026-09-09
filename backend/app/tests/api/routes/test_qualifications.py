@@ -191,16 +191,17 @@ def test_template_column_order_matches_new_spec(
     assert headers[36] == "引流短链", f"col37 应为「引流短链」，实际：{headers[36]}"
     assert headers[37] == "引流长链", f"col38 应为「引流长链」，实际：{headers[37]}"
     assert headers[38] == "商标唯一性举证", f"col39 应为「商标唯一性举证」，实际：{headers[38]}"
-    assert headers[43] == "签名举证附件", f"col44 应为「签名举证附件」，实际：{headers[43]}"
-    assert headers[44] == "引流号码举证附件", f"col45 应为「引流号码举证附件」，实际：{headers[44]}"
-    assert headers[45] == "引流链接举证", f"col46 应为「引流链接举证」，实际：{headers[45]}"
+    assert headers[39] == "其他证明图片", f"col40 应为「其他证明图片」，实际：{headers[39]}"
+    assert headers[44] == "签名举证附件", f"col45 应为「签名举证附件」，实际：{headers[44]}"
+    assert headers[45] == "引流号码举证附件", f"col46 应为「引流号码举证附件」，实际：{headers[45]}"
+    assert headers[46] == "引流链接举证", f"col47 应为「引流链接举证」，实际：{headers[46]}"
     # 旧名不应存在
     assert "链接地址" not in headers
     assert "经办人身份证正面" not in headers
     assert "经办人身份证反面" not in headers
     assert "引流举证附件" not in headers
     # 总列数
-    assert len([h for h in headers if h]) == 47
+    assert len([h for h in headers if h]) == 48
 
 
 def test_import_accepts_renamed_link_address_header(
@@ -222,7 +223,7 @@ def test_import_accepts_renamed_link_address_header(
     )
     assert r.status_code == 200
     assert r.json()["success_count"] == 1
-    # 验证值确实落到 link_address 和 sms_signature 字段
+    # 验证值确实落到新短链字段，并同步旧 link_address 兼容字段
     list_r = client.get(
         f"{settings.API_V1_STR}/qualifications",
         headers=superuser_token_headers,
@@ -230,6 +231,7 @@ def test_import_accepts_renamed_link_address_header(
     )
     assert list_r.status_code == 200
     item = list_r.json()["data"][0]
+    assert item["diversion_short_link"] == f"https://example.com/{marker}"
     assert item["link_address"] == f"https://example.com/{marker}"
     assert item["sms_signature"] == f"【测试签名{marker}】"
 
@@ -259,6 +261,7 @@ def test_import_accepts_short_and_long_link_headers(
     )
     assert list_r.status_code == 200
     item = list_r.json()["data"][0]
+    assert item["diversion_short_link"] == f"https://t.example/{marker}"
     assert item["link_address"] == f"https://t.example/{marker}"
     assert item["diversion_long_link"] == f"https://example.com/long/{marker}"
 
@@ -516,6 +519,24 @@ def test_preview_qualifications_import(
     assert body["total_data_rows"] == 1
     assert body["rows"][0]["enterprise_name"] == "测试企业A"
     assert body["rows"][0]["sms_signature"] == "签名A"
+
+
+def test_preview_qualification_import_recognizes_image_headers(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """图片列不进入未识别表头列表，避免导入前预览误报。"""
+    headers = ["企业名称", "商标唯一性举证", "其他证明图片", "引流号码举证附件", "引流链接举证"]
+    rows = [["测试企业图片列", "", "", "", ""]]
+    data = _build_xlsx(headers, rows)
+
+    files = {"file": ("test.xlsx", data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/import/preview",
+        headers=superuser_token_headers,
+        files=files,
+    )
+    assert r.status_code == 200
+    assert r.json()["unrecognized_headers"] == []
 
 
 def test_preview_qualifications_import_rejects_bad_extension(

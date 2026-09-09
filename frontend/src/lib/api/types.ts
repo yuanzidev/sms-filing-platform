@@ -54,6 +54,7 @@ export interface QualificationInfo {
   diversion_number_usage: string | null
   diversion_content: string | null
   link_address: string | null
+  diversion_short_link: string | null
   diversion_long_link: string | null
   link_type: string | null
   created_at: string

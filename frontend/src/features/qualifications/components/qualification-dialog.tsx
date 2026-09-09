@@ -54,6 +54,7 @@ const IMAGE_FIELDS = [
   { name: 'diversion_proof_image', label: '引流号码举证附件' },
   { name: 'diversion_link_proof_image', label: '引流链接举证' },
   { name: 'trademark_uniqueness_proof_image', label: '商标唯一性举证' },
+  { name: 'other_proof_image', label: '其他证明图片' },
 ]
 
 const PANEL_KEYS = [
@@ -112,6 +113,7 @@ const formSchema = z.object({
   diversion_number_type: z.string().optional(),
   diversion_number_usage: z.string().optional(),
   diversion_content: z.string().optional(),
+  diversion_short_link: z.string().optional(),
   link_address: z.string().optional(),
   diversion_long_link: z.string().optional(),
   link_type: z.string().optional(),
@@ -332,6 +334,8 @@ export function QualificationDialog({
         diversion_number_type: qualification.diversion_number_type || '',
         diversion_number_usage: qualification.diversion_number_usage || '',
         diversion_content: qualification.diversion_content || '',
+        diversion_short_link:
+          qualification.diversion_short_link || qualification.link_address || '',
         link_address: qualification.link_address || '',
         diversion_long_link: qualification.diversion_long_link || '',
         link_type: qualification.link_type || '',
@@ -371,6 +375,7 @@ export function QualificationDialog({
         diversion_number_type: '',
         diversion_number_usage: '',
         diversion_content: '',
+        diversion_short_link: '',
         link_address: '',
         diversion_long_link: '',
         link_type: '',
@@ -1079,7 +1084,7 @@ export function QualificationDialog({
                   />
                   <FormField
                     control={form.control}
-                    name='link_address'
+                    name='diversion_short_link'
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>引流短链</FormLabel>

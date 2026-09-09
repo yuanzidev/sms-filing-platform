@@ -56,6 +56,7 @@ class QualificationInfoBase(SQLModel):
     diversion_number_usage: str | None = Field(default=None, max_length=200)
     diversion_content: str | None = Field(default=None)
     link_address: str | None = Field(default=None, max_length=500)
+    diversion_short_link: str | None = Field(default=None, max_length=500)
     diversion_long_link: str | None = Field(default=None, max_length=1000)
     link_type: str | None = Field(default=None, max_length=50)
 
@@ -107,6 +108,7 @@ class QualificationInfoUpdate(SQLModel):
     diversion_number_usage: str | None = None
     diversion_content: str | None = None
     link_address: str | None = None
+    diversion_short_link: str | None = None
     diversion_long_link: str | None = None
     link_type: str | None = None
 

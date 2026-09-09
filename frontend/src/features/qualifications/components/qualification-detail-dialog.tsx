@@ -69,6 +69,7 @@ export function QualificationDetailDialog({
 
   const d = detail ?? qualification
   const imageAttachments = attachments ?? []
+  const diversionShortLink = d.diversion_short_link || d.link_address
 
   const getImageUrl = (id: string) => `/api/v1/files/${id}/download`
 
@@ -82,6 +83,7 @@ export function QualificationDetailDialog({
     { name: '引流号码举证附件', match: '引流号码举证附件' },
     { name: '引流链接举证', match: '引流链接举证' },
     { name: '商标唯一性举证', match: '商标唯一性举证' },
+    { name: '其他证明图片', match: '其他证明图片' },
     { name: '经办人现场照片', match: '经办人现场照片' },
   ]
 
@@ -207,7 +209,7 @@ export function QualificationDetailDialog({
                     value={d.diversion_number_usage}
                   />
                   <FieldRow label='引流内容' value={d.diversion_content} />
-                  <FieldRow label='引流短链' value={d.link_address} />
+                  <FieldRow label='引流短链' value={diversionShortLink} />
                   <FieldRow label='引流长链' value={d.diversion_long_link} />
                   <FieldRow label='链接类型' value={d.link_type} />
                 </Section>

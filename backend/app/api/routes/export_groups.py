@@ -57,7 +57,7 @@ def _find_header_index(headers: list[str], candidates: set[str]) -> int | None:
 
 @router.get("/registry", dependencies=[read_perm], response_model=list[dict])
 def read_field_registry() -> Any:
-    return [{**asdict(f), "id": f.name} for f in all_fields()]
+    return [{**asdict(f), "id": f.name} for f in all_fields() if not f.deprecated]
 
 
 @router.get("/registry/template", dependencies=[import_perm])
@@ -68,7 +68,8 @@ def download_registry_template() -> Any:
     ws.cell(row=1, column=1, value="字段编码")
     ws.cell(row=1, column=2, value="字段名称")
     ws.cell(row=1, column=3, value="所属分组")
-    for i, entry in enumerate(all_fields(), 2):
+    active_fields = [entry for entry in all_fields() if not entry.deprecated]
+    for i, entry in enumerate(active_fields, 2):
         ws.cell(row=i, column=1, value=entry.name)
         ws.cell(row=i, column=2, value=entry.label)
         ws.cell(row=i, column=3, value=entry.group)

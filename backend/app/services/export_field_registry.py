@@ -83,9 +83,10 @@ REGISTRY: list[ExportField] = [
     ExportField("diversion_number_type", "引流号码类型", "qualification", "引流信息"),
     ExportField("diversion_number_usage", "引流号码用途", "qualification", "引流信息"),
     ExportField("diversion_content", "引流内容", "qualification", "引流信息"),
-    ExportField("link_address", "引流短链", "qualification", "引流信息"),
+    ExportField("diversion_short_link", "引流短链", "qualification", "引流信息"),
     ExportField("diversion_long_link", "引流长链", "qualification", "引流信息"),
     ExportField("link_type", "链接类型", "qualification", "引流信息"),
+    ExportField("link_address", "引流短链", "qualification", "引流信息", deprecated=True),
 
     # ── 图片材料 ──
     ExportField("cert_image", "单位证件图片", "image_qualification", "图片材料"),
@@ -98,6 +99,7 @@ REGISTRY: list[ExportField] = [
     ExportField("diversion_number_proof", "引流号码举证附件", "image_qualification", "图片材料"),
     ExportField("diversion_link_proof", "引流链接举证", "image_qualification", "图片材料"),
     ExportField("trademark_uniqueness_proof", "商标唯一性举证", "image_qualification", "图片材料"),
+    ExportField("other_proof", "其他证明图片", "image_qualification", "图片材料"),
     ExportField("handler_scene_photo", "经办人现场照片", "image_qualification", "图片材料"),
 ]
 
