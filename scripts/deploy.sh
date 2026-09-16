@@ -11,10 +11,11 @@ set -e
 # ------------------------------------
 # 配置
 # ------------------------------------
-SSH_HOST="${SSH_HOST:-sms}"                              # SSH 别名(IP/端口由 ~/.ssh/config 解析)
+# 默认部署到生产机器 smsf；如需部署测试机: SSH_HOST=sms ENV_FILE=.env.deploy ./scripts/deploy.sh
+SSH_HOST="${SSH_HOST:-smsf}"                             # SSH 别名(IP/端口由 ~/.ssh/config 解析)
 REMOTE_DIR="${REMOTE_DIR:-/opt/sms-filing-platform}"    # 服务器上项目目录
 COMPOSE_FILE="docker-compose-deploy.yml"
-ENV_FILE=".env.deploy"
+ENV_FILE="${ENV_FILE:-.env.deploy.smsf}"                 # 生产环境配置(与 SSH_HOST=smsf 配套)
 HEALTH_PATH="/api/v1/utils/health-check/"               # 后端健康检查路径(经前端 nginx 代理)
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-90}"                  # 健康检查最长等待秒数
 

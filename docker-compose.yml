@@ -20,7 +20,7 @@ services:
     networks:
       - sms-filing-network
     ports:
-      - "5433:5432"
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
 
   # 后端服务
   backend:
