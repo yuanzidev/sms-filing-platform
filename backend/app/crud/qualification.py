@@ -1,5 +1,6 @@
 """CRUD operations for QualificationInfo."""
 import uuid
+from datetime import datetime
 
 from sqlmodel import Session, col, func, or_, select
 
@@ -73,12 +74,19 @@ def delete_qualification(*, session: Session, db_obj: QualificationInfo) -> None
 
 
 def get_qualifications_by_signatures(
-    *, session: Session, signatures: list[str]
+    *,
+    session: Session,
+    signatures: list[str],
+    imported_start: datetime | None = None,
+    imported_end: datetime | None = None,
 ) -> tuple[list[QualificationInfo], list[str]]:
     unique_sigs = list(dict.fromkeys(signatures))  # 去重保序
-    results = session.exec(
-        select(QualificationInfo).where(QualificationInfo.sms_signature.in_(unique_sigs))
-    ).all()
+    query = select(QualificationInfo).where(QualificationInfo.sms_signature.in_(unique_sigs))
+    if imported_start is not None:
+        query = query.where(QualificationInfo.created_at >= imported_start)
+    if imported_end is not None:
+        query = query.where(QualificationInfo.created_at < imported_end)
+    results = session.exec(query.order_by(QualificationInfo.created_at.desc())).all()
     matched_sigs = {r.sms_signature for r in results}
     unmatched = [s for s in unique_sigs if s not in matched_sigs]
     return list(results), unmatched

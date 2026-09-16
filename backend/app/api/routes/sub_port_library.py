@@ -38,7 +38,14 @@ read_perm = Depends(require_permission("sub_port:read"))
 write_perm = Depends(require_permission("sub_port:write"))
 import_perm = Depends(require_permission("sub_port:import"))
 
-FIXED_HEADERS = ("主端口号", "子端口号", "状态")
+FIXED_HEADERS = ("状态", "子端口号", "主端口号")
+FIXED_FIELD_NAMES = {"main_port_number", "sub_port_number", "port_sub_extension"}
+PRIORITY_FIELD_NAMES = ("operation_type", "port_full_number")
+SUPPLEMENTAL_FIELDS = (
+    ("other_proof", "其他举证图片"),
+    ("sub_port_failure_reason", "子端口失败原因"),
+)
+SUPPLEMENTAL_FIELD_NAMES = {name for name, _label in SUPPLEMENTAL_FIELDS}
 DELETE_MAIN_ALIASES = {"主端口号", "主端口"}
 DELETE_SUB_ALIASES = {"子端口号", "子端口"}
 
@@ -88,13 +95,52 @@ def _sorted_fields(group: ExportGroup) -> list:
     return sorted(group.fields, key=lambda f: f.sort_order)
 
 
+def _sub_port_value_fields(group: ExportGroup) -> list[tuple[str, str]]:
+    fields = [
+        (field.field_name, field.field_label)
+        for field in _sorted_fields(group)
+        if field.field_name not in FIXED_FIELD_NAMES
+        and field.field_name not in SUPPLEMENTAL_FIELD_NAMES
+    ]
+    seen_names = {name for name, _ in fields}
+    seen_labels = {label for _, label in fields}
+    for name, label in SUPPLEMENTAL_FIELDS:
+        if name not in seen_names and label not in seen_labels:
+            fields.append((name, label))
+            seen_names.add(name)
+            seen_labels.add(label)
+    return fields
+
+
+def _template_headers(group: ExportGroup) -> list[str]:
+    fields = _sub_port_value_fields(group)
+    fields_by_name = dict(fields)
+    headers = ["状态"]
+    used: set[str] = set()
+
+    for name in PRIORITY_FIELD_NAMES[:1]:
+        if name in fields_by_name:
+            headers.append(fields_by_name[name])
+            used.add(name)
+    headers.extend(["子端口号", "主端口号"])
+    for name in PRIORITY_FIELD_NAMES[1:]:
+        if name in fields_by_name:
+            headers.append(fields_by_name[name])
+            used.add(name)
+
+    for name, label in fields:
+        if name not in used:
+            headers.append(label)
+    return headers
+
+
 def _header_to_field(group: ExportGroup) -> dict[str, str]:
     """表头文本 -> 数据键（固定列 + 字段组字段 label）。"""
     mapping: dict[str, str] = {}
     for header in FIXED_HEADERS:
         mapping.setdefault(header, header)
-    for field in _sorted_fields(group):
-        mapping.setdefault(field.field_label, field.field_name)
+    for name, label in _sub_port_value_fields(group):
+        mapping.setdefault(label, name)
     return mapping
 
 
@@ -126,7 +172,7 @@ def _parse_sub_port_excel(
                 detail=f"缺少必要的表头列：{required}，请使用导入模板",
             )
 
-    group_fields = _sorted_fields(group)
+    group_fields = _sub_port_value_fields(group)
     records: list[dict] = []
     errors: list[dict] = []
     seen: set[tuple[str, str]] = set()
@@ -192,10 +238,10 @@ def _parse_sub_port_excel(
         seen.add(key)
 
         field_values: dict[str, str] = {}
-        for field in group_fields:
-            col_idx = col_map.get(field.field_name)
+        for field_name, _label in group_fields:
+            col_idx = col_map.get(field_name)
             value = values[col_idx] if col_idx is not None and col_idx < len(values) else ""
-            field_values[field.field_name] = value
+            field_values[field_name] = value
 
         records.append(
             {
@@ -267,21 +313,22 @@ def download_template(*, session: SessionDep, group_id: uuid.UUID) -> Any:
     wb = Workbook()
     ws = wb.active
     ws.title = "子端口数据"
-    headers = list(FIXED_HEADERS) + [
-        field.field_label for field in _sorted_fields(group)
-    ]
+    headers = _template_headers(group)
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
 
     instructions = wb.create_sheet("填写说明")
     instructions.cell(row=1, column=1, value="子端口数据导入填写说明")
+    field_labels = "、".join(label for _, label in _sub_port_value_fields(group))
     notes = [
         "1. 主端口号、子端口号为必填项，不能为空；",
         "2. 状态为单选：在线 / 下线 / 整改，留空默认为“在线”；",
-        f"3. 其余列为当前字段组“{group.name}”的自定义字段，选填；",
+        f"3. 其余列为当前字段组“{group.name}”及子端口库补充字段，选填；",
         "4. 导入时按“主端口号+子端口号”匹配：已存在则覆盖更新，不存在则新增；",
-        "5. 同一文件内不允许出现重复的“主端口号+子端口号”组合。",
+        "5. 同一文件内不允许出现重复的“主端口号+子端口号”组合；如出现重复，重复行会报错并跳过。",
     ]
+    if field_labels:
+        notes.append(f"6. 当前可导入的选填字段：{field_labels}。")
     for row_idx, note in enumerate(notes, 2):
         instructions.cell(row=row_idx, column=1, value=note)
 

@@ -70,6 +70,7 @@ export interface QualificationListResponse {
 
 export interface BatchSignatureRequest {
   signatures: string[]
+  import_date?: string
 }
 
 export interface BatchSignatureResponse {

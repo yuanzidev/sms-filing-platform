@@ -1,7 +1,8 @@
 """CRUD operations for SubPortRecord."""
+import json
 import uuid
 
-from sqlalchemy import or_
+from sqlalchemy import String, cast, or_
 from sqlmodel import Session, func, select
 
 from app.core.timezone import utcnow
@@ -24,10 +25,20 @@ def list_sub_port_records(
     query = select(SubPortRecord)
 
     if keyword:
+        escaped_keyword = json.dumps(keyword, ensure_ascii=True)[1:-1]
+        field_value_conditions = [cast(SubPortRecord.field_values, String).contains(keyword)]
+        if escaped_keyword != keyword:
+            field_value_conditions.append(
+                cast(SubPortRecord.field_values, String).contains(
+                    escaped_keyword.replace("\\", "\\\\")
+                )
+            )
         query = query.where(
             or_(
                 SubPortRecord.main_port_number.contains(keyword),
                 SubPortRecord.sub_port_number.contains(keyword),
+                SubPortRecord.status.contains(keyword),
+                *field_value_conditions,
             )
         )
     if status:

@@ -2,6 +2,7 @@
 
 import io
 import uuid
+from datetime import datetime, time, timedelta, timezone
 from typing import Any
 from urllib.parse import quote
 
@@ -12,6 +13,7 @@ from pydantic import BaseModel
 from sqlmodel import select
 
 from app.api.deps import CurrentUser, SessionDep, require_permission
+from app.core.timezone import get_timezone
 from app.crud.qualification import (
     create_qualification,
     delete_qualification,
@@ -672,8 +674,20 @@ def download_import_error_report(body: ImportErrorReport) -> Any:
 
 @router.post("/batch-by-signatures", dependencies=[write_perm], response_model=BatchSignatureResponse)
 def batch_by_signatures(*, session: SessionDep, body: BatchSignatureRequest) -> Any:
+    imported_start = None
+    imported_end = None
+    if body.import_date is not None:
+        local_tz = get_timezone()
+        local_start = datetime.combine(body.import_date, time.min, tzinfo=local_tz)
+        local_end = local_start + timedelta(days=1)
+        imported_start = local_start.astimezone(timezone.utc)
+        imported_end = local_end.astimezone(timezone.utc)
+
     qualified, unmatched = get_qualifications_by_signatures(
-        session=session, signatures=body.signatures
+        session=session,
+        signatures=body.signatures,
+        imported_start=imported_start,
+        imported_end=imported_end,
     )
     return BatchSignatureResponse(
         matched_qualifications=qualified,

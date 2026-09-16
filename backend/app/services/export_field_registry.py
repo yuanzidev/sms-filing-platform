@@ -41,6 +41,7 @@ REGISTRY: list[ExportField] = [
     ExportField("customer_type", "客户类型", "port", "端口信息"),
     ExportField("basic_telecom_enterprise_id", "基础电信企业ID", "port", "端口信息", "基础电信企业唯一标识"),
     ExportField("port_enterprise_name", "主端口备案公司", "port", "端口信息"),
+    ExportField("sub_port_failure_reason", "子端口失败原因", "port", "端口信息"),
 
     # ── 业务信息（来源 qualification：这些字段实际在 qualification_info 模型上） ──
     ExportField("business_attribute", "业务属性", "qualification", "业务信息"),

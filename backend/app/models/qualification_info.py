@@ -1,6 +1,6 @@
 """Qualification info model — enterprise qualification attributes."""
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -128,6 +128,7 @@ class QualificationInfosPublic(SQLModel):
 
 class BatchSignatureRequest(SQLModel):
     signatures: list[str]
+    import_date: date | None = None
 
 
 class BatchSignatureResponse(SQLModel):

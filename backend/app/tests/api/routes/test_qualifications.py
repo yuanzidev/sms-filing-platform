@@ -1,9 +1,13 @@
 """Tests for qualifications API: updated field schema."""
 import uuid
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
+from sqlmodel import Session
 
 from app.core.config import settings
+from app.core.db import engine
+from app.models import QualificationInfo
 
 
 def test_list_qualifications_filter_by_sms_signature(
@@ -110,6 +114,43 @@ def _build_xlsx(headers: list[str], rows: list[list]) -> bytes:
 
 def _unique_marker() -> str:
     return uuid.uuid4().hex[:8]
+
+
+def test_batch_by_signatures_filters_by_import_date(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    signature = f"同签名日期筛选-{marker}"
+    old_created_at = datetime(2026, 9, 13, 16, 30, tzinfo=timezone.utc)
+    target_created_at = datetime(2026, 9, 14, 16, 30, tzinfo=timezone.utc)
+
+    with Session(engine) as session:
+        old_item = QualificationInfo(
+            enterprise_name=f"旧资质-{marker}",
+            sms_signature=signature,
+            created_at=old_created_at,
+            updated_at=old_created_at,
+        )
+        target_item = QualificationInfo(
+            enterprise_name=f"目标资质-{marker}",
+            sms_signature=signature,
+            created_at=target_created_at,
+            updated_at=target_created_at,
+        )
+        session.add(old_item)
+        session.add(target_item)
+        session.commit()
+
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/batch-by-signatures",
+        headers=superuser_token_headers,
+        json={"signatures": [signature], "import_date": "2026-09-15"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["unmatched_signatures"] == []
+    names = {item["enterprise_name"] for item in body["matched_qualifications"]}
+    assert names == {f"目标资质-{marker}"}
 
 
 def test_import_rejects_missing_enterprise_name(

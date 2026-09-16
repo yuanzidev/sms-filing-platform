@@ -25,6 +25,7 @@ import {
 } from '@/lib/api/sub-port-library'
 import type { ExportGroup } from '@/lib/api/types'
 import type { SubPortRecord } from '@/lib/api/sub-port-library'
+import { getSubPortLibraryFields } from '../fields'
 
 interface Props {
   open: boolean
@@ -47,7 +48,7 @@ export function SubPortDialog({ open, onOpenChange, record, group, onSuccess }: 
   const [status, setStatus] = useState<string>(SUB_PORT_STATUSES[0])
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
 
-  const sortedFields = [...group.fields].sort((a, b) => a.sort_order - b.sort_order)
+  const sortedFields = getSubPortLibraryFields(group)
 
   useEffect(() => {
     if (open) {
@@ -96,7 +97,7 @@ export function SubPortDialog({ open, onOpenChange, record, group, onSuccess }: 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='sm:max-w-[560px]'>
+      <DialogContent className='max-h-[88vh] overflow-hidden sm:max-w-[560px]'>
         <DialogHeader>
           <DialogTitle>{record ? '编辑子端口' : '新增子端口'}</DialogTitle>
           <DialogDescription>
@@ -104,7 +105,7 @@ export function SubPortDialog({ open, onOpenChange, record, group, onSuccess }: 
           </DialogDescription>
         </DialogHeader>
 
-        <div className='grid gap-4 py-2'>
+        <div className='grid max-h-[calc(88vh-160px)] gap-4 overflow-y-auto py-2 pr-1'>
           <div className='grid grid-cols-2 gap-4'>
             <div className='flex flex-col gap-2'>
               <label className='text-sm font-medium'>

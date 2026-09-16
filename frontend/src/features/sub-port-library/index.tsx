@@ -48,6 +48,7 @@ import { StatusTag } from '@/components/shared/status-tag'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ImportDeleteDialog } from './components/import-delete-dialog'
 import { SubPortDialog } from './components/sub-port-dialog'
+import { getSubPortLibraryFields } from './fields'
 
 const PAGE_SIZE = 10
 const GROUP_ID_STORAGE_KEY = 'sub-port-library-group-id'
@@ -156,7 +157,7 @@ export function SubPortLibraryPage() {
 
   const sortedFields = useMemo(() => {
     if (!selectedGroup) return []
-    return [...selectedGroup.fields].sort((a, b) => a.sort_order - b.sort_order)
+    return getSubPortLibraryFields(selectedGroup)
   }, [selectedGroup])
 
   const columns = useMemo<ColumnDef<SubPortRecord>[]>(() => {
@@ -356,7 +357,7 @@ export function SubPortLibraryPage() {
           <div className='flex flex-col gap-1'>
             <label className='text-muted-foreground text-sm'>关键词</label>
             <Input
-              placeholder='搜索主/子端口号'
+              placeholder='搜索全部字段'
               value={keyword}
               onChange={(e) => {
                 setKeyword(e.target.value)

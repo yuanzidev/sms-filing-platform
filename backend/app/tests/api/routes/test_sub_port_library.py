@@ -93,9 +93,27 @@ def _template_headers(
 def test_download_template(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
-    group = _create_group([("sms_signature", "短信签名"), ("enterprise_name", "企业名称")])
+    group = _create_group(
+        [
+            ("main_port_number", "主端口号"),
+            ("operation_type", "操作类型"),
+            ("sms_signature", "短信签名"),
+            ("port_full_number", "短信子端口号"),
+            ("enterprise_name", "企业名称"),
+        ]
+    )
     result = _template_headers(client, superuser_token_headers, group["id"])
-    assert result["headers"] == ["主端口号", "子端口号", "状态", "短信签名", "企业名称"]
+    assert result["headers"] == [
+        "状态",
+        "操作类型",
+        "子端口号",
+        "主端口号",
+        "短信子端口号",
+        "短信签名",
+        "企业名称",
+        "其他举证图片",
+        "子端口失败原因",
+    ]
     assert "填写说明" in result["sheets"]
     # 模板不含示例数据行
     assert result["data_rows"] == 0
@@ -126,6 +144,8 @@ def test_import_creates_records(
     assert len(data) == 1
     assert data[0]["status"] == "在线"
     assert data[0]["field_values"]["sms_signature"] == f"签名{marker}"
+    assert "other_proof" in data[0]["field_values"]
+    assert "sub_port_failure_reason" in data[0]["field_values"]
 
 
 def test_import_upsert(
@@ -332,15 +352,15 @@ def test_delete_list_parse_and_delete(
 def test_list_filters(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
-    group = _create_group([])
+    group = _create_group([("sms_signature", "短信签名")])
     marker = uuid.uuid4().hex[:8]
     main = f"1069{marker}"
     rows = [
-        [main, f"8001{marker}", "在线"],
-        [main, f"8002{marker}", "下线"],
-        [f"1070{marker}", f"8003{marker}", "整改"],
+        [main, f"8001{marker}", "在线", f"签名A{marker}"],
+        [main, f"8002{marker}", "下线", f"签名B{marker}"],
+        [f"1070{marker}", f"8003{marker}", "整改", f"签名C{marker}"],
     ]
-    content = _build_excel(["主端口号", "子端口号", "状态"], rows)
+    content = _build_excel(["主端口号", "子端口号", "状态", "短信签名"], rows)
     assert _import_file(client, superuser_token_headers, content, group["id"]).json()[
         "success_count"
     ] == 3
@@ -352,6 +372,16 @@ def test_list_filters(
         params={"keyword": f"8001{marker}"},
     )
     assert len(r.json()["data"]) == 1
+
+    # keyword 命中字段组动态字段
+    r = client.get(
+        f"{settings.API_V1_STR}/sub-port-library",
+        headers=superuser_token_headers,
+        params={"keyword": f"签名B{marker}"},
+    )
+    data = r.json()["data"]
+    assert len(data) == 1
+    assert data[0]["sub_port_number"] == f"8002{marker}"
 
     # status 精确
     r = client.get(

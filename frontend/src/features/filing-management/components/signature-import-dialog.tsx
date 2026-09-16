@@ -41,10 +41,14 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
   const [resultKey, setResultKey] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [importDate, setImportDate] = useState('')
 
   const signatures = useMemo(() => parseSignaturesFromText(pasteText), [pasteText])
   const uniqueCount = useMemo(() => new Set(signatures).size, [signatures])
-  const signatureKey = useMemo(() => [...new Set(signatures)].join('\n'), [signatures])
+  const signatureKey = useMemo(
+    () => `${[...new Set(signatures)].join('\n')}::${importDate}`,
+    [signatures, importDate]
+  )
 
   const querySignatures = useCallback(async (sigs: string[]): Promise<BatchSignatureResponse | null> => {
     const unique = [...new Set(sigs)]
@@ -56,9 +60,9 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
     setLoading(true)
     setError(null)
     try {
-      const res = await getQualificationsBySignatures(unique)
+      const res = await getQualificationsBySignatures(unique, importDate)
       setResult(res)
-      setResultKey(unique.join('\n'))
+      setResultKey(`${unique.join('\n')}::${importDate}`)
       return res
     } catch {
       setError('查询失败，请稍后重试')
@@ -66,7 +70,7 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [importDate])
 
   const handleFileUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,6 +124,7 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
     onOpenChange(false)
     // Reset
     setPasteText('')
+    setImportDate('')
     setResult(null)
     setResultKey('')
     setError(null)
@@ -139,6 +144,36 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
         </DialogHeader>
 
         <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">资质导入日期（选填）</label>
+            <div className="flex gap-2">
+              <Input
+                type="date"
+                value={importDate}
+                onChange={(e) => {
+                  setImportDate(e.target.value)
+                  setResult(null)
+                  setResultKey('')
+                }}
+                className="w-48"
+              />
+              {importDate && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setImportDate('')
+                    setResult(null)
+                    setResultKey('')
+                  }}
+                >
+                  清除
+                </Button>
+              )}
+            </div>
+          </div>
+
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="paste">
