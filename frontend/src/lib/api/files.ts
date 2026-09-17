@@ -7,7 +7,7 @@ import type { FileAttachmentPublic } from './types'
 export const uploadFile = async (
   file: File,
   entityType: string,
-  entityId: string,
+  entityId: string
 ): Promise<FileAttachmentPublic> => {
   const formData = new FormData()
   formData.append('file', file)
@@ -25,6 +25,16 @@ export const uploadFile = async (
  */
 export const getFileUrl = (id: string): string => {
   return `/api/v1/files/${id}`
+}
+
+export const listFiles = async (
+  entityType: string,
+  entityId: string
+): Promise<FileAttachmentPublic[]> => {
+  const response = await api.get('/api/v1/files', {
+    params: { entity_type: entityType, entity_id: entityId },
+  })
+  return response.data
 }
 
 /**

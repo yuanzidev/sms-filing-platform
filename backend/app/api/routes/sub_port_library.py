@@ -31,6 +31,11 @@ from app.models import (
     SubPortRecordsPublic,
     SubPortRecordUpdate,
 )
+from app.services.excel_image_extractor import (
+    extract_cell_images_from_xlsx,
+    extract_images_from_xlsx,
+    upload_import_images,
+)
 
 router = APIRouter(prefix="/sub-port-library", tags=["sub-port-library"])
 
@@ -42,6 +47,7 @@ FIXED_HEADERS = ("状态", "子端口号", "主端口号")
 FIXED_FIELD_NAMES = {"main_port_number", "sub_port_number", "port_sub_extension"}
 PRIORITY_FIELD_NAMES = ("operation_type", "port_full_number")
 SUPPLEMENTAL_FIELDS = (
+    ("is_four_category", "是否四类"),
     ("other_proof", "其他举证图片"),
     ("sub_port_failure_reason", "子端口失败原因"),
 )
@@ -151,7 +157,9 @@ def _parse_sub_port_excel(
     try:
         wb = load_workbook(io.BytesIO(content))
     except Exception:
-        raise HTTPException(status_code=400, detail="无法解析 Excel 文件，请检查文件格式")
+        raise HTTPException(
+            status_code=400, detail="无法解析 Excel 文件，请检查文件格式"
+        )
     ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
     if len(rows) < 1:
@@ -184,9 +192,17 @@ def _parse_sub_port_excel(
             continue
         total_data_rows += 1
 
-        main_port_number = values[col_map["主端口号"]] if col_map["主端口号"] < len(values) else ""
-        sub_port_number = values[col_map["子端口号"]] if col_map["子端口号"] < len(values) else ""
-        status = values[col_map["状态"]] if col_map.get("状态") is not None and col_map["状态"] < len(values) else ""
+        main_port_number = (
+            values[col_map["主端口号"]] if col_map["主端口号"] < len(values) else ""
+        )
+        sub_port_number = (
+            values[col_map["子端口号"]] if col_map["子端口号"] < len(values) else ""
+        )
+        status = (
+            values[col_map["状态"]]
+            if col_map.get("状态") is not None and col_map["状态"] < len(values)
+            else ""
+        )
 
         if not main_port_number:
             errors.append(
@@ -240,11 +256,14 @@ def _parse_sub_port_excel(
         field_values: dict[str, str] = {}
         for field_name, _label in group_fields:
             col_idx = col_map.get(field_name)
-            value = values[col_idx] if col_idx is not None and col_idx < len(values) else ""
+            value = (
+                values[col_idx] if col_idx is not None and col_idx < len(values) else ""
+            )
             field_values[field_name] = value
 
         records.append(
             {
+                "source_row": row_idx,
                 "main_port_number": main_port_number,
                 "sub_port_number": sub_port_number,
                 "status": status,
@@ -260,7 +279,9 @@ def _parse_delete_list(content: bytes) -> list[tuple[str, str]]:
     try:
         wb = load_workbook(io.BytesIO(content))
     except Exception:
-        raise HTTPException(status_code=400, detail="无法解析 Excel 文件，请检查文件格式")
+        raise HTTPException(
+            status_code=400, detail="无法解析 Excel 文件，请检查文件格式"
+        )
     ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
     if len(rows) < 1:
@@ -289,7 +310,9 @@ def _parse_delete_list(content: bytes) -> list[tuple[str, str]]:
         if all(v == "" for v in values):
             continue
         main_port_number = values[main_col] if main_col < len(values) else ""
-        sub_port_number = values[sub_col] if sub_col is not None and sub_col < len(values) else ""
+        sub_port_number = (
+            values[sub_col] if sub_col is not None and sub_col < len(values) else ""
+        )
         if not main_port_number or not sub_port_number:
             continue
         key = (main_port_number, sub_port_number)
@@ -324,7 +347,7 @@ def download_template(*, session: SessionDep, group_id: uuid.UUID) -> Any:
         "1. 主端口号、子端口号为必填项，不能为空；",
         "2. 状态为单选：在线 / 下线 / 整改，留空默认为“在线”；",
         f"3. 其余列为当前字段组“{group.name}”及子端口库补充字段，选填；",
-        "4. 导入时按“主端口号+子端口号”匹配：已存在则覆盖更新，不存在则新增；",
+        "4. 导入时“主端口号+子端口号”不能与库内已有记录重复，重复行会报错并跳过；",
         "5. 同一文件内不允许出现重复的“主端口号+子端口号”组合；如出现重复，重复行会报错并跳过。",
     ]
     if field_labels:
@@ -346,7 +369,10 @@ def download_template(*, session: SessionDep, group_id: uuid.UUID) -> Any:
 
 @router.post("/import/preview", dependencies=[import_perm])
 def preview_import(
-    *, session: SessionDep, file: UploadFile = File(...), group_id: uuid.UUID = Form(...)
+    *,
+    session: SessionDep,
+    file: UploadFile = File(...),
+    group_id: uuid.UUID = Form(...),
 ) -> Any:
     group = _load_group(session, group_id)
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
@@ -386,15 +412,20 @@ def preview_import(
 
 @router.post("/import", dependencies=[import_perm])
 def import_sub_ports(
-    *, session: SessionDep, file: UploadFile = File(...), group_id: uuid.UUID = Form(...)
+    *,
+    session: SessionDep,
+    file: UploadFile = File(...),
+    group_id: uuid.UUID = Form(...),
 ) -> Any:
     group = _load_group(session, group_id)
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
-    _, records, errors, total_data_rows = _parse_sub_port_excel(
-        file.file.read(), group
-    )
+    content = file.file.read()
+    headers, records, errors, total_data_rows = _parse_sub_port_excel(content, group)
 
+    importable_records = []
+    imported_objects: list[SubPortRecord] = []
+    data_row_indices: list[int] = []
     for record in records:
         existing = get_by_main_and_sub(
             session=session,
@@ -402,25 +433,74 @@ def import_sub_ports(
             sub_port_number=record["sub_port_number"],
         )
         if existing:
-            existing.status = record["status"]
-            existing.field_values = record["field_values"]
-            session.add(existing)
+            errors.append(
+                {
+                    "row": record["source_row"],
+                    "field": "主端口号+子端口号",
+                    "value": f'{record["main_port_number"]} / {record["sub_port_number"]}',
+                    "reason": "子端口号已存在，导入不会覆盖已有记录",
+                    "suggestion": "请删除重复子端口，或先在子端口库中删除旧记录后重新导入",
+                }
+            )
         else:
-            session.add(SubPortRecord(**record))
+            importable_records.append(record)
+            db_record = {k: v for k, v in record.items() if k != "source_row"}
+            db_obj = SubPortRecord(**db_record)
+            session.add(db_obj)
+            imported_objects.append(db_obj)
+            data_row_indices.append(record["source_row"])
+
+    warnings: list[str] = []
+    if imported_objects:
+        session.flush()
+        if file.filename.endswith(".xlsx"):
+            all_images: list = []
+            try:
+                all_images.extend(
+                    extract_cell_images_from_xlsx(
+                        content,
+                        headers=headers,
+                        data_row_indices=data_row_indices,
+                    )
+                )
+            except Exception as e:
+                warnings.append(f"单元格图片提取失败: {e}")
+            try:
+                all_images.extend(
+                    extract_images_from_xlsx(
+                        content,
+                        headers=headers,
+                        data_row_indices=data_row_indices,
+                    )
+                )
+            except Exception as e:
+                warnings.append(f"浮动图片提取失败: {e}")
+            if all_images:
+                _, img_warnings, img_errors = upload_import_images(
+                    images=all_images,
+                    objects=imported_objects,
+                    entity_type="sub_port_record",
+                    session=session,
+                )
+                warnings.extend(img_warnings)
+                errors.extend(img_errors)
     session.commit()
 
-    success_count = len(records)
+    success_count = len(importable_records)
     return {
         "total": total_data_rows,
         "success_count": success_count,
         "error_count": len(errors),
         "errors": errors,
-        "message": f"导入完成：成功 {success_count} 条（新增或覆盖更新），失败 {len(errors)} 条",
+        "warnings": warnings,
+        "message": f"导入完成：成功 {success_count} 条，失败 {len(errors)} 条",
     }
 
 
 @router.post("/import/parse-delete", dependencies=[import_perm])
-def parse_delete_list_endpoint(*, session: SessionDep, file: UploadFile = File(...)) -> Any:
+def parse_delete_list_endpoint(
+    *, session: SessionDep, file: UploadFile = File(...)
+) -> Any:
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
     pairs = _parse_delete_list(file.file.read())
@@ -444,7 +524,9 @@ def parse_delete_list_endpoint(*, session: SessionDep, file: UploadFile = File(.
 
 
 @router.post("/import/delete", dependencies=[import_perm])
-def delete_by_list_endpoint(*, session: SessionDep, file: UploadFile = File(...)) -> Any:
+def delete_by_list_endpoint(
+    *, session: SessionDep, file: UploadFile = File(...)
+) -> Any:
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
     pairs = _parse_delete_list(file.file.read())
@@ -472,7 +554,12 @@ def delete_by_list_endpoint(*, session: SessionDep, file: UploadFile = File(...)
 
 
 @router.get("", dependencies=[read_perm], response_model=SubPortRecordsPublic)
-@router.get("/", dependencies=[read_perm], include_in_schema=False, response_model=SubPortRecordsPublic)
+@router.get(
+    "/",
+    dependencies=[read_perm],
+    include_in_schema=False,
+    response_model=SubPortRecordsPublic,
+)
 def read_sub_port_records(
     session: SessionDep,
     page: int = 1,
@@ -480,6 +567,7 @@ def read_sub_port_records(
     keyword: str | None = None,
     status: str | None = None,
     main_port_number: str | None = None,
+    sub_port_number: str | None = None,
 ) -> Any:
     records, count = list_sub_port_records(
         session=session,
@@ -488,14 +576,93 @@ def read_sub_port_records(
         keyword=keyword,
         status=status,
         main_port_number=main_port_number,
+        sub_port_number=sub_port_number,
     )
     return SubPortRecordsPublic(
         data=records, total=count, page=page, page_size=page_size
     )
 
 
+@router.get("/export", dependencies=[read_perm])
+def export_sub_port_records(
+    session: SessionDep,
+    group_id: uuid.UUID,
+    keyword: str | None = None,
+    status: str | None = None,
+    main_port_number: str | None = None,
+    sub_port_number: str | None = None,
+    ids: str | None = None,
+    field_names: str | None = None,
+) -> Any:
+    group = _load_group(session, group_id)
+    selected_ids: list[uuid.UUID] | None = None
+    if ids:
+        selected_ids = []
+        for raw_id in ids.split(","):
+            raw_id = raw_id.strip()
+            if not raw_id:
+                continue
+            try:
+                selected_ids.append(uuid.UUID(raw_id))
+            except ValueError:
+                raise HTTPException(status_code=400, detail="ids 参数包含无效 UUID")
+
+    records, _count = list_sub_port_records(
+        session=session,
+        keyword=keyword,
+        status=status,
+        main_port_number=main_port_number,
+        sub_port_number=sub_port_number,
+        ids=selected_ids,
+        skip_pagination=True,
+    )
+
+    all_fields = _sub_port_value_fields(group)
+    if field_names:
+        selected_names = [
+            name.strip() for name in field_names.split(",") if name.strip()
+        ]
+        selected_set = set(selected_names)
+        fields = [(name, label) for name, label in all_fields if name in selected_set]
+    else:
+        fields = all_fields
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "子端口数据"
+    headers = ["状态", "子端口号", "主端口号", *[label for _name, label in fields]]
+    for col_idx, header in enumerate(headers, 1):
+        ws.cell(row=1, column=col_idx, value=header)
+
+    for row_idx, record in enumerate(records, 2):
+        values = [
+            record.status,
+            record.sub_port_number,
+            record.main_port_number,
+            *[record.field_values.get(name, "") for name, _label in fields],
+        ]
+        for col_idx, value in enumerate(values, 1):
+            ws.cell(row=row_idx, column=col_idx, value=value)
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote('子端口库导出.xlsx')}"
+        },
+    )
+
+
 @router.post("", dependencies=[write_perm], response_model=SubPortRecordPublic)
-@router.post("/", dependencies=[write_perm], include_in_schema=False, response_model=SubPortRecordPublic)
+@router.post(
+    "/",
+    dependencies=[write_perm],
+    include_in_schema=False,
+    response_model=SubPortRecordPublic,
+)
 def create_sub_port_record_endpoint(
     *, session: SessionDep, create: SubPortRecordCreate
 ) -> Any:
@@ -521,9 +688,7 @@ def update_sub_port_record_endpoint(
 
 
 @router.delete("/{id}", dependencies=[write_perm])
-def delete_sub_port_record_endpoint(
-    *, session: SessionDep, id: uuid.UUID
-) -> Message:
+def delete_sub_port_record_endpoint(*, session: SessionDep, id: uuid.UUID) -> Message:
     db_obj = get_sub_port_record(session=session, id=id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="子端口记录不存在")

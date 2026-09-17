@@ -14,6 +14,8 @@ export interface FilingTaskFilters {
   start_date?: string
   end_date?: string
   keyword?: string
+  main_port_number?: string
+  sub_port_number?: string
 }
 
 /**

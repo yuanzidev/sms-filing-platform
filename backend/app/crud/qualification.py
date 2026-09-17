@@ -1,4 +1,5 @@
 """CRUD operations for QualificationInfo."""
+
 import uuid
 from datetime import datetime
 
@@ -34,9 +35,15 @@ def list_qualifications(
     if identity_cert_number:
         query = query.where(
             or_(
-                col(QualificationInfo.legal_representative_cert_number).contains(identity_cert_number),
-                col(QualificationInfo.responsible_cert_number).contains(identity_cert_number),
-                col(QualificationInfo.handler_cert_number).contains(identity_cert_number),
+                col(QualificationInfo.legal_representative_cert_number).contains(
+                    identity_cert_number
+                ),
+                col(QualificationInfo.responsible_cert_number).contains(
+                    identity_cert_number
+                ),
+                col(QualificationInfo.handler_cert_number).contains(
+                    identity_cert_number
+                ),
             )
         )
     if sms_signature:
@@ -49,7 +56,9 @@ def list_qualifications(
     return list(results), count
 
 
-def create_qualification(*, session: Session, create: QualificationInfoCreate) -> QualificationInfo:
+def create_qualification(
+    *, session: Session, create: QualificationInfoCreate
+) -> QualificationInfo:
     db_obj = QualificationInfo.model_validate(create)
     session.add(db_obj)
     session.commit()
@@ -81,12 +90,23 @@ def get_qualifications_by_signatures(
     imported_end: datetime | None = None,
 ) -> tuple[list[QualificationInfo], list[str]]:
     unique_sigs = list(dict.fromkeys(signatures))  # 去重保序
-    query = select(QualificationInfo).where(QualificationInfo.sms_signature.in_(unique_sigs))
+    query = select(QualificationInfo).where(
+        QualificationInfo.sms_signature.in_(unique_sigs)
+    )
     if imported_start is not None:
         query = query.where(QualificationInfo.created_at >= imported_start)
     if imported_end is not None:
         query = query.where(QualificationInfo.created_at < imported_end)
     results = session.exec(query.order_by(QualificationInfo.created_at.desc())).all()
-    matched_sigs = {r.sms_signature for r in results}
+    results_by_signature: dict[str, list[QualificationInfo]] = {}
+    for item in results:
+        if item.sms_signature:
+            results_by_signature.setdefault(item.sms_signature, []).append(item)
+    ordered_results = [
+        item
+        for signature in unique_sigs
+        for item in results_by_signature.get(signature, [])
+    ]
+    matched_sigs = set(results_by_signature)
     unmatched = [s for s in unique_sigs if s not in matched_sigs]
-    return list(results), unmatched
+    return ordered_results, unmatched

@@ -541,7 +541,12 @@ def check_sub_port_availability(
 
 
 @router.get("", dependencies=[read_perm], response_model=FilingTasksPublic)
-@router.get("/", dependencies=[read_perm], include_in_schema=False, response_model=FilingTasksPublic)
+@router.get(
+    "/",
+    dependencies=[read_perm],
+    include_in_schema=False,
+    response_model=FilingTasksPublic,
+)
 def read_tasks(
     session: SessionDep,
     page: int = Query(1, ge=1),
@@ -549,6 +554,8 @@ def read_tasks(
     start_date: date | None = None,
     end_date: date | None = None,
     keyword: str | None = None,
+    main_port_number: str | None = None,
+    sub_port_number: str | None = None,
 ) -> Any:
     skip = (page - 1) * page_size
     items, total = list_filing_tasks(
@@ -558,6 +565,8 @@ def read_tasks(
         start_date=start_date,
         end_date=end_date,
         keyword=keyword,
+        main_port_number=main_port_number,
+        sub_port_number=sub_port_number,
     )
     data = [_task_to_public(session, t) for t in items]
     return FilingTasksPublic(data=data, total=total, page=page, page_size=page_size)
@@ -572,7 +581,12 @@ def read_task(*, session: SessionDep, id: uuid.UUID) -> Any:
 
 
 @router.post("", dependencies=[write_perm], response_model=FilingTaskDetail)
-@router.post("/", dependencies=[write_perm], include_in_schema=False, response_model=FilingTaskDetail)
+@router.post(
+    "/",
+    dependencies=[write_perm],
+    include_in_schema=False,
+    response_model=FilingTaskDetail,
+)
 def create_task(
     *,
     session: SessionDep,
@@ -600,6 +614,12 @@ def create_task(
     )
     if not qualifications:
         raise HTTPException(status_code=404, detail="未找到匹配的资质信息")
+    qualifications_by_id = {q.id: q for q in qualifications}
+    qualifications = [
+        qualifications_by_id[qid]
+        for qid in create.qualification_ids
+        if qid in qualifications_by_id
+    ]
 
     qualification_only = create.allocation_mode == "qualification_only"
 
@@ -790,7 +810,11 @@ def delete_task(
 
 @router.post("/batch-delete", dependencies=[write_perm])
 def batch_delete_tasks(
-    *, session: SessionDep, body: FilingTaskBatchDelete, current_user: CurrentUser, request: Request
+    *,
+    session: SessionDep,
+    body: FilingTaskBatchDelete,
+    current_user: CurrentUser,
+    request: Request,
 ) -> Any:
     deleted_count = 0
     storage = get_storage()

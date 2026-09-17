@@ -1,11 +1,13 @@
 """CRUD operations for filing tasks."""
+
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import or_
+from sqlalchemy import String, cast, or_
 from sqlmodel import Session, func, select
 
 from app.models.filing_task import FilingTask, FilingTaskCreate
+from app.models.port_info import PortInfo
 from app.models.user import User
 
 
@@ -28,7 +30,10 @@ def create_filing_task(
     operator_id: uuid.UUID,
     export_group_name: str | None = None,
 ) -> FilingTask:
-    task_name = create.task_name or f"BEI-{date.today().strftime('%Y%m%d')}-{_task_name_sequence(session):03d}"
+    task_name = (
+        create.task_name
+        or f"BEI-{date.today().strftime('%Y%m%d')}-{_task_name_sequence(session):03d}"
+    )
     db_obj = FilingTask(
         task_name=task_name,
         qualification_ids=[str(qid) for qid in create.qualification_ids],
@@ -60,6 +65,8 @@ def list_filing_tasks(
     start_date: date | None = None,
     end_date: date | None = None,
     keyword: str | None = None,
+    main_port_number: str | None = None,
+    sub_port_number: str | None = None,
 ) -> tuple[list[FilingTask], int]:
     query = select(FilingTask).join(User, FilingTask.operator_id == User.id)
 
@@ -78,6 +85,20 @@ def list_filing_tasks(
                 FilingTask.export_group_name.contains(keyword),  # type: ignore[union-attr]
             )
         )
+    if main_port_number or sub_port_number:
+        port_query = select(PortInfo.id)
+        if main_port_number:
+            port_query = port_query.where(PortInfo.main_port_number == main_port_number)
+        if sub_port_number:
+            port_query = port_query.where(PortInfo.sub_port_number == sub_port_number)
+        matched_port_ids = [str(id_) for id_ in session.exec(port_query).all()]
+        if not matched_port_ids:
+            return [], 0
+        port_id_conditions = [
+            cast(FilingTask.port_ids, String).contains(port_id)
+            for port_id in matched_port_ids
+        ]
+        query = query.where(or_(*port_id_conditions))
 
     count = session.exec(select(func.count()).select_from(query.subquery())).one()
     results = session.exec(

@@ -1,4 +1,5 @@
 """Tests for sub-port-library API."""
+
 import uuid
 from collections.abc import Generator
 from io import BytesIO
@@ -67,7 +68,13 @@ def _import_file(
     return client.post(
         f"{settings.API_V1_STR}/sub-port-library{path}",
         headers=headers,
-        files={"file": ("data.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        files={
+            "file": (
+                "data.xlsx",
+                content,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
         data={"group_id": group_id},
     )
 
@@ -111,6 +118,7 @@ def test_download_template(
         "短信子端口号",
         "短信签名",
         "企业名称",
+        "是否四类",
         "其他举证图片",
         "子端口失败原因",
     ]
@@ -144,11 +152,12 @@ def test_import_creates_records(
     assert len(data) == 1
     assert data[0]["status"] == "在线"
     assert data[0]["field_values"]["sms_signature"] == f"签名{marker}"
+    assert "is_four_category" in data[0]["field_values"]
     assert "other_proof" in data[0]["field_values"]
     assert "sub_port_failure_reason" in data[0]["field_values"]
 
 
-def test_import_upsert(
+def test_import_duplicate_existing_is_rejected(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
     group = _create_group([("sms_signature", "短信签名")])
@@ -159,9 +168,12 @@ def test_import_upsert(
         ["主端口号", "子端口号", "状态", "短信签名"],
         [[main, sub, "在线", f"旧签名{marker}"]],
     )
-    assert _import_file(client, superuser_token_headers, first, group["id"]).json()[
-        "success_count"
-    ] == 1
+    assert (
+        _import_file(client, superuser_token_headers, first, group["id"]).json()[
+            "success_count"
+        ]
+        == 1
+    )
 
     second = _build_excel(
         ["主端口号", "子端口号", "状态", "短信签名"],
@@ -169,7 +181,11 @@ def test_import_upsert(
     )
     r = _import_file(client, superuser_token_headers, second, group["id"])
     assert r.status_code == 200
-    assert r.json()["success_count"] == 1
+    body = r.json()
+    assert body["success_count"] == 0
+    assert body["error_count"] == 1
+    assert body["errors"][0]["row"] == 2
+    assert body["errors"][0]["reason"] == "子端口号已存在，导入不会覆盖已有记录"
 
     r = client.get(
         f"{settings.API_V1_STR}/sub-port-library",
@@ -178,8 +194,8 @@ def test_import_upsert(
     )
     data = r.json()["data"]
     assert len(data) == 1
-    assert data[0]["status"] == "整改"
-    assert data[0]["field_values"]["sms_signature"] == f"新签名{marker}"
+    assert data[0]["status"] == "在线"
+    assert data[0]["field_values"]["sms_signature"] == f"旧签名{marker}"
 
 
 def test_import_validation_errors(
@@ -311,9 +327,12 @@ def test_delete_list_parse_and_delete(
         [f"1069{marker}", f"8002{marker}", "在线"],
     ]
     content = _build_excel(["主端口号", "子端口号", "状态"], rows)
-    assert _import_file(client, superuser_token_headers, content, group["id"]).json()[
-        "success_count"
-    ] == 2
+    assert (
+        _import_file(client, superuser_token_headers, content, group["id"]).json()[
+            "success_count"
+        ]
+        == 2
+    )
 
     delete_content = _build_excel(
         ["主端口号", "子端口号"],
@@ -323,7 +342,11 @@ def test_delete_list_parse_and_delete(
         ],
     )
     r = _import_file(
-        client, superuser_token_headers, delete_content, group["id"], "/import/parse-delete"
+        client,
+        superuser_token_headers,
+        delete_content,
+        group["id"],
+        "/import/parse-delete",
     )
     assert r.status_code == 200, r.text
     body = r.json()
@@ -361,9 +384,12 @@ def test_list_filters(
         [f"1070{marker}", f"8003{marker}", "整改", f"签名C{marker}"],
     ]
     content = _build_excel(["主端口号", "子端口号", "状态", "短信签名"], rows)
-    assert _import_file(client, superuser_token_headers, content, group["id"]).json()[
-        "success_count"
-    ] == 3
+    assert (
+        _import_file(client, superuser_token_headers, content, group["id"]).json()[
+            "success_count"
+        ]
+        == 3
+    )
 
     # keyword 模糊
     r = client.get(
@@ -410,6 +436,45 @@ def test_list_filters(
     body = r.json()
     assert body["total"] == 2
     assert len(body["data"]) == 1
+
+
+def test_export_selected_fields(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    group = _create_group(
+        [("sms_signature", "短信签名"), ("enterprise_name", "企业名称")]
+    )
+    marker = uuid.uuid4().hex[:8]
+    main = f"1069{marker}"
+    content = _build_excel(
+        ["主端口号", "子端口号", "状态", "短信签名", "企业名称"],
+        [
+            [main, f"8001{marker}", "在线", f"签名A{marker}", f"企业A{marker}"],
+            [main, f"8002{marker}", "在线", f"签名B{marker}", f"企业B{marker}"],
+        ],
+    )
+    assert (
+        _import_file(client, superuser_token_headers, content, group["id"]).json()[
+            "success_count"
+        ]
+        == 2
+    )
+
+    r = client.get(
+        f"{settings.API_V1_STR}/sub-port-library/export",
+        headers=superuser_token_headers,
+        params={
+            "group_id": group["id"],
+            "main_port_number": main,
+            "field_names": "sms_signature",
+        },
+    )
+    assert r.status_code == 200, r.text
+    wb = load_workbook(BytesIO(r.content))
+    ws = wb.active
+    assert [c.value for c in ws[1]] == ["状态", "子端口号", "主端口号", "短信签名"]
+    assert ws.max_row == 3
+    assert ws.cell(row=2, column=4).value in {f"签名A{marker}", f"签名B{marker}"}
 
 
 def test_manual_crud_and_batch_delete(

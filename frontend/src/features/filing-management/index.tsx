@@ -90,6 +90,8 @@ export function FilingManagementPage() {
   const [keyword, setKeyword] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [mainPortFilter, setMainPortFilter] = useState('')
+  const [subPortFilter, setSubPortFilter] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -104,6 +106,8 @@ export function FilingManagementPage() {
     keyword: keyword || undefined,
     start_date: startDate || undefined,
     end_date: endDate || undefined,
+    main_port_number: mainPortFilter || undefined,
+    sub_port_number: subPortFilter || undefined,
   }
 
   const { data } = useQuery({
@@ -195,6 +199,8 @@ export function FilingManagementPage() {
     setKeyword('')
     setStartDate('')
     setEndDate('')
+    setMainPortFilter('')
+    setSubPortFilter('')
     setPage(1)
   }
 
@@ -203,7 +209,7 @@ export function FilingManagementPage() {
       { accessorKey: 'task_name', header: '任务名称' },
       {
         accessorKey: 'created_at',
-        header: '生成时间',
+        header: '提报时间',
         cell: ({ getValue }) => formatCN(getValue() as string),
       },
       { accessorKey: 'operator_name', header: '操作人' },
@@ -274,7 +280,7 @@ export function FilingManagementPage() {
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>报备管理</h2>
             <p className='text-muted-foreground'>
-              管理报备任务，查看导出文件并支持按日期和关键词筛选
+              管理报备任务，查看导出文件并支持按时间、端口和关键词筛选
             </p>
           </div>
           <div className='flex space-x-2'>
@@ -340,6 +346,26 @@ export function FilingManagementPage() {
                 className='w-48 pl-8'
               />
             </div>
+          </div>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>主端口号</label>
+            <Input
+              type='text'
+              placeholder='精确匹配主端口'
+              value={mainPortFilter}
+              onChange={(e) => setMainPortFilter(e.target.value)}
+              className='w-44'
+            />
+          </div>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>子端口号</label>
+            <Input
+              type='text'
+              placeholder='精确匹配子端口'
+              value={subPortFilter}
+              onChange={(e) => setSubPortFilter(e.target.value)}
+              className='w-44'
+            />
           </div>
           <div className='flex gap-2'>
             <Button size='sm' onClick={handleSearch}>

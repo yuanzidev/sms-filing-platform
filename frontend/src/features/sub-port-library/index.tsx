@@ -4,19 +4,21 @@ import { type ColumnDef } from '@tanstack/react-table'
 import type { RowSelectionState } from '@tanstack/react-table'
 import { Download, FileX, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
+import { getExportGroups } from '@/lib/api/export-groups'
 import {
   getSubPortRecords,
   deleteSubPortRecord,
   batchDeleteSubPortRecords,
   downloadSubPortTemplate,
+  downloadSubPortRecords,
   importSubPorts,
   previewSubPortsImport,
   SUB_PORT_STATUSES,
 } from '@/lib/api/sub-port-library'
 import type { SubPortRecord } from '@/lib/api/sub-port-library'
-import { getExportGroups } from '@/lib/api/export-groups'
 import type { ExportGroup } from '@/lib/api/types'
 import { formatCN } from '@/lib/time'
+import { usePermissions } from '@/hooks/use-permissions'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +30,14 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -38,7 +48,6 @@ import {
 } from '@/components/ui/select'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
-import { usePermissions } from '@/hooks/use-permissions'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ActionIconButton } from '@/components/shared/action-icon-button'
@@ -54,11 +63,9 @@ const PAGE_SIZE = 10
 const GROUP_ID_STORAGE_KEY = 'sub-port-library-group-id'
 
 const STATUS_COLOR_MAP: Record<string, string> = {
-  在线:
-    'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300',
+  在线: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300',
   下线: 'border-slate-200 bg-slate-50 text-slate-700',
-  整改:
-    'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300',
+  整改: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300',
 }
 
 export function SubPortLibraryPage() {
@@ -69,6 +76,7 @@ export function SubPortLibraryPage() {
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('__all__')
   const [mainPortFilter, setMainPortFilter] = useState('')
+  const [subPortFilter, setSubPortFilter] = useState('')
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<SubPortRecord | undefined>()
@@ -76,6 +84,10 @@ export function SubPortLibraryPage() {
   const [toDelete, setToDelete] = useState<SubPortRecord | undefined>()
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [deleteListDialogOpen, setDeleteListDialogOpen] = useState(false)
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [exportFieldNames, setExportFieldNames] = useState<
+    Record<string, boolean>
+  >({})
   const queryClient = useQueryClient()
   const { has } = usePermissions()
 
@@ -115,6 +127,7 @@ export function SubPortLibraryPage() {
     keyword: keyword || undefined,
     status: statusFilter !== '__all__' ? statusFilter : undefined,
     main_port_number: mainPortFilter || undefined,
+    sub_port_number: subPortFilter || undefined,
   }
 
   const recordsQuery = useQuery({
@@ -160,6 +173,38 @@ export function SubPortLibraryPage() {
     return getSubPortLibraryFields(selectedGroup)
   }, [selectedGroup])
 
+  useEffect(() => {
+    setExportFieldNames((prev) => {
+      const next: Record<string, boolean> = {}
+      for (const field of sortedFields) {
+        next[field.field_name] = prev[field.field_name] ?? true
+      }
+      return next
+    })
+  }, [sortedFields])
+
+  const handleExport = async () => {
+    if (!selectedGroup) return
+    const fieldNames = sortedFields
+      .filter((field) => exportFieldNames[field.field_name])
+      .map((field) => field.field_name)
+    try {
+      await downloadSubPortRecords({
+        group_id: selectedGroup.id,
+        keyword: filters.keyword,
+        status: filters.status,
+        main_port_number: filters.main_port_number,
+        sub_port_number: filters.sub_port_number,
+        ids: selectedCount > 0 ? selectedIds : undefined,
+        field_names: fieldNames,
+      })
+      toast.success('子端口数据导出成功')
+      setExportDialogOpen(false)
+    } catch {
+      toast.error('子端口数据导出失败')
+    }
+  }
+
   const columns = useMemo<ColumnDef<SubPortRecord>[]>(() => {
     const base: ColumnDef<SubPortRecord>[] = [
       {
@@ -176,7 +221,10 @@ export function SubPortLibraryPage() {
         accessorKey: 'status',
         header: '状态',
         cell: ({ getValue }) => (
-          <StatusTag status={getValue() as string} customMap={STATUS_COLOR_MAP} />
+          <StatusTag
+            status={getValue() as string}
+            customMap={STATUS_COLOR_MAP}
+          />
         ),
       },
     ]
@@ -236,7 +284,9 @@ export function SubPortLibraryPage() {
           </div>
         </Header>
         <Main>
-          <p className='text-muted-foreground py-10 text-center text-sm'>加载中...</p>
+          <p className='text-muted-foreground py-10 text-center text-sm'>
+            加载中...
+          </p>
         </Main>
       </>
     )
@@ -297,7 +347,10 @@ export function SubPortLibraryPage() {
             )}
             {has('sub_port:import') && (
               <>
-                <Button variant='outline' onClick={() => setImportDialogOpen(true)}>
+                <Button
+                  variant='outline'
+                  onClick={() => setImportDialogOpen(true)}
+                >
                   <Upload className='mr-2 h-4 w-4' />
                   导入数据
                 </Button>
@@ -308,7 +361,17 @@ export function SubPortLibraryPage() {
                   <Download className='mr-2 h-4 w-4' />
                   下载模板
                 </Button>
-                <Button variant='outline' onClick={() => setDeleteListDialogOpen(true)}>
+                <Button
+                  variant='outline'
+                  onClick={() => setExportDialogOpen(true)}
+                >
+                  <Download className='mr-2 h-4 w-4' />
+                  导出数据
+                </Button>
+                <Button
+                  variant='outline'
+                  onClick={() => setDeleteListDialogOpen(true)}
+                >
                   <FileX className='mr-2 h-4 w-4' />
                   导入删除清单
                 </Button>
@@ -400,6 +463,18 @@ export function SubPortLibraryPage() {
               className='w-44'
             />
           </div>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>子端口号</label>
+            <Input
+              placeholder='精确匹配子端口号'
+              value={subPortFilter}
+              onChange={(e) => {
+                setSubPortFilter(e.target.value)
+                setPage(1)
+              }}
+              className='w-44'
+            />
+          </div>
           <div className='flex gap-2'>
             <Button
               variant='ghost'
@@ -408,6 +483,7 @@ export function SubPortLibraryPage() {
                 setKeyword('')
                 setStatusFilter('__all__')
                 setMainPortFilter('')
+                setSubPortFilter('')
                 setPage(1)
               }}
             >
@@ -445,7 +521,8 @@ export function SubPortLibraryPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除子端口 {toDelete?.sub_port_number || ''} 吗？此操作不可撤销。
+              确定要删除子端口 {toDelete?.sub_port_number || ''}{' '}
+              吗？此操作不可撤销。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -475,6 +552,55 @@ export function SubPortLibraryPage() {
         onOpenChange={setDeleteListDialogOpen}
         onSuccess={invalidate}
       />
+
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className='sm:max-w-[520px]'>
+          <DialogHeader>
+            <DialogTitle>导出子端口数据</DialogTitle>
+          </DialogHeader>
+          <div className='space-y-3'>
+            <div className='text-muted-foreground text-sm'>
+              {selectedCount > 0
+                ? `将导出已选 ${selectedCount} 条记录`
+                : '将导出当前筛选条件下的全部记录'}
+            </div>
+            <div className='rounded-md border p-3'>
+              <div className='mb-2 text-sm font-medium'>固定列</div>
+              <div className='text-muted-foreground text-sm'>
+                状态、子端口号、主端口号
+              </div>
+            </div>
+            <div className='max-h-72 space-y-2 overflow-y-auto rounded-md border p-3'>
+              {sortedFields.map((field) => (
+                <label
+                  key={field.field_name}
+                  className='flex cursor-pointer items-center gap-2 text-sm'
+                >
+                  <Checkbox
+                    checked={!!exportFieldNames[field.field_name]}
+                    onCheckedChange={(checked) =>
+                      setExportFieldNames((prev) => ({
+                        ...prev,
+                        [field.field_name]: checked === true,
+                      }))
+                    }
+                  />
+                  <span>{field.field_label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant='outline'
+              onClick={() => setExportDialogOpen(false)}
+            >
+              取消
+            </Button>
+            <Button onClick={handleExport}>导出</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

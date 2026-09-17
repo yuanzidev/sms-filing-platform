@@ -1,8 +1,9 @@
 import { useState, useCallback, useMemo } from 'react'
+import { Loader2, Upload, ClipboardPaste } from 'lucide-react'
+import * as XLSX from 'xlsx'
+import { getQualificationsBySignatures } from '@/lib/api/qualifications'
+import type { BatchSignatureResponse } from '@/lib/api/types'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import { Input } from '@/components/ui/input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
   DialogContent,
@@ -11,10 +12,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { getQualificationsBySignatures } from '@/lib/api/qualifications'
-import type { BatchSignatureResponse } from '@/lib/api/types'
-import { Loader2, Upload, ClipboardPaste } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
 
 interface SignatureImportDialogProps {
   open: boolean
@@ -34,7 +34,11 @@ function looksLikeSignature(val: string): boolean {
   return !headerKeywords.includes(val.trim()) && val.trim().length > 0
 }
 
-export function SignatureImportDialog({ open, onOpenChange, onConfirm }: SignatureImportDialogProps) {
+export function SignatureImportDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+}: SignatureImportDialogProps) {
   const [activeTab, setActiveTab] = useState('paste')
   const [pasteText, setPasteText] = useState('')
   const [result, setResult] = useState<BatchSignatureResponse | null>(null)
@@ -43,34 +47,40 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
   const [error, setError] = useState<string | null>(null)
   const [importDate, setImportDate] = useState('')
 
-  const signatures = useMemo(() => parseSignaturesFromText(pasteText), [pasteText])
+  const signatures = useMemo(
+    () => parseSignaturesFromText(pasteText),
+    [pasteText]
+  )
   const uniqueCount = useMemo(() => new Set(signatures).size, [signatures])
   const signatureKey = useMemo(
     () => `${[...new Set(signatures)].join('\n')}::${importDate}`,
     [signatures, importDate]
   )
 
-  const querySignatures = useCallback(async (sigs: string[]): Promise<BatchSignatureResponse | null> => {
-    const unique = [...new Set(sigs)]
-    if (unique.length === 0) {
-      setResult(null)
-      setResultKey('')
-      return null
-    }
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await getQualificationsBySignatures(unique, importDate)
-      setResult(res)
-      setResultKey(`${unique.join('\n')}::${importDate}`)
-      return res
-    } catch {
-      setError('查询失败，请稍后重试')
-      return null
-    } finally {
-      setLoading(false)
-    }
-  }, [importDate])
+  const querySignatures = useCallback(
+    async (sigs: string[]): Promise<BatchSignatureResponse | null> => {
+      const unique = [...new Set(sigs)]
+      if (unique.length === 0) {
+        setResult(null)
+        setResultKey('')
+        return null
+      }
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await getQualificationsBySignatures(unique, importDate)
+        setResult(res)
+        setResultKey(`${unique.join('\n')}::${importDate}`)
+        return res
+      } catch {
+        setError('查询失败，请稍后重试')
+        return null
+      } finally {
+        setLoading(false)
+      }
+    },
+    [importDate]
+  )
 
   const handleFileUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,7 +95,9 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
           const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 })
           // 取第一列，跳过可能的表头行
           const firstCol = data
-            .map((row: string[]) => (row && row.length > 0 ? String(row[0] ?? '').trim() : ''))
+            .map((row: string[]) =>
+              row && row.length > 0 ? String(row[0] ?? '').trim() : ''
+            )
             .filter((v: string) => looksLikeSignature(v))
           if (firstCol.length === 0) {
             setError('未识别到签名数据，请确认表格第一列为签名')
@@ -101,7 +113,7 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
       }
       reader.readAsBinaryString(file)
     },
-    [querySignatures],
+    [querySignatures]
   )
 
   const handlePasteBlur = useCallback(() => {
@@ -115,9 +127,10 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
       setError('请先输入或导入签名')
       return
     }
-    const currentResult = result && resultKey === signatureKey
-      ? result
-      : await querySignatures(signatures)
+    const currentResult =
+      result && resultKey === signatureKey
+        ? result
+        : await querySignatures(signatures)
     if (!currentResult) return
     const ids = currentResult.matched_qualifications.map((q) => q.id)
     onConfirm(ids)
@@ -128,40 +141,48 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
     setResult(null)
     setResultKey('')
     setError(null)
-  }, [result, resultKey, signatureKey, signatures, querySignatures, onConfirm, onOpenChange])
+  }, [
+    result,
+    resultKey,
+    signatureKey,
+    signatures,
+    querySignatures,
+    onConfirm,
+    onOpenChange,
+  ])
 
   const matchedCount = result?.matched_qualifications.length ?? 0
   const unmatchedCount = result?.unmatched_signatures.length ?? 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className='flex max-h-[88vh] max-w-lg flex-col overflow-hidden'>
+        <DialogHeader className='shrink-0'>
           <DialogTitle>批量导入签名</DialogTitle>
           <DialogDescription>
             通过粘贴板或 Excel 表格导入签名列表，系统自动匹配对应资质
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">资质导入日期（选填）</label>
-            <div className="flex gap-2">
+        <div className='min-h-0 flex-1 space-y-4 overflow-y-auto pr-1'>
+          <div className='space-y-2'>
+            <label className='text-sm font-medium'>资质导入日期（选填）</label>
+            <div className='flex gap-2'>
               <Input
-                type="date"
+                type='date'
                 value={importDate}
                 onChange={(e) => {
                   setImportDate(e.target.value)
                   setResult(null)
                   setResultKey('')
                 }}
-                className="w-48"
+                className='w-48'
               />
               {importDate && (
                 <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
+                  type='button'
+                  variant='ghost'
+                  size='sm'
                   onClick={() => {
                     setImportDate('')
                     setResult(null)
@@ -175,39 +196,39 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="paste">
-                <ClipboardPaste className="mr-2 h-4 w-4" />
+            <TabsList className='grid w-full grid-cols-2'>
+              <TabsTrigger value='paste'>
+                <ClipboardPaste className='mr-2 h-4 w-4' />
                 粘贴板导入
               </TabsTrigger>
-              <TabsTrigger value="file">
-                <Upload className="mr-2 h-4 w-4" />
+              <TabsTrigger value='file'>
+                <Upload className='mr-2 h-4 w-4' />
                 表格导入
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="paste" className="mt-3 space-y-2">
+            <TabsContent value='paste' className='mt-3 space-y-2'>
               <Textarea
                 placeholder={`每行一个签名，例如：\nDX-湖北武汉电信\nDX-甘肃兰州电信三枢纽-出省5%\nLT-重庆联通`}
                 value={pasteText}
                 onChange={(e) => setPasteText(e.target.value)}
                 onBlur={handlePasteBlur}
                 rows={8}
-                className="font-mono text-sm"
+                className='max-h-64 font-mono text-sm'
               />
-              <p className="text-xs text-muted-foreground">
+              <p className='text-muted-foreground text-xs'>
                 已输入 {signatures.length} 条签名（去重后 {uniqueCount} 条）
               </p>
             </TabsContent>
-            <TabsContent value="file" className="mt-3">
-              <div className="rounded-lg border-2 border-dashed p-6 text-center">
-                <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
-                <p className="mt-2 text-sm text-muted-foreground">
+            <TabsContent value='file' className='mt-3'>
+              <div className='rounded-lg border-2 border-dashed p-6 text-center'>
+                <Upload className='text-muted-foreground mx-auto h-8 w-8' />
+                <p className='text-muted-foreground mt-2 text-sm'>
                   选择 Excel 文件（.xlsx / .xls），自动读取第一列
                 </p>
-                <div className="mt-3">
+                <div className='mt-3'>
                   <Input
-                    type="file"
-                    accept=".xlsx,.xls"
+                    type='file'
+                    accept='.xlsx,.xls'
                     onChange={handleFileUpload}
                   />
                 </div>
@@ -217,37 +238,37 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
 
           {/* Loading */}
           {loading && (
-            <div className="flex items-center justify-center py-4 text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <div className='text-muted-foreground flex items-center justify-center py-4'>
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
               查询中...
             </div>
           )}
 
           {/* Error */}
           {error && (
-            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+            <div className='bg-destructive/10 text-destructive rounded-md p-3 text-sm'>
               {error}
             </div>
           )}
 
           {/* Result */}
           {result && !loading && (
-            <div className="space-y-2 rounded-lg border p-3">
-              <p className="text-sm font-medium">匹配结果</p>
-              <div className="flex gap-4 text-sm">
-                <span className="text-green-600">
+            <div className='space-y-2 rounded-lg border p-3'>
+              <p className='text-sm font-medium'>匹配结果</p>
+              <div className='flex gap-4 text-sm'>
+                <span className='text-green-600'>
                   匹配成功：{matchedCount} 条资质
                 </span>
-                <span className="text-red-500">
+                <span className='text-red-500'>
                   无匹配：{unmatchedCount} 条
                 </span>
               </div>
               {unmatchedCount > 0 && (
-                <details className="text-sm">
-                  <summary className="cursor-pointer text-red-500">
+                <details className='text-sm'>
+                  <summary className='cursor-pointer text-red-500'>
                     查看无匹配签名
                   </summary>
-                  <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+                  <ul className='text-muted-foreground mt-1 max-h-40 list-disc overflow-y-auto pl-5'>
                     {result.unmatched_signatures.map((s) => (
                       <li key={s}>{s}</li>
                     ))}
@@ -258,11 +279,18 @@ export function SignatureImportDialog({ open, onOpenChange, onConfirm }: Signatu
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+        <DialogFooter className='shrink-0'>
+          <Button
+            variant='outline'
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
             取消
           </Button>
-          <Button onClick={handleConfirm} disabled={signatures.length === 0 || loading}>
+          <Button
+            onClick={handleConfirm}
+            disabled={signatures.length === 0 || loading}
+          >
             {matchedCount > 0 ? `确认并勾选 ${matchedCount} 个资质` : '确认'}
           </Button>
         </DialogFooter>

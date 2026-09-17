@@ -1,4 +1,5 @@
 """CRUD operations for SubPortRecord."""
+
 import json
 import uuid
 
@@ -21,12 +22,17 @@ def list_sub_port_records(
     keyword: str | None = None,
     status: str | None = None,
     main_port_number: str | None = None,
+    sub_port_number: str | None = None,
+    ids: list[uuid.UUID] | None = None,
+    skip_pagination: bool = False,
 ) -> tuple[list[SubPortRecord], int]:
     query = select(SubPortRecord)
 
     if keyword:
         escaped_keyword = json.dumps(keyword, ensure_ascii=True)[1:-1]
-        field_value_conditions = [cast(SubPortRecord.field_values, String).contains(keyword)]
+        field_value_conditions = [
+            cast(SubPortRecord.field_values, String).contains(keyword)
+        ]
         if escaped_keyword != keyword:
             field_value_conditions.append(
                 cast(SubPortRecord.field_values, String).contains(
@@ -45,13 +51,16 @@ def list_sub_port_records(
         query = query.where(SubPortRecord.status == status)
     if main_port_number:
         query = query.where(SubPortRecord.main_port_number == main_port_number)
+    if sub_port_number:
+        query = query.where(SubPortRecord.sub_port_number == sub_port_number)
+    if ids:
+        query = query.where(SubPortRecord.id.in_(ids))  # type: ignore[attr-defined]
 
     count = session.exec(select(func.count()).select_from(query.subquery())).one()
-    results = session.exec(
-        query.order_by(SubPortRecord.created_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    ).all()
+    statement = query.order_by(SubPortRecord.created_at.desc())
+    if not skip_pagination:
+        statement = statement.offset((page - 1) * page_size).limit(page_size)
+    results = session.exec(statement).all()
     return list(results), count
 
 
@@ -96,9 +105,7 @@ def delete_sub_port_record(*, session: Session, db_obj: SubPortRecord) -> None:
     session.commit()
 
 
-def delete_sub_port_records(
-    *, session: Session, ids: list[uuid.UUID]
-) -> int:
+def delete_sub_port_records(*, session: Session, ids: list[uuid.UUID]) -> int:
     records = list(
         session.exec(
             select(SubPortRecord).where(SubPortRecord.id.in_(ids))  # type: ignore[attr-defined]

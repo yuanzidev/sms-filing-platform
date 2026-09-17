@@ -2,11 +2,13 @@ import { useState, useRef, useEffect } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Upload, X, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
+import { deleteFile, getFileUrl } from '@/lib/api/files'
 import {
   createQualification,
+  getQualificationAttachments,
   updateQualification,
   uploadQualificationImage,
 } from '@/lib/api/qualifications'
@@ -163,6 +165,12 @@ export function QualificationDialog({
     makeDefaultOpenMap(!qualification)
   )
 
+  const { data: attachments = [] } = useQuery({
+    queryKey: ['qualification-attachments', qualification?.id],
+    queryFn: () => getQualificationAttachments(qualification!.id),
+    enabled: open && !!qualification,
+  })
+
   // ── Mutations ───────────────────────────────────────────────
 
   const createMutation = useMutation({
@@ -253,6 +261,18 @@ export function QualificationDialog({
     onError: () => toast.error('资质更新失败'),
   })
 
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: (id: string) => deleteFile(id),
+    onSuccess: () => {
+      toast.success('附件已删除')
+      queryClient.invalidateQueries({
+        queryKey: ['qualification-attachments', qualification?.id],
+      })
+      queryClient.invalidateQueries({ queryKey: ['qualification-attachments'] })
+    },
+    onError: () => toast.error('附件删除失败'),
+  })
+
   // ── Image handlers ──────────────────────────────────────────
 
   const cleanupImages = () => {
@@ -291,6 +311,9 @@ export function QualificationDialog({
       return next
     })
   }
+
+  const attachmentsByField = (fieldLabel: string) =>
+    attachments.filter((item) => item.field_name === fieldLabel)
 
   // ── Form ────────────────────────────────────────────────────
 
@@ -335,7 +358,9 @@ export function QualificationDialog({
         diversion_number_usage: qualification.diversion_number_usage || '',
         diversion_content: qualification.diversion_content || '',
         diversion_short_link:
-          qualification.diversion_short_link || qualification.link_address || '',
+          qualification.diversion_short_link ||
+          qualification.link_address ||
+          '',
         link_address: qualification.link_address || '',
         diversion_long_link: qualification.diversion_long_link || '',
         link_type: qualification.link_type || '',
@@ -1144,6 +1169,42 @@ export function QualificationDialog({
                       <FormLabel className='mb-1 block'>
                         {field.label}
                       </FormLabel>
+                      {attachmentsByField(field.label).length > 0 && (
+                        <div className='mb-2 space-y-2'>
+                          {attachmentsByField(field.label).map((item) => (
+                            <div
+                              key={item.id}
+                              className='flex items-center gap-2 rounded border p-2'
+                            >
+                              <img
+                                src={getFileUrl(item.id)}
+                                alt={item.original_name}
+                                className='bg-muted h-12 w-12 rounded object-cover'
+                              />
+                              <div className='min-w-0 flex-1'>
+                                <div className='truncate text-xs font-medium'>
+                                  {item.original_name}
+                                </div>
+                                <div className='text-muted-foreground text-xs'>
+                                  {(item.file_size / 1024).toFixed(1)} KB
+                                </div>
+                              </div>
+                              <Button
+                                type='button'
+                                variant='ghost'
+                                size='icon'
+                                className='text-muted-foreground hover:text-destructive h-7 w-7'
+                                onClick={() =>
+                                  deleteAttachmentMutation.mutate(item.id)
+                                }
+                                disabled={deleteAttachmentMutation.isPending}
+                              >
+                                <X className='h-3.5 w-3.5' />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       {imagePreviews[field.name] ? (
                         <div className='relative overflow-hidden rounded border'>
                           <img

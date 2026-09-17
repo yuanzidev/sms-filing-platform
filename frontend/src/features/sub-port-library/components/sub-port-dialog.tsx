@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { X } from 'lucide-react'
 import { toast } from 'sonner'
+import { deleteFile, getFileUrl, listFiles } from '@/lib/api/files'
+import {
+  createSubPortRecord,
+  updateSubPortRecord,
+  SUB_PORT_STATUSES,
+} from '@/lib/api/sub-port-library'
+import type { SubPortRecord } from '@/lib/api/sub-port-library'
+import type { ExportGroup } from '@/lib/api/types'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -9,7 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -18,13 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  createSubPortRecord,
-  updateSubPortRecord,
-  SUB_PORT_STATUSES,
-} from '@/lib/api/sub-port-library'
-import type { ExportGroup } from '@/lib/api/types'
-import type { SubPortRecord } from '@/lib/api/sub-port-library'
 import { getSubPortLibraryFields } from '../fields'
 
 interface Props {
@@ -36,19 +38,36 @@ interface Props {
 }
 
 function extractErrorDetail(err: unknown): string | undefined {
-  const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data
-    ?.detail
+  const detail = (err as { response?: { data?: { detail?: unknown } } })
+    ?.response?.data?.detail
   if (typeof detail === 'string') return detail
   return undefined
 }
 
-export function SubPortDialog({ open, onOpenChange, record, group, onSuccess }: Props) {
+function isDispimgValue(value: string | undefined): boolean {
+  return !!value && /(?:_xlfn\.)?DISPIMG\s*\(/i.test(value)
+}
+
+export function SubPortDialog({
+  open,
+  onOpenChange,
+  record,
+  group,
+  onSuccess,
+}: Props) {
+  const queryClient = useQueryClient()
   const [mainPort, setMainPort] = useState('')
   const [subPort, setSubPort] = useState('')
   const [status, setStatus] = useState<string>(SUB_PORT_STATUSES[0])
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
 
   const sortedFields = getSubPortLibraryFields(group)
+
+  const { data: attachments = [] } = useQuery({
+    queryKey: ['sub-port-attachments', record?.id],
+    queryFn: () => listFiles('sub_port_record', record!.id),
+    enabled: open && !!record,
+  })
 
   useEffect(() => {
     if (open) {
@@ -81,6 +100,17 @@ export function SubPortDialog({ open, onOpenChange, record, group, onSuccess }: 
     },
   })
 
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: (id: string) => deleteFile(id),
+    onSuccess: () => {
+      toast.success('附件已删除')
+      queryClient.invalidateQueries({
+        queryKey: ['sub-port-attachments', record?.id],
+      })
+    },
+    onError: () => toast.error('附件删除失败'),
+  })
+
   const handleSubmit = () => {
     if (!mainPort.trim()) {
       toast.error('主端口号不能为空')
@@ -94,15 +124,15 @@ export function SubPortDialog({ open, onOpenChange, record, group, onSuccess }: 
   }
 
   const isPending = mutation.isPending
+  const attachmentsByField = (fieldLabel: string) =>
+    attachments.filter((item) => item.field_name === fieldLabel)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className='max-h-[88vh] overflow-hidden sm:max-w-[560px]'>
         <DialogHeader>
           <DialogTitle>{record ? '编辑子端口' : '新增子端口'}</DialogTitle>
-          <DialogDescription>
-            字段组：{group.name}
-          </DialogDescription>
+          <DialogDescription>字段组：{group.name}</DialogDescription>
         </DialogHeader>
 
         <div className='grid max-h-[calc(88vh-160px)] gap-4 overflow-y-auto py-2 pr-1'>
@@ -149,9 +179,15 @@ export function SubPortDialog({ open, onOpenChange, record, group, onSuccess }: 
             <div className='grid grid-cols-2 gap-4 border-t pt-4'>
               {sortedFields.map((field) => (
                 <div key={field.field_name} className='flex flex-col gap-2'>
-                  <label className='text-sm font-medium'>{field.field_label}</label>
+                  <label className='text-sm font-medium'>
+                    {field.field_label}
+                  </label>
                   <Input
-                    value={fieldValues[field.field_name] ?? ''}
+                    value={
+                      isDispimgValue(fieldValues[field.field_name])
+                        ? ''
+                        : (fieldValues[field.field_name] ?? '')
+                    }
                     onChange={(e) =>
                       setFieldValues((prev) => ({
                         ...prev,
@@ -160,6 +196,34 @@ export function SubPortDialog({ open, onOpenChange, record, group, onSuccess }: 
                     }
                     placeholder={field.field_label}
                   />
+                  {attachmentsByField(field.field_label).length > 0 && (
+                    <div className='grid grid-cols-2 gap-2'>
+                      {attachmentsByField(field.field_label).map((item) => (
+                        <div
+                          key={item.id}
+                          className='relative overflow-hidden rounded border'
+                        >
+                          <img
+                            src={getFileUrl(item.id)}
+                            alt={item.original_name}
+                            className='bg-muted h-24 w-full object-contain'
+                          />
+                          <Button
+                            type='button'
+                            variant='ghost'
+                            size='icon'
+                            className='bg-background/80 hover:bg-background absolute top-1 right-1 h-6 w-6'
+                            onClick={() =>
+                              deleteAttachmentMutation.mutate(item.id)
+                            }
+                            disabled={deleteAttachmentMutation.isPending}
+                          >
+                            <X className='h-3 w-3' />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -167,7 +231,11 @@ export function SubPortDialog({ open, onOpenChange, record, group, onSuccess }: 
         </div>
 
         <DialogFooter>
-          <Button variant='outline' onClick={() => onOpenChange(false)} disabled={isPending}>
+          <Button
+            variant='outline'
+            onClick={() => onOpenChange(false)}
+            disabled={isPending}
+          >
             取消
           </Button>
           <Button onClick={handleSubmit} disabled={isPending}>

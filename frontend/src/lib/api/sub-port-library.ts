@@ -57,9 +57,41 @@ export const getSubPortRecords = async (params?: {
   keyword?: string
   status?: string
   main_port_number?: string
+  sub_port_number?: string
 }): Promise<SubPortRecordsResponse> => {
   const response = await api.get('/api/v1/sub-port-library', { params })
   return response.data
+}
+
+export const downloadSubPortRecords = async (params: {
+  group_id: string
+  keyword?: string
+  status?: string
+  main_port_number?: string
+  sub_port_number?: string
+  ids?: string[]
+  field_names?: string[]
+}): Promise<void> => {
+  const response = await api.get('/api/v1/sub-port-library/export', {
+    params: {
+      group_id: params.group_id,
+      keyword: params.keyword,
+      status: params.status,
+      main_port_number: params.main_port_number,
+      sub_port_number: params.sub_port_number,
+      ids: params.ids?.join(',') || undefined,
+      field_names: params.field_names?.join(',') || undefined,
+    },
+    responseType: 'blob',
+  })
+  const url = window.URL.createObjectURL(new Blob([response.data]))
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', '子端口库导出.xlsx')
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(url)
 }
 
 export const createSubPortRecord = async (
@@ -77,7 +109,9 @@ export const updateSubPortRecord = async (
   return response.data
 }
 
-export const deleteSubPortRecord = async (id: string): Promise<{ message: string }> => {
+export const deleteSubPortRecord = async (
+  id: string
+): Promise<{ message: string }> => {
   const response = await api.delete(`/api/v1/sub-port-library/${id}`)
   return response.data
 }
@@ -85,11 +119,15 @@ export const deleteSubPortRecord = async (id: string): Promise<{ message: string
 export const batchDeleteSubPortRecords = async (
   ids: string[]
 ): Promise<{ deleted_count: number }> => {
-  const response = await api.post('/api/v1/sub-port-library/batch-delete', { ids })
+  const response = await api.post('/api/v1/sub-port-library/batch-delete', {
+    ids,
+  })
   return response.data
 }
 
-export const downloadSubPortTemplate = async (groupId: string): Promise<void> => {
+export const downloadSubPortTemplate = async (
+  groupId: string
+): Promise<void> => {
   const response = await api.get('/api/v1/sub-port-library/template', {
     params: { group_id: groupId },
     responseType: 'blob',
@@ -117,6 +155,7 @@ export interface SubPortImportResult {
   success_count: number
   error_count: number
   errors: SubPortImportErrorItem[]
+  warnings?: string[]
   message: string
 }
 
@@ -145,20 +184,31 @@ export const previewSubPortsImport = async (
   const formData = new FormData()
   formData.append('file', file)
   formData.append('group_id', groupId)
-  const response = await api.post('/api/v1/sub-port-library/import/preview', formData)
+  const response = await api.post(
+    '/api/v1/sub-port-library/import/preview',
+    formData
+  )
   return response.data
 }
 
-export const parseDeleteList = async (file: File): Promise<ParseDeleteResult> => {
+export const parseDeleteList = async (
+  file: File
+): Promise<ParseDeleteResult> => {
   const formData = new FormData()
   formData.append('file', file)
-  const response = await api.post('/api/v1/sub-port-library/import/parse-delete', formData)
+  const response = await api.post(
+    '/api/v1/sub-port-library/import/parse-delete',
+    formData
+  )
   return response.data
 }
 
 export const deleteByList = async (file: File): Promise<DeleteListResult> => {
   const formData = new FormData()
   formData.append('file', file)
-  const response = await api.post('/api/v1/sub-port-library/import/delete', formData)
+  const response = await api.post(
+    '/api/v1/sub-port-library/import/delete',
+    formData
+  )
   return response.data
 }
