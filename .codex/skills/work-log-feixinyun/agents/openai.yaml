@@ -1,0 +1,4 @@
+interface:
+  display_name: "飞信云工作日志"
+  short_description: "为短信报备平台自动生成飞信云项目工作日志记录与追加"
+  default_prompt: "Use $work-log-feixinyun to generate or update today's SMS filing platform work log."
