@@ -1,4 +1,5 @@
 """File upload/download API routes."""
+
 import hashlib
 import uuid
 from datetime import date
@@ -31,14 +32,19 @@ def upload_file(
 
     content = file.file.read()
     if len(content) > settings.MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=413, detail=f"File exceeds {settings.MAX_UPLOAD_SIZE // 1024 // 1024}MB limit")
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds {settings.MAX_UPLOAD_SIZE // 1024 // 1024}MB limit",
+        )
 
     md5_hash = hashlib.md5(content).hexdigest()
     content_type = file.content_type or "application/octet-stream"
     ext = Path(file.filename).suffix or ".bin"
 
     # Build storage key: {entity_type}/{yyyy-mm}/{uuid}{ext}
-    key = f"{entity_type or 'uploads'}/{date.today().isoformat()}/{uuid.uuid4().hex}{ext}"
+    key = (
+        f"{entity_type or 'uploads'}/{date.today().isoformat()}/{uuid.uuid4().hex}{ext}"
+    )
 
     storage = get_storage()
     storage.upload(key, content, content_type)
@@ -46,9 +52,12 @@ def upload_file(
     try:
         entity_uuid = uuid.UUID(entity_id) if entity_id else uuid.uuid4()
     except ValueError:
-        raise HTTPException(status_code=422, detail="Invalid entity_id format, must be a valid UUID")
+        raise HTTPException(
+            status_code=422, detail="Invalid entity_id format, must be a valid UUID"
+        )
 
     from app.crud.file_attachment import create_file_attachment
+
     fa_in = FileAttachmentCreate(
         original_name=file.filename,
         stored_path=key,
@@ -59,7 +68,9 @@ def upload_file(
         entity_id=entity_uuid,
         field_name=field_name or None,
     )
-    db_obj = create_file_attachment(session=session, create=fa_in, uploader_id=current_user.id)
+    db_obj = create_file_attachment(
+        session=session, create=fa_in, uploader_id=current_user.id
+    )
     return db_obj
 
 
@@ -72,20 +83,40 @@ def list_files(
 ) -> Any:
     """List file attachments for a given entity."""
     from app.crud.file_attachment import get_file_attachments_by_entity
-    return get_file_attachments_by_entity(session=session, entity_type=entity_type, entity_id=entity_id)
+
+    return get_file_attachments_by_entity(
+        session=session, entity_type=entity_type, entity_id=entity_id
+    )
 
 
 @router.get("/{id}")
 def get_file(*, session: SessionDep, id: uuid.UUID) -> Any:
-    """Redirect to presigned download URL."""
+    """Return local file bytes or redirect to an external presigned URL."""
     from app.crud.file_attachment import get_file_attachment
+
     fa = get_file_attachment(session=session, id=id)
     if not fa:
         raise HTTPException(status_code=404, detail="File not found")
 
     storage = get_storage()
     url = storage.get_url(fa.stored_path)
+    if url.startswith("/"):
+        # LocalFileStorage historically returns a URL containing the storage
+        # key.  That URL cannot be handled by /files/{id}/download because the
+        # route expects an attachment UUID, not a path such as
+        # "sub_port_record/2026-09/xxx.png".  Serve local content directly so
+        # <img src="/api/v1/files/{id}"> works without a broken redirect.
+        try:
+            content = storage.download(fa.stored_path)
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="Stored file not found")
+
+        from fastapi.responses import Response
+
+        return Response(content=content, media_type=fa.mime_type)
+
     from fastapi.responses import RedirectResponse
+
     return RedirectResponse(url=url)
 
 
@@ -93,6 +124,7 @@ def get_file(*, session: SessionDep, id: uuid.UUID) -> Any:
 def download_file(*, session: SessionDep, id: uuid.UUID) -> Any:
     """Download file bytes directly (used when storage is local)."""
     from app.crud.file_attachment import get_file_attachment
+
     fa = get_file_attachment(session=session, id=id)
     if not fa:
         raise HTTPException(status_code=404, detail="File not found")
@@ -100,6 +132,7 @@ def download_file(*, session: SessionDep, id: uuid.UUID) -> Any:
     storage = get_storage()
     content = storage.download(fa.stored_path)
     from fastapi.responses import Response
+
     return Response(content=content, media_type=fa.mime_type)
 
 
@@ -109,6 +142,7 @@ def delete_file(
 ) -> Message:
     """Delete a file and its storage object."""
     from app.crud.file_attachment import delete_file_attachment, get_file_attachment
+
     fa = get_file_attachment(session=session, id=id)
     if not fa:
         raise HTTPException(status_code=404, detail="File not found")
