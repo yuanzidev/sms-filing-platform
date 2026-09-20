@@ -69,7 +69,15 @@ interface DownloadErrorDetail {
 async function parseDownloadErrorDetail(
   err: unknown
 ): Promise<DownloadErrorDetail | undefined> {
-  const data = (err as { response?: { data?: unknown } })?.response?.data
+  const requestError = err as {
+    code?: string
+    response?: { data?: unknown }
+  }
+  if (requestError.code === 'ECONNABORTED') {
+    return { reason: '文件较大，下载超时，请检查网络后重试' }
+  }
+
+  const data = requestError.response?.data
   let detail: unknown
   if (data instanceof Blob) {
     try {

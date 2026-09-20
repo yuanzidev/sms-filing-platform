@@ -5,6 +5,8 @@ import type {
   CreateFilingTaskRequest,
 } from './types'
 
+const FILE_DOWNLOAD_TIMEOUT = 5 * 60 * 1000
+
 /**
  * 报备任务查询参数
  */
@@ -80,6 +82,8 @@ export const downloadFilingTaskFile = async (
 ): Promise<void> => {
   const response = await api.get(`/api/v1/filing-tasks/${id}/download`, {
     responseType: 'blob',
+    // 报备文件可能包含大量图片，不能沿用全局 API 的 10 秒超时。
+    timeout: FILE_DOWNLOAD_TIMEOUT,
   })
   // 从 Content-Disposition 响应头提取 filename
   let filename = name || 'export.xlsx'
