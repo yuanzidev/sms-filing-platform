@@ -132,18 +132,7 @@ export function SubPortDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className='max-h-[88vh] overflow-hidden sm:max-w-[560px]'
-        onInteractOutside={(event) => {
-          if (lightboxSrc) event.preventDefault()
-        }}
-        onEscapeKeyDown={(event) => {
-          if (lightboxSrc) {
-            event.preventDefault()
-            setLightboxSrc(null)
-          }
-        }}
-      >
+      <DialogContent className='max-h-[88vh] overflow-hidden sm:max-w-[560px]'>
         <DialogHeader>
           <DialogTitle>{record ? '编辑子端口' : '新增子端口'}</DialogTitle>
           <DialogDescription>字段组：{group.name}</DialogDescription>
@@ -271,32 +260,36 @@ export function SubPortDialog({
         </DialogFooter>
       </DialogContent>
 
-      {lightboxSrc && (
-        <div
-          className='fixed inset-0 z-[9999] flex cursor-pointer items-center justify-center bg-black/80'
-          onClick={() => setLightboxSrc(null)}
+      <Dialog
+        open={!!lightboxSrc}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setLightboxSrc(null)
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          className='flex h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-none items-center justify-center border-0 bg-black/85 p-0 shadow-none sm:max-w-none'
         >
+          <DialogTitle className='sr-only'>图片预览</DialogTitle>
           <Button
             type='button'
             variant='ghost'
             size='icon'
-            className='absolute top-4 right-4 text-white hover:bg-white/20'
-            onClick={(event) => {
-              event.stopPropagation()
-              setLightboxSrc(null)
-            }}
+            className='absolute top-4 right-4 z-10 text-white hover:bg-white/20'
+            onClick={() => setLightboxSrc(null)}
             aria-label='关闭大图'
           >
             <X className='h-6 w-6' />
           </Button>
-          <img
-            src={lightboxSrc}
-            alt='大图查看'
-            className='max-h-[90vh] max-w-[90vw] rounded object-contain'
-            onClick={(event) => event.stopPropagation()}
-          />
-        </div>
-      )}
+          {lightboxSrc && (
+            <img
+              src={lightboxSrc}
+              alt='大图查看'
+              className='max-h-[90vh] max-w-[90vw] rounded object-contain'
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }
