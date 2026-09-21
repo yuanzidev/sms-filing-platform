@@ -17,7 +17,7 @@ REMOTE_DIR="${REMOTE_DIR:-/opt/sms-filing-platform}"    # 服务器上项目目�
 COMPOSE_FILE="docker-compose-deploy.yml"
 ENV_FILE="${ENV_FILE:-.env.deploy.smsf}"                 # 生产环境配置(与 SSH_HOST=smsf 配套)
 HEALTH_PATH="/api/v1/utils/health-check/"               # 后端健康检查路径(经前端 nginx 代理)
-HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-90}"                  # 健康检查最长等待秒数
+HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-240}"                 # 健康检查最长等待秒数(frontend 新镜像首次冷启动实测约 2.6 分钟)
 
 # 版本 tag:默认与 build.sh 一致(本地 git short sha),可被 IMAGE_TAG 环境变量覆盖
 VERSION_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD 2>/dev/null || echo latest)}"
