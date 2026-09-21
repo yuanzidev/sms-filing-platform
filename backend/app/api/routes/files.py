@@ -6,6 +6,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from botocore.exceptions import ClientError
 from fastapi import APIRouter, Form, HTTPException, Query, UploadFile
 
 from app.api.deps import CurrentUser, SessionDep
@@ -91,7 +92,7 @@ def list_files(
 
 @router.get("/{id}")
 def get_file(*, session: SessionDep, id: uuid.UUID) -> Any:
-    """Return local file bytes or redirect to an external presigned URL."""
+    """Return file bytes through the API for both local and MinIO storage."""
     from app.crud.file_attachment import get_file_attachment
 
     fa = get_file_attachment(session=session, id=id)
@@ -99,25 +100,14 @@ def get_file(*, session: SessionDep, id: uuid.UUID) -> Any:
         raise HTTPException(status_code=404, detail="File not found")
 
     storage = get_storage()
-    url = storage.get_url(fa.stored_path)
-    if url.startswith("/"):
-        # LocalFileStorage historically returns a URL containing the storage
-        # key.  That URL cannot be handled by /files/{id}/download because the
-        # route expects an attachment UUID, not a path such as
-        # "sub_port_record/2026-09/xxx.png".  Serve local content directly so
-        # <img src="/api/v1/files/{id}"> works without a broken redirect.
-        try:
-            content = storage.download(fa.stored_path)
-        except FileNotFoundError:
-            raise HTTPException(status_code=404, detail="Stored file not found")
+    try:
+        content = storage.download(fa.stored_path)
+    except (FileNotFoundError, ClientError):
+        raise HTTPException(status_code=404, detail="Stored file not found")
 
-        from fastapi.responses import Response
+    from fastapi.responses import Response
 
-        return Response(content=content, media_type=fa.mime_type)
-
-    from fastapi.responses import RedirectResponse
-
-    return RedirectResponse(url=url)
+    return Response(content=content, media_type=fa.mime_type)
 
 
 @router.get("/{id}/download")
@@ -141,6 +131,7 @@ def delete_file(
     *, session: SessionDep, current_user: CurrentUser, id: uuid.UUID
 ) -> Message:
     """Delete a file and its storage object."""
+    _ = current_user  # Keep the active-user dependency for authorization.
     from app.crud.file_attachment import delete_file_attachment, get_file_attachment
 
     fa = get_file_attachment(session=session, id=id)
