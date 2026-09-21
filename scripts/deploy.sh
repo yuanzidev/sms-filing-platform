@@ -133,8 +133,8 @@ pull_images() {
         exit 1
     fi
 
-    # 拉取(docker compose pull)
-    ssh "$SSH_HOST" "cd '$REMOTE_DIR' && TAG='$VERSION_TAG' docker compose -f $COMPOSE_FILE --env-file $ENV_FILE pull"
+    # 只拉取 ACR 上的业务镜像;minio/postgres 等基础镜像服务器已存在,且加速源不稳定,不重复拉取
+    ssh "$SSH_HOST" "cd '$REMOTE_DIR' && TAG='$VERSION_TAG' docker compose -f $COMPOSE_FILE --env-file $ENV_FILE pull backend frontend"
     print_success "镜像拉取完成"
 }
 
