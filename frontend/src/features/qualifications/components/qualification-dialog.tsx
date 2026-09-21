@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Upload, X, ChevronDown } from 'lucide-react'
+import { Upload, X, ChevronDown, ZoomIn } from 'lucide-react'
 import { toast } from 'sonner'
 import { deleteFile, getFileUrl } from '@/lib/api/files'
 import {
@@ -44,6 +44,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ImageLightbox } from '@/components/shared/image-lightbox'
 
 const IMAGE_FIELDS = [
   { name: 'cert_image', label: '单位证件图片' },
@@ -158,6 +159,7 @@ export function QualificationDialog({
   // Image file state: { fieldKey: File }
   const [imageFiles, setImageFiles] = useState<Record<string, File>>({})
   const [imagePreviews, setImagePreviews] = useState<Record<string, string>>({})
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   // Collapsible panel state
@@ -428,6 +430,7 @@ export function QualificationDialog({
   }, [open])
 
   const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen) setLightboxSrc(null)
     onOpenChange(newOpen)
   }
 
@@ -1176,11 +1179,23 @@ export function QualificationDialog({
                               key={item.id}
                               className='flex items-center gap-2 rounded border p-2'
                             >
-                              <img
-                                src={getFileUrl(item.id)}
-                                alt={item.original_name}
-                                className='bg-muted h-12 w-12 rounded object-cover'
-                              />
+                              <button
+                                type='button'
+                                className='group relative shrink-0 cursor-zoom-in overflow-hidden rounded'
+                                onClick={() =>
+                                  setLightboxSrc(getFileUrl(item.id))
+                                }
+                                aria-label={`放大查看 ${item.original_name}`}
+                              >
+                                <img
+                                  src={getFileUrl(item.id)}
+                                  alt={item.original_name}
+                                  className='bg-muted h-12 w-12 object-cover'
+                                />
+                                <span className='absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30'>
+                                  <ZoomIn className='h-4 w-4 text-white opacity-0 transition-opacity group-hover:opacity-100' />
+                                </span>
+                              </button>
                               <div className='min-w-0 flex-1'>
                                 <div className='truncate text-xs font-medium'>
                                   {item.original_name}
@@ -1207,16 +1222,28 @@ export function QualificationDialog({
                       )}
                       {imagePreviews[field.name] ? (
                         <div className='relative overflow-hidden rounded border'>
-                          <img
-                            src={imagePreviews[field.name]}
-                            alt={field.label}
-                            className='bg-muted h-32 w-full object-contain'
-                          />
+                          <button
+                            type='button'
+                            className='group relative block w-full cursor-zoom-in'
+                            onClick={() =>
+                              setLightboxSrc(imagePreviews[field.name])
+                            }
+                            aria-label={`放大查看 ${field.label}`}
+                          >
+                            <img
+                              src={imagePreviews[field.name]}
+                              alt={field.label}
+                              className='bg-muted h-32 w-full object-contain'
+                            />
+                            <span className='absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30'>
+                              <ZoomIn className='h-6 w-6 text-white opacity-0 transition-opacity group-hover:opacity-100' />
+                            </span>
+                          </button>
                           <Button
                             type='button'
                             variant='ghost'
                             size='icon'
-                            className='bg-background/80 hover:bg-background absolute top-1 right-1 h-6 w-6'
+                            className='bg-background/80 hover:bg-background absolute top-1 right-1 z-10 h-6 w-6'
                             onClick={handleRemoveImage(field.name)}
                           >
                             <X className='h-3 w-3' />
@@ -1262,6 +1289,7 @@ export function QualificationDialog({
           </form>
         </Form>
       </DialogContent>
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </Dialog>
   )
 }

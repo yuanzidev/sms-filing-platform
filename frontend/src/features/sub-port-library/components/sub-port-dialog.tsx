@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ImageLightbox } from '@/components/shared/image-lightbox'
 import { getSubPortLibraryFields } from '../fields'
 
 interface Props {
@@ -260,36 +261,7 @@ export function SubPortDialog({
         </DialogFooter>
       </DialogContent>
 
-      <Dialog
-        open={!!lightboxSrc}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) setLightboxSrc(null)
-        }}
-      >
-        <DialogContent
-          showCloseButton={false}
-          className='flex h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-none items-center justify-center border-0 bg-black/85 p-0 shadow-none sm:max-w-none'
-        >
-          <DialogTitle className='sr-only'>图片预览</DialogTitle>
-          <Button
-            type='button'
-            variant='ghost'
-            size='icon'
-            className='absolute top-4 right-4 z-10 text-white hover:bg-white/20'
-            onClick={() => setLightboxSrc(null)}
-            aria-label='关闭大图'
-          >
-            <X className='h-6 w-6' />
-          </Button>
-          {lightboxSrc && (
-            <img
-              src={lightboxSrc}
-              alt='大图查看'
-              className='max-h-[90vh] max-w-[90vw] rounded object-contain'
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </Dialog>
   )
 }
