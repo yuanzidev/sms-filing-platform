@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { X } from 'lucide-react'
+import { X, ZoomIn } from 'lucide-react'
 import { toast } from 'sonner'
 import { deleteFile, getFileUrl, listFiles } from '@/lib/api/files'
 import {
@@ -60,6 +60,7 @@ export function SubPortDialog({
   const [subPort, setSubPort] = useState('')
   const [status, setStatus] = useState<string>(SUB_PORT_STATUSES[0])
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
 
   const sortedFields = getSubPortLibraryFields(group)
 
@@ -75,6 +76,8 @@ export function SubPortDialog({
       setSubPort(record?.sub_port_number || '')
       setStatus(record?.status || SUB_PORT_STATUSES[0])
       setFieldValues(record?.field_values ? { ...record.field_values } : {})
+    } else {
+      setLightboxSrc(null)
     }
   }, [open, record])
 
@@ -203,16 +206,29 @@ export function SubPortDialog({
                           key={item.id}
                           className='relative overflow-hidden rounded border'
                         >
-                          <img
-                            src={getFileUrl(item.id)}
-                            alt={item.original_name}
-                            className='bg-muted h-24 w-full object-contain'
-                          />
+                          <button
+                            type='button'
+                            className='group relative block w-full cursor-zoom-in'
+                            onClick={() => setLightboxSrc(getFileUrl(item.id))}
+                            onDoubleClick={() =>
+                              setLightboxSrc(getFileUrl(item.id))
+                            }
+                            aria-label={`放大查看 ${item.original_name}`}
+                          >
+                            <img
+                              src={getFileUrl(item.id)}
+                              alt={item.original_name}
+                              className='bg-muted h-24 w-full object-contain'
+                            />
+                            <span className='absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30'>
+                              <ZoomIn className='h-5 w-5 text-white opacity-0 transition-opacity group-hover:opacity-100' />
+                            </span>
+                          </button>
                           <Button
                             type='button'
                             variant='ghost'
                             size='icon'
-                            className='bg-background/80 hover:bg-background absolute top-1 right-1 h-6 w-6'
+                            className='bg-background/80 hover:bg-background absolute top-1 right-1 z-10 h-6 w-6'
                             onClick={() =>
                               deleteAttachmentMutation.mutate(item.id)
                             }
@@ -243,6 +259,33 @@ export function SubPortDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {lightboxSrc && (
+        <div
+          className='fixed inset-0 z-[9999] flex cursor-pointer items-center justify-center bg-black/80'
+          onClick={() => setLightboxSrc(null)}
+        >
+          <Button
+            type='button'
+            variant='ghost'
+            size='icon'
+            className='absolute top-4 right-4 text-white hover:bg-white/20'
+            onClick={(event) => {
+              event.stopPropagation()
+              setLightboxSrc(null)
+            }}
+            aria-label='关闭大图'
+          >
+            <X className='h-6 w-6' />
+          </Button>
+          <img
+            src={lightboxSrc}
+            alt='大图查看'
+            className='max-h-[90vh] max-w-[90vw] rounded object-contain'
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
+      )}
     </Dialog>
   )
 }

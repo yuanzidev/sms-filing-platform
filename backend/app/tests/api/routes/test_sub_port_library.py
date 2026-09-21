@@ -1,17 +1,20 @@
 """Tests for sub-port-library API."""
 
+import hashlib
 import uuid
+import zipfile
 from collections.abc import Generator
 from io import BytesIO
 
 import pytest
 from fastapi.testclient import TestClient
 from openpyxl import Workbook, load_workbook
-from sqlmodel import Session, delete
+from PIL import Image
+from sqlmodel import Session, delete, select
 
 from app.core.config import settings
 from app.core.db import engine
-from app.models import ExportGroup, ExportGroupField, SubPortRecord
+from app.models import ExportGroup, ExportGroupField, FileAttachment, SubPortRecord
 
 TRACKED_GROUP_IDS: list[uuid.UUID] = []
 
@@ -475,6 +478,86 @@ def test_export_selected_fields(
     assert [c.value for c in ws[1]] == ["状态", "子端口号", "主端口号", "短信签名"]
     assert ws.max_row == 3
     assert ws.cell(row=2, column=4).value in {f"签名A{marker}", f"签名B{marker}"}
+
+
+def test_export_embeds_attachment_instead_of_dispimg_formula(
+    monkeypatch, client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    group = _create_group([])
+    marker = uuid.uuid4().hex[:8]
+    main = f"1069{marker}"
+    sub = f"8001{marker}"
+    r = client.post(
+        f"{settings.API_V1_STR}/sub-port-library",
+        headers=superuser_token_headers,
+        json={
+            "main_port_number": main,
+            "sub_port_number": sub,
+            "field_values": {"other_proof": '=DISPIMG("image-id")'},
+        },
+    )
+    assert r.status_code == 200, r.text
+    record_id = uuid.UUID(r.json()["id"])
+
+    image_output = BytesIO()
+    Image.new("RGB", (40, 20), "red").save(image_output, format="PNG")
+    image_bytes = image_output.getvalue()
+    stored_path = f"sub_port_record_images/{marker}.png"
+    with Session(engine) as session:
+        session.add(
+            FileAttachment(
+                original_name="image_row2_col8.png",
+                stored_path=stored_path,
+                file_size=len(image_bytes),
+                mime_type="image/png",
+                md5_hash=hashlib.md5(image_bytes).hexdigest(),
+                entity_type="sub_port_record",
+                entity_id=record_id,
+                field_name="其他举证图片",
+            )
+        )
+        session.commit()
+
+    class FakeStorage:
+        def download(self, key: str) -> bytes:
+            assert key == stored_path
+            return image_bytes
+
+    monkeypatch.setattr(
+        "app.api.routes.sub_port_library.get_storage", lambda: FakeStorage()
+    )
+    r = client.get(
+        f"{settings.API_V1_STR}/sub-port-library/export",
+        headers=superuser_token_headers,
+        params={
+            "group_id": group["id"],
+            "main_port_number": main,
+            "field_names": "other_proof",
+        },
+    )
+    assert r.status_code == 200, r.text
+    wb = load_workbook(BytesIO(r.content))
+    ws = wb.active
+    assert [cell.value for cell in ws[1]] == [
+        "状态",
+        "子端口号",
+        "主端口号",
+        "其他举证图片",
+    ]
+    assert ws.cell(row=2, column=4).value is None
+    assert len(ws._images) == 1
+    with zipfile.ZipFile(BytesIO(r.content)) as archive:
+        names = set(archive.namelist())
+        assert "xl/drawings/drawing1.xml" in names
+        assert any(name.startswith("xl/media/image") for name in names)
+        assert b"DISPIMG" not in archive.read("xl/worksheets/sheet1.xml")
+
+    with Session(engine) as session:
+        attachment = session.exec(
+            select(FileAttachment).where(FileAttachment.entity_id == record_id)
+        ).one()
+        session.delete(attachment)
+        session.commit()
 
 
 def test_manual_crud_and_batch_delete(

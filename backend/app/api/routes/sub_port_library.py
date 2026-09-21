@@ -8,9 +8,12 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
+from openpyxl.drawing.image import Image as XLImage
 
 from app.api.deps import SessionDep, require_permission
+from app.core.storage import get_storage
 from app.crud.export_group import get_export_group
+from app.crud.file_attachment import get_file_attachments_by_entity
 from app.crud.sub_port_record import (
     create_sub_port_record,
     delete_sub_port_record,
@@ -58,6 +61,13 @@ DELETE_SUB_ALIASES = {"子端口号", "子端口"}
 
 def _cell_text(value: Any) -> str:
     return str(value).strip() if value is not None else ""
+
+
+def _export_cell_value(value: Any) -> Any:
+    """Never export provider-specific image formulas as broken Excel refs."""
+    if isinstance(value, str) and "DISPIMG(" in value.upper():
+        return ""
+    return value
 
 
 def _load_group(session: SessionDep, group_id: uuid.UUID) -> ExportGroup:
@@ -327,6 +337,33 @@ def _target_detail(target: tuple[str, str]) -> dict[str, str]:
         "main_port_number": target[0],
         "sub_port_number": target[1],
     }
+
+
+def _embed_export_image(ws, cell_ref: str, image_bytes: bytes) -> io.BytesIO | None:
+    """Embed an attachment into an export cell and keep its stream alive."""
+    stream = io.BytesIO(image_bytes)
+    try:
+        image = XLImage(stream)
+    except Exception:
+        return None
+
+    max_width_px = 120
+    max_height_px = 80
+    width = image.width or max_width_px
+    height = image.height or max_height_px
+    scale = min(max_width_px / width, max_height_px / height)
+    image.width = max(1, int(width * scale))
+    image.height = max(1, int(height * scale))
+    ws.add_image(image, cell_ref)
+
+    cell = ws[cell_ref]
+    ws.row_dimensions[cell.row].height = max(
+        ws.row_dimensions[cell.row].height or 15,
+        image.height * 0.75 + 6,
+    )
+    column = ws.column_dimensions[cell.column_letter]
+    column.width = max(column.width or 0, min(max(image.width / 7 + 2, 14), 24))
+    return stream
 
 
 @router.get("/template", dependencies=[import_perm])
@@ -634,18 +671,50 @@ def export_sub_port_records(
     for col_idx, header in enumerate(headers, 1):
         ws.cell(row=1, column=col_idx, value=header)
 
+    storage = None
+    image_streams: list[io.BytesIO] = []
     for row_idx, record in enumerate(records, 2):
         values = [
             record.status,
             record.sub_port_number,
             record.main_port_number,
-            *[record.field_values.get(name, "") for name, _label in fields],
+            *[
+                _export_cell_value(record.field_values.get(name, ""))
+                for name, _label in fields
+            ],
         ]
         for col_idx, value in enumerate(values, 1):
             ws.cell(row=row_idx, column=col_idx, value=value)
 
+        attachments = get_file_attachments_by_entity(
+            session=session,
+            entity_type="sub_port_record",
+            entity_id=record.id,
+        )
+        attachments_by_field = {
+            attachment.field_name: attachment
+            for attachment in attachments
+            if attachment.field_name
+        }
+        for field_offset, (_name, label) in enumerate(fields, 4):
+            attachment = attachments_by_field.get(label)
+            if not attachment:
+                continue
+            cell = ws.cell(row=row_idx, column=field_offset)
+            cell.value = None
+            try:
+                if storage is None:
+                    storage = get_storage()
+                image_bytes = storage.download(attachment.stored_path)
+            except Exception:
+                continue
+            stream = _embed_export_image(ws, cell.coordinate, image_bytes)
+            if stream:
+                image_streams.append(stream)
+
     output = io.BytesIO()
     wb.save(output)
+    image_streams.clear()
     output.seek(0)
     return StreamingResponse(
         output,
