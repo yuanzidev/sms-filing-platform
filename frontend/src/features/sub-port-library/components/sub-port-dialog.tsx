@@ -132,7 +132,18 @@ export function SubPortDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-h-[88vh] overflow-hidden sm:max-w-[560px]'>
+      <DialogContent
+        className='max-h-[88vh] overflow-hidden sm:max-w-[560px]'
+        onInteractOutside={(event) => {
+          if (lightboxSrc) event.preventDefault()
+        }}
+        onEscapeKeyDown={(event) => {
+          if (lightboxSrc) {
+            event.preventDefault()
+            setLightboxSrc(null)
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{record ? '编辑子端口' : '新增子端口'}</DialogTitle>
           <DialogDescription>字段组：{group.name}</DialogDescription>
