@@ -141,6 +141,22 @@ def extract_cell_images_from_xlsx(
     if not row_elements:
         row_elements = [sheet_root]
 
+    # Excel may store repeated DISPIMG formulas as shared formulas: only the
+    # master cell contains the formula text, while follower cells contain an
+    # empty <f t="shared" si="..."/> element.  Resolve the shared formula by
+    # its index so every referencing cell gets its own attachment.
+    shared_formulas: dict[str, str] = {}
+    for row_el in row_elements:
+        for cell_el in row_el.iter(f"{s_ns}c"):
+            f_el = cell_el.find(f"{s_ns}f")
+            if (
+                f_el is not None
+                and f_el.get("t") == "shared"
+                and f_el.get("si")
+                and f_el.text
+            ):
+                shared_formulas[f_el.get("si", "")] = f_el.text
+
     extracted: list[ExtractedImage] = []
     for row_el in row_elements:
         for cell_el in row_el.iter(f"{s_ns}c"):
@@ -148,9 +164,14 @@ def extract_cell_images_from_xlsx(
             if not cell_ref:
                 continue
             f_el = cell_el.find(f"{s_ns}f")
-            if f_el is None or not f_el.text:
+            if f_el is None:
                 continue
-            m = _DISPIMG_RE.search(f_el.text)
+            formula = f_el.text
+            if not formula and f_el.get("t") == "shared":
+                formula = shared_formulas.get(f_el.get("si", ""))
+            if not formula:
+                continue
+            m = _DISPIMG_RE.search(formula)
             if not m:
                 continue
             image_name = m.group(1)
