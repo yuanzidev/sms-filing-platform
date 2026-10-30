@@ -51,16 +51,14 @@ export function SignatureImportDialog({
     () => parseSignaturesFromText(pasteText),
     [pasteText]
   )
-  const uniqueCount = useMemo(() => new Set(signatures).size, [signatures])
   const signatureKey = useMemo(
-    () => `${[...new Set(signatures)].join('\n')}::${importDate}`,
+    () => `${signatures.join('\n')}::${importDate}`,
     [signatures, importDate]
   )
 
   const querySignatures = useCallback(
     async (sigs: string[]): Promise<BatchSignatureResponse | null> => {
-      const unique = [...new Set(sigs)]
-      if (unique.length === 0) {
+      if (sigs.length === 0) {
         setResult(null)
         setResultKey('')
         return null
@@ -68,9 +66,9 @@ export function SignatureImportDialog({
       setLoading(true)
       setError(null)
       try {
-        const res = await getQualificationsBySignatures(unique, importDate)
+        const res = await getQualificationsBySignatures(sigs, importDate)
         setResult(res)
-        setResultKey(`${unique.join('\n')}::${importDate}`)
+        setResultKey(`${sigs.join('\n')}::${importDate}`)
         return res
       } catch {
         setError('查询失败，请稍后重试')
@@ -216,7 +214,7 @@ export function SignatureImportDialog({
                 className='max-h-64 font-mono text-sm'
               />
               <p className='text-muted-foreground text-xs'>
-                已输入 {signatures.length} 条签名（去重后 {uniqueCount} 条）
+                已输入 {signatures.length} 条签名
               </p>
             </TabsContent>
             <TabsContent value='file' className='mt-3'>
@@ -257,7 +255,7 @@ export function SignatureImportDialog({
               <p className='text-sm font-medium'>匹配结果</p>
               <div className='flex gap-4 text-sm'>
                 <span className='text-green-600'>
-                  匹配成功：{matchedCount} 条资质
+                  匹配成功：{matchedCount} 次
                 </span>
                 <span className='text-red-500'>
                   无匹配：{unmatchedCount} 条
@@ -269,8 +267,8 @@ export function SignatureImportDialog({
                     查看无匹配签名
                   </summary>
                   <ul className='text-muted-foreground mt-1 max-h-40 list-disc overflow-y-auto pl-5'>
-                    {result.unmatched_signatures.map((s) => (
-                      <li key={s}>{s}</li>
+                    {result.unmatched_signatures.map((s, index) => (
+                      <li key={`${index}-${s}`}>{s}</li>
                     ))}
                   </ul>
                 </details>
@@ -291,7 +289,7 @@ export function SignatureImportDialog({
             onClick={handleConfirm}
             disabled={signatures.length === 0 || loading}
           >
-            {matchedCount > 0 ? `确认并勾选 ${matchedCount} 个资质` : '确认'}
+            {matchedCount > 0 ? '确认并勾选匹配资质' : '确认'}
           </Button>
         </DialogFooter>
       </DialogContent>

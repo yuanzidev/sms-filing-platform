@@ -89,9 +89,8 @@ def get_qualifications_by_signatures(
     imported_start: datetime | None = None,
     imported_end: datetime | None = None,
 ) -> tuple[list[QualificationInfo], list[str]]:
-    unique_sigs = list(dict.fromkeys(signatures))  # 去重保序
     query = select(QualificationInfo).where(
-        QualificationInfo.sms_signature.in_(unique_sigs)
+        QualificationInfo.sms_signature.in_(signatures)
     )
     if imported_start is not None:
         query = query.where(QualificationInfo.created_at >= imported_start)
@@ -104,9 +103,9 @@ def get_qualifications_by_signatures(
             results_by_signature.setdefault(item.sms_signature, []).append(item)
     ordered_results = [
         item
-        for signature in unique_sigs
+        for signature in signatures
         for item in results_by_signature.get(signature, [])
     ]
     matched_sigs = set(results_by_signature)
-    unmatched = [s for s in unique_sigs if s not in matched_sigs]
+    unmatched = [s for s in signatures if s not in matched_sigs]
     return ordered_results, unmatched

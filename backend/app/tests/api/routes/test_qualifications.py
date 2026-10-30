@@ -153,6 +153,29 @@ def test_batch_by_signatures_filters_by_import_date(
     assert names == {f"目标资质-{marker}"}
 
 
+def test_batch_by_signatures_preserves_duplicate_input_rows(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    signature = f"重复签名-{marker}"
+    missing = f"无匹配签名-{marker}"
+    with Session(engine) as session:
+        item = QualificationInfo(enterprise_name=f"测试企业-{marker}", sms_signature=signature)
+        session.add(item)
+        session.commit()
+        item_id = str(item.id)
+
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/batch-by-signatures",
+        headers=superuser_token_headers,
+        json={"signatures": [signature, missing, signature, missing]},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert [q["id"] for q in body["matched_qualifications"]] == [item_id, item_id]
+    assert body["unmatched_signatures"] == [missing, missing]
+
+
 def test_import_rejects_missing_enterprise_name(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
