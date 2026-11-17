@@ -100,6 +100,8 @@ def get_field_value(
             return ""
         attr = _PORT_ALIAS.get(field_name, field_name)
         value = getattr(port, attr, "")
+        if field_name == "handler_phone" and not value:
+            value = qualification.handler_phone
     elif source == "qualification":
         value = getattr(qualification, field_name, "")
     else:

@@ -2,10 +2,11 @@
 
 import io
 import uuid
+from datetime import date, datetime
 from typing import Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from openpyxl.drawing.image import Image as XLImage
@@ -20,8 +21,12 @@ from app.crud.sub_port_record import (
     delete_sub_port_records,
     get_by_main_and_sub,
     get_sub_port_record,
+    list_records_by_sub_port,
+    list_sub_port_filter_options,
     list_sub_port_records,
+    overwrite_sub_port_record,
     update_sub_port_record,
+    update_sub_port_record_statuses,
 )
 from app.models import (
     SUB_PORT_STATUSES,
@@ -50,6 +55,8 @@ FIXED_HEADERS = ("状态", "子端口号", "主端口号")
 FIXED_FIELD_NAMES = {"main_port_number", "sub_port_number", "port_sub_extension"}
 PRIORITY_FIELD_NAMES = ("operation_type", "port_full_number")
 SUPPLEMENTAL_FIELDS = (
+    ("carrier", "运营商"),
+    ("resource_name", "命名"),
     ("is_four_category", "是否四类"),
     ("other_proof", "其他举证图片"),
     ("sub_port_failure_reason", "子端口失败原因"),
@@ -57,9 +64,25 @@ SUPPLEMENTAL_FIELDS = (
 SUPPLEMENTAL_FIELD_NAMES = {name for name, _label in SUPPLEMENTAL_FIELDS}
 DELETE_MAIN_ALIASES = {"主端口号", "主端口"}
 DELETE_SUB_ALIASES = {"子端口号", "子端口"}
+UNICOM_BUSINESS_TYPES = {
+    "A01-金融推销（包含贷款理财和保险推销）", "A02-零售业推销", "A03-电信业务宣传",
+    "A04-网络游戏推广", "A05-教育培训推销", "A06-房产中介推销",
+    "A07-股票证券推销", "A08-医疗卫生推销", "A09-猎头招聘推广",
+    "A10-旅游推广", "A11-其它营销类别", "B01-操作验证", "B02-民生服务",
+    "B03-业务提醒（非金融类）", "B04-业务提醒（金融类）", "B05-还款通知",
+    "B06-其他业务管理服务类", "C01-非应急公益性", "C02-应急公益性",
+}
 
 
-def _cell_text(value: Any) -> str:
+def _cell_text(value: Any, number_format: str = "") -> str:
+    if isinstance(value, datetime):
+        if value.time().isoformat() == "00:00:00" and not any(
+            marker in number_format.lower() for marker in ("h", "s")
+        ):
+            return value.date().isoformat()
+        return value.isoformat(sep=" ")
+    if isinstance(value, date):
+        return value.isoformat()
     return str(value).strip() if value is not None else ""
 
 
@@ -171,11 +194,11 @@ def _parse_sub_port_excel(
             status_code=400, detail="无法解析 Excel 文件，请检查文件格式"
         )
     ws = wb.active
-    rows = list(ws.iter_rows(values_only=True))
+    rows = list(ws.iter_rows())
     if len(rows) < 1:
         raise HTTPException(status_code=400, detail="文件为空，请导入有效的 Excel 文件")
 
-    headers = [_cell_text(c) for c in rows[0]]
+    headers = [_cell_text(c.value, c.number_format) for c in rows[0]]
     header_to_field = _header_to_field(group)
 
     col_map: dict[str, int] = {}
@@ -197,7 +220,7 @@ def _parse_sub_port_excel(
     total_data_rows = 0
 
     for row_idx, row in enumerate(rows[1:], start=2):
-        values = [_cell_text(c) for c in row]
+        values = [_cell_text(c.value, c.number_format) for c in row]
         if all(v == "" for v in values):
             continue
         total_data_rows += 1
@@ -270,6 +293,13 @@ def _parse_sub_port_excel(
                 values[col_idx] if col_idx is not None and col_idx < len(values) else ""
             )
             field_values[field_name] = value
+        if not field_values.get("carrier"):
+            matches = [
+                carrier for carrier in ("联通", "电信", "移动", "广电")
+                if carrier in group.name
+            ]
+            if len(matches) == 1:
+                field_values["carrier"] = f"中国{matches[0]}"
 
         records.append(
             {
@@ -447,12 +477,91 @@ def preview_import(
     }
 
 
+@router.get("/import/status-template", dependencies=[import_perm])
+def download_status_template() -> Any:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["子端口号", "状态", "主端口号（可选）"])
+    sheet.append(["123456", "整改", ""])
+    output = io.BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote('子端口状态批量修改模板.xlsx')}"},
+    )
+
+
+@router.post("/import/status", dependencies=[import_perm])
+def import_sub_port_statuses(
+    *, session: SessionDep, file: UploadFile = File(...)
+) -> Any:
+    if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
+    try:
+        workbook = load_workbook(io.BytesIO(file.file.read()))
+    except Exception:
+        raise HTTPException(status_code=400, detail="无法解析 Excel 文件")
+    rows = list(workbook.active.iter_rows(values_only=True))
+    if not rows:
+        raise HTTPException(status_code=400, detail="文件为空")
+    headers = [_cell_text(cell) for cell in rows[0]]
+    required = ("子端口号", "状态")
+    if any(header not in headers for header in required):
+        raise HTTPException(status_code=400, detail="需要子端口号、状态两列")
+    columns = {header: headers.index(header) for header in required}
+    if "主端口号" in headers:
+        columns["主端口号"] = headers.index("主端口号")
+    elif "主端口号（可选）" in headers:
+        columns["主端口号"] = headers.index("主端口号（可选）")
+    updates: list[tuple[SubPortRecord, str]] = []
+    errors: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for row_number, row in enumerate(rows[1:], 2):
+        if all(cell is None or _cell_text(cell) == "" for cell in row):
+            continue
+        values = {
+            header: _cell_text(row[index]) if index < len(row) else ""
+            for header, index in columns.items()
+        }
+        main_port = values.get("主端口号", "")
+        sub_port = values["子端口号"]
+        status = values["状态"]
+        if not sub_port:
+            errors.append({"row": row_number, "reason": "子端口号不能为空"})
+            continue
+        if status not in SUB_PORT_STATUSES:
+            errors.append({"row": row_number, "reason": "状态必须是在线、下线或整改"})
+            continue
+        key = (main_port, sub_port)
+        if key in seen:
+            errors.append({"row": row_number, "reason": "文件内存在重复子端口"})
+            continue
+        seen.add(key)
+        matches = (
+            [get_by_main_and_sub(session=session, main_port_number=main_port, sub_port_number=sub_port)]
+            if main_port else list_records_by_sub_port(session=session, sub_port_number=sub_port)
+        )
+        if len(matches) > 1:
+            errors.append({"row": row_number, "reason": "子端口号对应多个主端口，请填写主端口号"})
+            continue
+        record = matches[0] if matches else None
+        if not record:
+            errors.append({"row": row_number, "reason": "子端口记录不存在"})
+            continue
+        updates.append((record, status))
+    updated_count = update_sub_port_record_statuses(session=session, updates=updates)
+    return {"updated_count": updated_count, "error_count": len(errors), "errors": errors}
+
+
 @router.post("/import", dependencies=[import_perm])
 def import_sub_ports(
     *,
     session: SessionDep,
     file: UploadFile = File(...),
     group_id: uuid.UUID = Form(...),
+    overwrite: bool = Form(False),
 ) -> Any:
     group = _load_group(session, group_id)
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
@@ -462,6 +571,7 @@ def import_sub_ports(
 
     importable_records = []
     imported_objects: list[SubPortRecord] = []
+    old_attachments = []
     data_row_indices: list[int] = []
     for record in records:
         existing = get_by_main_and_sub(
@@ -469,7 +579,7 @@ def import_sub_ports(
             main_port_number=record["main_port_number"],
             sub_port_number=record["sub_port_number"],
         )
-        if existing:
+        if existing and not overwrite:
             errors.append(
                 {
                     "row": record["source_row"],
@@ -479,6 +589,20 @@ def import_sub_ports(
                     "suggestion": "请删除重复子端口，或先在子端口库中删除旧记录后重新导入",
                 }
             )
+        elif existing:
+            old_attachments.extend(get_file_attachments_by_entity(
+                session=session, entity_type="sub_port_record", entity_id=existing.id
+            ))
+            importable_records.append(record)
+            imported_objects.append(
+                overwrite_sub_port_record(
+                    session=session,
+                    db_obj=existing,
+                    status=record["status"],
+                    field_values=record["field_values"],
+                )
+            )
+            data_row_indices.append(record["source_row"])
         else:
             importable_records.append(record)
             db_record = {k: v for k, v in record.items() if k != "source_row"}
@@ -521,7 +645,17 @@ def import_sub_ports(
                 )
                 warnings.extend(img_warnings)
                 errors.extend(img_errors)
+    old_attachment_paths = [attachment.stored_path for attachment in old_attachments]
+    for attachment in old_attachments:
+        session.delete(attachment)
     session.commit()
+    if old_attachment_paths:
+        storage = get_storage()
+        for path in old_attachment_paths:
+            try:
+                storage.delete(path)
+            except Exception as exc:
+                warnings.append(f"旧附件清理失败: {exc}")
 
     success_count = len(importable_records)
     return {
@@ -590,6 +724,13 @@ def delete_by_list_endpoint(
     }
 
 
+@router.get("/filter-options", dependencies=[read_perm])
+def read_sub_port_filter_options(session: SessionDep, field: str) -> list[str]:
+    if field not in ("sub_port_number", "sms_signature", "main_port_number", "carrier"):
+        raise HTTPException(status_code=400, detail="不支持的筛选字段")
+    return list_sub_port_filter_options(session=session, field=field)
+
+
 @router.get("", dependencies=[read_perm], response_model=SubPortRecordsPublic)
 @router.get(
     "/",
@@ -605,6 +746,11 @@ def read_sub_port_records(
     status: str | None = None,
     main_port_number: str | None = None,
     sub_port_number: str | None = None,
+    sub_port_numbers: list[str] | None = Query(None),
+    sms_signatures: list[str] | None = Query(None),
+    is_four_category: str | None = None,
+    carrier: str | None = None,
+    resource_name: str | None = None,
 ) -> Any:
     records, count = list_sub_port_records(
         session=session,
@@ -614,6 +760,11 @@ def read_sub_port_records(
         status=status,
         main_port_number=main_port_number,
         sub_port_number=sub_port_number,
+        sub_port_numbers=sub_port_numbers,
+        sms_signatures=sms_signatures,
+        is_four_category=is_four_category,
+        carrier=carrier,
+        resource_name=resource_name,
     )
     return SubPortRecordsPublic(
         data=records, total=count, page=page, page_size=page_size
@@ -628,10 +779,18 @@ def export_sub_port_records(
     status: str | None = None,
     main_port_number: str | None = None,
     sub_port_number: str | None = None,
+    sub_port_numbers: list[str] | None = Query(None),
+    sms_signatures: list[str] | None = Query(None),
+    is_four_category: str | None = None,
+    carrier: str | None = None,
+    resource_name: str | None = None,
     ids: str | None = None,
     field_names: str | None = None,
+    business_type: str | None = None,
 ) -> Any:
     group = _load_group(session, group_id)
+    if business_type and business_type not in UNICOM_BUSINESS_TYPES:
+        raise HTTPException(status_code=400, detail="不支持的联通业务类型")
     selected_ids: list[uuid.UUID] | None = None
     if ids:
         selected_ids = []
@@ -650,12 +809,17 @@ def export_sub_port_records(
         status=status,
         main_port_number=main_port_number,
         sub_port_number=sub_port_number,
+        sub_port_numbers=sub_port_numbers,
+        sms_signatures=sms_signatures,
+        is_four_category=is_four_category,
+        carrier=carrier,
+        resource_name=resource_name,
         ids=selected_ids,
         skip_pagination=True,
     )
 
     all_fields = _sub_port_value_fields(group)
-    if field_names:
+    if field_names is not None:
         selected_names = [
             name.strip() for name in field_names.split(",") if name.strip()
         ]
@@ -663,6 +827,8 @@ def export_sub_port_records(
         fields = [(name, label) for name, label in all_fields if name in selected_set]
     else:
         fields = all_fields
+    if business_type and not any(name == "business_type" for name, _ in fields):
+        fields.append(("business_type", "业务类型"))
 
     wb = Workbook()
     ws = wb.active
@@ -679,6 +845,7 @@ def export_sub_port_records(
             record.sub_port_number,
             record.main_port_number,
             *[
+                business_type if name == "business_type" and business_type and "联通" in record.field_values.get("carrier", "") else
                 _export_cell_value(record.field_values.get(name, ""))
                 for name, _label in fields
             ],

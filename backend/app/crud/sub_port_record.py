@@ -23,6 +23,11 @@ def list_sub_port_records(
     status: str | None = None,
     main_port_number: str | None = None,
     sub_port_number: str | None = None,
+    sub_port_numbers: list[str] | None = None,
+    sms_signatures: list[str] | None = None,
+    is_four_category: str | None = None,
+    carrier: str | None = None,
+    resource_name: str | None = None,
     ids: list[uuid.UUID] | None = None,
     skip_pagination: bool = False,
 ) -> tuple[list[SubPortRecord], int]:
@@ -52,12 +57,37 @@ def list_sub_port_records(
     if main_port_number:
         query = query.where(SubPortRecord.main_port_number == main_port_number)
     if sub_port_number:
-        query = query.where(SubPortRecord.sub_port_number == sub_port_number)
+        query = query.where(
+            or_(
+                SubPortRecord.sub_port_number == sub_port_number,
+                SubPortRecord.main_port_number + SubPortRecord.sub_port_number
+                == sub_port_number,
+            )
+        )
+    if sub_port_numbers:
+        query = query.where(SubPortRecord.sub_port_number.in_(sub_port_numbers))
+    if sms_signatures:
+        query = query.where(
+            SubPortRecord.field_values["sms_signature"].as_string().in_(sms_signatures)
+        )
+    if is_four_category:
+        four_category = SubPortRecord.field_values["is_four_category"].as_string()
+        query = query.where(
+            or_(four_category.is_(None), four_category == "")
+            if is_four_category == "__empty__"
+            else four_category == is_four_category
+        )
+    if resource_name:
+        query = query.where(
+            SubPortRecord.field_values["resource_name"].as_string().contains(resource_name)
+        )
+    if carrier:
+        query = query.where(SubPortRecord.field_values["carrier"].as_string() == carrier)
     if ids:
         query = query.where(SubPortRecord.id.in_(ids))  # type: ignore[attr-defined]
 
     count = session.exec(select(func.count()).select_from(query.subquery())).one()
-    statement = query.order_by(SubPortRecord.created_at.desc())
+    statement = query.order_by(SubPortRecord.created_at.asc(), SubPortRecord.id.asc())
     if not skip_pagination:
         statement = statement.offset((page - 1) * page_size).limit(page_size)
     results = session.exec(statement).all()
@@ -68,6 +98,20 @@ def get_sub_port_record(*, session: Session, id: uuid.UUID) -> SubPortRecord | N
     return session.get(SubPortRecord, id)
 
 
+def list_sub_port_filter_options(*, session: Session, field: str) -> list[str]:
+    column = (
+        SubPortRecord.sub_port_number
+        if field == "sub_port_number"
+        else SubPortRecord.main_port_number
+        if field == "main_port_number"
+        else SubPortRecord.field_values["carrier"].as_string()
+        if field == "carrier"
+        else SubPortRecord.field_values["sms_signature"].as_string()
+    )
+    values = session.exec(select(column).distinct()).all()
+    return sorted({value for value in values if value})
+
+
 def get_by_main_and_sub(
     *, session: Session, main_port_number: str, sub_port_number: str
 ) -> SubPortRecord | None:
@@ -76,6 +120,10 @@ def get_by_main_and_sub(
         SubPortRecord.sub_port_number == sub_port_number,
     )
     return session.exec(statement).first()
+
+
+def list_records_by_sub_port(*, session: Session, sub_port_number: str) -> list[SubPortRecord]:
+    return list(session.exec(select(SubPortRecord).where(SubPortRecord.sub_port_number == sub_port_number)).all())
 
 
 def create_sub_port_record(
@@ -97,6 +145,27 @@ def update_sub_port_record(
     session.add(db_obj)
     session.commit()
     session.refresh(db_obj)
+    return db_obj
+
+
+def update_sub_port_record_statuses(
+    *, session: Session, updates: list[tuple[SubPortRecord, str]]
+) -> int:
+    for record, status in updates:
+        record.status = status
+        record.updated_at = utcnow()
+        session.add(record)
+    session.commit()
+    return len(updates)
+
+
+def overwrite_sub_port_record(
+    *, session: Session, db_obj: SubPortRecord, status: str, field_values: dict
+) -> SubPortRecord:
+    db_obj.status = status
+    db_obj.field_values = field_values
+    db_obj.updated_at = utcnow()
+    session.add(db_obj)
     return db_obj
 
 

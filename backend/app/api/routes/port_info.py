@@ -65,6 +65,7 @@ _PORT_HEADER_TO_FIELD = {
     "端口审核表": "audit_form",
     "客户类型": "customer_type",
     "基础电信企业ID": "basic_telecom_enterprise_id",
+    "经办人手机号": "handler_phone",
 }
 
 _PORT_HEADERS = [
@@ -93,6 +94,7 @@ _PORT_HEADERS = [
     "端口审核表",
     "客户类型",
     "基础电信企业ID",
+    "经办人手机号",
     "授权书图片",
 ]
 
@@ -117,6 +119,7 @@ def _validate_port_type(value: str) -> None:
 def download_port_info_template() -> Any:
     from openpyxl.styles import Font
     from PIL import Image, ImageDraw
+
     from app.services.excel_image_extractor import inject_cell_images
 
     wb = Workbook()
@@ -151,6 +154,7 @@ def download_port_info_template() -> Any:
         "黑名单",
         "已审核",
         "企业客户",
+        "13900139000",
     ]
     for col_idx, val in enumerate(example_data, 1):
         ws.cell(row=2, column=col_idx, value=val)
@@ -183,8 +187,8 @@ def download_port_info_template() -> Any:
     img_buf = io.BytesIO()
     sample_img.save(img_buf, format="PNG")
 
-    # Authorization image column = column 26 (1-based) = "Z2"
-    cell_images = {"Z2": img_buf.getvalue()}
+    # Authorization image column = column 27 (1-based) = "AA2"
+    cell_images = {"AA2": img_buf.getvalue()}
     xlsx_bytes = inject_cell_images(xlsx_bytes, cell_images)
 
     return StreamingResponse(
@@ -303,7 +307,7 @@ def import_port_infos(*, session: SessionDep, file: UploadFile = File(...)) -> A
         if all(c is None or str(c).strip() == "" for c in row):
             continue
 
-        def cell(col_name: str) -> str | None:
+        def cell(col_name: str, row=row) -> str | None:
             if col_name not in col_map:
                 return None
             idx = col_map[col_name]
@@ -322,7 +326,7 @@ def import_port_infos(*, session: SessionDep, file: UploadFile = File(...)) -> A
 
         row_errors: list[dict] = []
 
-        def parse_date(col_name: str, cn_name: str):
+        def parse_date(col_name: str, cn_name: str, row=row, row_errors=row_errors, row_idx=row_idx):
             if col_name not in col_map:
                 return None
             idx = col_map[col_name]
@@ -475,6 +479,7 @@ def import_port_infos(*, session: SessionDep, file: UploadFile = File(...)) -> A
                     audit_form=cell("audit_form"),
                     customer_type=cell("customer_type"),
                     basic_telecom_enterprise_id=cell("basic_telecom_enterprise_id"),
+                    handler_phone=cell("handler_phone"),
                 )
             )
             data_row_indices.append(row_idx)

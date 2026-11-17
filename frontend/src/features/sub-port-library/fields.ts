@@ -12,6 +12,9 @@ const FIXED_FIELD_NAMES = new Set([
 ])
 
 const SUPPLEMENTAL_FIELDS: SubPortLibraryField[] = [
+  { field_name: 'carrier', field_label: '运营商', sort_order: 9_998 },
+  { field_name: 'resource_name', field_label: '命名', sort_order: 9_999 },
+  { field_name: 'is_four_category', field_label: '是否四类', sort_order: 9_999 },
   {
     field_name: 'other_proof',
     field_label: '其他举证图片',

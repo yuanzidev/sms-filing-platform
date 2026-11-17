@@ -3,12 +3,13 @@
 import io
 import uuid
 from datetime import datetime, time, timedelta, timezone
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
+from openpyxl.utils import get_column_letter
 from pydantic import BaseModel
 from sqlmodel import select
 
@@ -101,7 +102,6 @@ _QUALIFICATION_HEADERS = [
     "经办人姓名",
     "经办人证件类型",
     "经办人证件号码",
-    "经办人手机号",
     "经办人证件地址",
     "经办人现场照片",
     "法人姓名",
@@ -181,7 +181,6 @@ def download_qualification_template() -> Any:
         "王五",  # 经办人姓名
         "身份证",  # 经办人证件类型
         "110101199501011234",  # 经办人证件号码
-        "13900139000",  # 经办人手机号
         "北京市海淀区XX路2号",  # 经办人证件地址
         "",  # 经办人现场照片
         "张三",  # 法人姓名
@@ -248,8 +247,8 @@ def download_qualification_template() -> Any:
     img_buf = io.BytesIO()
     sample_img.save(img_buf, format="PNG")
 
-    # 签名举证附件 is column 44 (1-based) = "AR2"
-    cell_images = {"AR2": img_buf.getvalue()}
+    image_column = get_column_letter(_QUALIFICATION_HEADERS.index("签名举证附件") + 1)
+    cell_images = {f"{image_column}2": img_buf.getvalue()}
     xlsx_bytes = inject_cell_images(xlsx_bytes, cell_images)
 
     return StreamingResponse(
@@ -705,6 +704,8 @@ def read_qualifications(
     cert_number: str | None = None,
     identity_cert_number: str | None = None,
     sms_signature: str | None = None,
+    sms_signature_mode: Literal["contains", "exact"] = "contains",
+    diversion_info: str | None = None,
 ) -> Any:
     skip = (page - 1) * page_size
     items, total = list_qualifications(
@@ -715,6 +716,8 @@ def read_qualifications(
         cert_number=cert_number,
         identity_cert_number=identity_cert_number,
         sms_signature=sms_signature,
+        sms_signature_mode=sms_signature_mode,
+        diversion_info=diversion_info,
     )
     return QualificationInfosPublic(
         data=items, total=total, page=page, page_size=page_size

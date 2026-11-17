@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -28,6 +29,7 @@ interface DataTableProps<TData, TValue> {
   pageSize: number
   total: number
   onPageChange: (page: number) => void
+  onPageSizeChange?: (pageSize: number) => void
   onSortingChange?: (sorting: SortingState) => void
   enableRowSelection?: boolean
   rowSelection?: RowSelectionState
@@ -42,6 +44,7 @@ export function DataTable<TData, TValue>({
   pageSize,
   total,
   onPageChange,
+  onPageSizeChange,
   onSortingChange,
   enableRowSelection,
   rowSelection,
@@ -186,7 +189,19 @@ export function DataTable<TData, TValue>({
         </Table>
       </div>
       <div className='flex flex-wrap items-center justify-between gap-3'>
-        <span className='text-muted-foreground text-sm'>共 {total} 条记录</span>
+        <div className='flex items-center gap-2'>
+          <span className='text-muted-foreground text-sm'>共 {total} 条记录</span>
+          {onPageSizeChange && (
+            <Select value={String(pageSize)} onValueChange={(value) => onPageSizeChange(Number(value))}>
+              <SelectTrigger className='h-8 w-28'><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {[10, 20, 50, 100].map((size) => (
+                  <SelectItem key={size} value={String(size)}>{size} 条/页</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
         <div className='flex flex-wrap items-center justify-end gap-2'>
           <Button
             variant='outline'

@@ -13,6 +13,8 @@ export const getQualifications = async (params?: {
   cert_number?: string
   identity_cert_number?: string
   sms_signature?: string
+  sms_signature_mode?: 'contains' | 'exact'
+  diversion_info?: string
 }): Promise<QualificationListResponse> => {
   const response = await api.get('/api/v1/qualifications', { params })
   return response.data

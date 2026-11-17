@@ -7,11 +7,14 @@ import { toast } from 'sonner'
 import { getExportGroups } from '@/lib/api/export-groups'
 import {
   getSubPortRecords,
+  getSubPortFilterOptions,
   deleteSubPortRecord,
   batchDeleteSubPortRecords,
   downloadSubPortTemplate,
+  downloadSubPortStatusTemplate,
   downloadSubPortRecords,
   importSubPorts,
+  importSubPortStatuses,
   previewSubPortsImport,
   SUB_PORT_STATUSES,
 } from '@/lib/api/sub-port-library'
@@ -57,10 +60,24 @@ import { StatusTag } from '@/components/shared/status-tag'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ImportDeleteDialog } from './components/import-delete-dialog'
 import { SubPortDialog } from './components/sub-port-dialog'
+import { ValueFilter } from './components/value-filter'
 import { getSubPortLibraryFields } from './fields'
 
-const PAGE_SIZE = 10
 const GROUP_ID_STORAGE_KEY = 'sub-port-library-group-id'
+const carrierForGroup = (name: string) => {
+  const matches = ['联通', '电信', '移动', '广电'].filter((carrier) =>
+    name.includes(carrier)
+  )
+  return matches.length === 1 ? `中国${matches[0]}` : '__all__'
+}
+const UNICOM_BUSINESS_TYPES = [
+  'A01-金融推销（包含贷款理财和保险推销）', 'A02-零售业推销', 'A03-电信业务宣传',
+  'A04-网络游戏推广', 'A05-教育培训推销', 'A06-房产中介推销',
+  'A07-股票证券推销', 'A08-医疗卫生推销', 'A09-猎头招聘推广',
+  'A10-旅游推广', 'A11-其它营销类别', 'B01-操作验证', 'B02-民生服务',
+  'B03-业务提醒（非金融类）', 'B04-业务提醒（金融类）', 'B05-还款通知',
+  'B06-其他业务管理服务类', 'C01-非应急公益性', 'C02-应急公益性',
+]
 
 const STATUS_COLOR_MAP: Record<string, string> = {
   在线: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300',
@@ -73,18 +90,26 @@ export function SubPortLibraryPage() {
     () => localStorage.getItem(GROUP_ID_STORAGE_KEY) || ''
   )
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('__all__')
+  const [fourCategoryFilter, setFourCategoryFilter] = useState('__all__')
+  const [carrierFilter, setCarrierFilter] = useState('__auto__')
   const [mainPortFilter, setMainPortFilter] = useState('')
   const [subPortFilter, setSubPortFilter] = useState('')
+  const [resourceNameFilter, setResourceNameFilter] = useState('')
+  const [selectedSubPorts, setSelectedSubPorts] = useState<string[] | null>(null)
+  const [selectedSignatures, setSelectedSignatures] = useState<string[] | null>(null)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<SubPortRecord | undefined>()
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [toDelete, setToDelete] = useState<SubPortRecord | undefined>()
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [statusImportDialogOpen, setStatusImportDialogOpen] = useState(false)
   const [deleteListDialogOpen, setDeleteListDialogOpen] = useState(false)
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [unicomBusinessType, setUnicomBusinessType] = useState('__none__')
   const [exportFieldNames, setExportFieldNames] = useState<
     Record<string, boolean>
   >({})
@@ -99,6 +124,22 @@ export function SubPortLibraryPage() {
     () => groupsQuery.data?.data ?? [],
     [groupsQuery.data]
   )
+  const subPortOptionsQuery = useQuery({
+    queryKey: ['sub-port-filter-options', 'sub_port_number'],
+    queryFn: () => getSubPortFilterOptions('sub_port_number'),
+  })
+  const signatureOptionsQuery = useQuery({
+    queryKey: ['sub-port-filter-options', 'sms_signature'],
+    queryFn: () => getSubPortFilterOptions('sms_signature'),
+  })
+  const mainPortOptionsQuery = useQuery({
+    queryKey: ['sub-port-filter-options', 'main_port_number'],
+    queryFn: () => getSubPortFilterOptions('main_port_number'),
+  })
+  const carrierOptionsQuery = useQuery({
+    queryKey: ['sub-port-filter-options', 'carrier'],
+    queryFn: () => getSubPortFilterOptions('carrier'),
+  })
 
   // 默认选中第一个字段组；持久化的 groupId 不在列表中时回退
   const selectedGroup: ExportGroup | undefined = useMemo(() => {
@@ -119,25 +160,39 @@ export function SubPortLibraryPage() {
     localStorage.setItem(GROUP_ID_STORAGE_KEY, id)
     setRowSelection({})
     setPage(1)
+    setSelectedSubPorts(null)
+    setSelectedSignatures(null)
+    setCarrierFilter('__auto__')
   }
 
+  const selectedCarrier = carrierFilter === '__auto__'
+    ? carrierForGroup(selectedGroup?.name ?? '')
+    : carrierFilter
   const filters = {
     page,
-    page_size: PAGE_SIZE,
+    page_size: pageSize,
     keyword: keyword || undefined,
     status: statusFilter !== '__all__' ? statusFilter : undefined,
+    is_four_category:
+      fourCategoryFilter !== '__all__' ? fourCategoryFilter : undefined,
+    carrier: selectedCarrier !== '__all__' ? selectedCarrier : undefined,
     main_port_number: mainPortFilter || undefined,
     sub_port_number: subPortFilter || undefined,
+    resource_name: resourceNameFilter || undefined,
+    sub_port_numbers: selectedSubPorts ?? undefined,
+    sms_signatures: selectedSignatures ?? undefined,
   }
+  const noValuesSelected =
+    selectedSubPorts?.length === 0 || selectedSignatures?.length === 0
 
   const recordsQuery = useQuery({
     queryKey: ['sub-port-library', selectedGroup?.id ?? '', filters],
     queryFn: () => getSubPortRecords(filters),
-    enabled: !!selectedGroup,
+    enabled: !!selectedGroup && !noValuesSelected,
   })
 
-  const records = recordsQuery.data?.data ?? []
-  const total = recordsQuery.data?.total ?? 0
+  const records = noValuesSelected ? [] : (recordsQuery.data?.data ?? [])
+  const total = noValuesSelected ? 0 : (recordsQuery.data?.total ?? 0)
 
   const selectedIds = Object.keys(rowSelection).filter((id) =>
     records.some((r) => r.id === id)
@@ -145,7 +200,10 @@ export function SubPortLibraryPage() {
   const selectedCount = selectedIds.length
 
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ['sub-port-library'] })
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['sub-port-library'] }),
+      queryClient.invalidateQueries({ queryKey: ['sub-port-filter-options'] }),
+    ])
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteSubPortRecord(id),
@@ -184,7 +242,7 @@ export function SubPortLibraryPage() {
   }, [sortedFields])
 
   const handleExport = async () => {
-    if (!selectedGroup) return
+    if (!selectedGroup || noValuesSelected) return
     const fieldNames = sortedFields
       .filter((field) => exportFieldNames[field.field_name])
       .map((field) => field.field_name)
@@ -193,10 +251,16 @@ export function SubPortLibraryPage() {
         group_id: selectedGroup.id,
         keyword: filters.keyword,
         status: filters.status,
+        is_four_category: filters.is_four_category,
+        carrier: filters.carrier,
         main_port_number: filters.main_port_number,
         sub_port_number: filters.sub_port_number,
+        resource_name: filters.resource_name,
+        sub_port_numbers: filters.sub_port_numbers,
+        sms_signatures: filters.sms_signatures,
         ids: selectedCount > 0 ? selectedIds : undefined,
         field_names: fieldNames,
+        business_type: unicomBusinessType === '__none__' ? undefined : unicomBusinessType,
       })
       toast.success('子端口数据导出成功')
       setExportDialogOpen(false)
@@ -356,6 +420,13 @@ export function SubPortLibraryPage() {
                 </Button>
                 <Button
                   variant='outline'
+                  onClick={() => setStatusImportDialogOpen(true)}
+                >
+                  <Upload className='mr-2 h-4 w-4' />
+                  批量修改状态
+                </Button>
+                <Button
+                  variant='outline'
                   onClick={() => downloadSubPortTemplate(selectedGroup.id)}
                 >
                   <Download className='mr-2 h-4 w-4' />
@@ -452,9 +523,42 @@ export function SubPortLibraryPage() {
             </Select>
           </div>
           <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>是否四类</label>
+            <Select
+              value={fourCategoryFilter}
+              onValueChange={(value) => {
+                setFourCategoryFilter(value)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className='w-32'>
+                <SelectValue placeholder='全部' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='__all__'>全部</SelectItem>
+                <SelectItem value='是'>是</SelectItem>
+                <SelectItem value='否'>否</SelectItem>
+                <SelectItem value='__empty__'>未填写</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>运营商</label>
+            <Select value={selectedCarrier} onValueChange={(value) => { setCarrierFilter(value); setPage(1) }}>
+              <SelectTrigger className='w-32'><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value='__all__'>全部</SelectItem>
+                {Array.from(new Set([...(carrierOptionsQuery.data ?? []), selectedCarrier]))
+                  .filter((carrier) => carrier !== '__all__')
+                  .map((carrier) => <SelectItem key={carrier} value={carrier}>{carrier}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className='flex flex-col gap-1'>
             <label className='text-muted-foreground text-sm'>主端口号</label>
             <Input
-              placeholder='精确匹配主端口号'
+              placeholder='搜索或选择主端口号'
+              list='main-port-options'
               value={mainPortFilter}
               onChange={(e) => {
                 setMainPortFilter(e.target.value)
@@ -462,6 +566,10 @@ export function SubPortLibraryPage() {
               }}
               className='w-44'
             />
+            <datalist id='main-port-options'>
+              {(mainPortOptionsQuery.data ?? []).map((number) => <option key={number} value={number} />)}
+            </datalist>
+            <span className='text-muted-foreground text-xs'>已导入 {mainPortOptionsQuery.data?.length ?? 0} 个主端口</span>
           </div>
           <div className='flex flex-col gap-1'>
             <label className='text-muted-foreground text-sm'>子端口号</label>
@@ -475,6 +583,39 @@ export function SubPortLibraryPage() {
               className='w-44'
             />
           </div>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>按子端口号筛选</label>
+            <ValueFilter
+              label='子端口号'
+              options={subPortOptionsQuery.data ?? []}
+              selected={selectedSubPorts}
+              onChange={(values) => {
+                setSelectedSubPorts(values)
+                setPage(1)
+              }}
+            />
+          </div>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>命名</label>
+            <Input
+              placeholder='搜索命名'
+              value={resourceNameFilter}
+              onChange={(e) => { setResourceNameFilter(e.target.value); setPage(1) }}
+              className='w-40'
+            />
+          </div>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>按签名筛选</label>
+            <ValueFilter
+              label='签名'
+              options={signatureOptionsQuery.data ?? []}
+              selected={selectedSignatures}
+              onChange={(values) => {
+                setSelectedSignatures(values)
+                setPage(1)
+              }}
+            />
+          </div>
           <div className='flex gap-2'>
             <Button
               variant='ghost'
@@ -482,8 +623,13 @@ export function SubPortLibraryPage() {
               onClick={() => {
                 setKeyword('')
                 setStatusFilter('__all__')
+                setFourCategoryFilter('__all__')
+                setCarrierFilter('__auto__')
                 setMainPortFilter('')
                 setSubPortFilter('')
+                setResourceNameFilter('')
+                setSelectedSubPorts(null)
+                setSelectedSignatures(null)
                 setPage(1)
               }}
             >
@@ -497,7 +643,8 @@ export function SubPortLibraryPage() {
           data={records}
           total={total}
           page={page}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
           onPageChange={setPage}
           enableRowSelection
           onRowSelectionChange={setRowSelection}
@@ -542,8 +689,36 @@ export function SubPortLibraryPage() {
         onOpenChange={setImportDialogOpen}
         title='子端口数据'
         onDownloadTemplate={() => downloadSubPortTemplate(selectedGroup.id)}
-        onImport={(file) => importSubPorts(file, selectedGroup.id)}
+        onImport={(file, overwrite) =>
+          importSubPorts(file, selectedGroup.id, overwrite)
+        }
         onPreview={(file) => previewSubPortsImport(file, selectedGroup.id)}
+        onSuccess={invalidate}
+        allowOverwrite
+      />
+
+      <ImportDialog
+        open={statusImportDialogOpen}
+        onOpenChange={setStatusImportDialogOpen}
+        title='子端口状态'
+        onDownloadTemplate={downloadSubPortStatusTemplate}
+        onImport={async (file) => {
+          const result = await importSubPortStatuses(file)
+          if (result.updated_count > 0) invalidate()
+          return {
+            total: result.updated_count + result.error_count,
+            success_count: result.updated_count,
+            error_count: result.error_count,
+            errors: result.errors.map((error) => ({
+              row: error.row,
+              field: '状态',
+              value: '',
+              reason: error.reason,
+              suggestion: '',
+            })),
+            message: `已更新 ${result.updated_count} 条子端口状态`,
+          }
+        }}
         onSuccess={invalidate}
       />
 
@@ -569,6 +744,16 @@ export function SubPortLibraryPage() {
               <div className='text-muted-foreground text-sm'>
                 状态、子端口号、主端口号
               </div>
+            </div>
+            <div className='space-y-2'>
+              <label className='text-sm font-medium'>联通通用业务类型（可选）</label>
+              <Select value={unicomBusinessType} onValueChange={setUnicomBusinessType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='__none__'>使用记录原值</SelectItem>
+                  {UNICOM_BUSINESS_TYPES.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className='max-h-72 space-y-2 overflow-y-auto rounded-md border p-3'>
               {sortedFields.map((field) => (

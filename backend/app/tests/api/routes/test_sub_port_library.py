@@ -4,6 +4,7 @@ import hashlib
 import uuid
 import zipfile
 from collections.abc import Generator
+from datetime import date, datetime
 from io import BytesIO
 
 import pytest
@@ -100,6 +101,122 @@ def _template_headers(
     }
 
 
+def test_sub_port_number_search_matches_extension_and_full_number(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex[:8]
+    main, sub = f"1069{marker}", "123456"
+    group = _create_group([])
+    imported = _import_file(
+        client, superuser_token_headers,
+        _build_excel(["状态", "子端口号", "主端口号"], [["在线", sub, main]]),
+        group["id"],
+    )
+    assert imported.status_code == 200, imported.text
+    for value in (sub, main + sub):
+        response = client.get(
+            f"{settings.API_V1_STR}/sub-port-library",
+            headers=superuser_token_headers,
+            params={"sub_port_number": value},
+        )
+        assert response.status_code == 200, response.text
+        assert any(item["main_port_number"] == main for item in response.json()["data"])
+
+
+def test_status_import_accepts_sub_port_only_when_unambiguous(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex[:8]
+    group = _create_group([])
+    created = _import_file(
+        client, superuser_token_headers,
+        _build_excel(["状态", "子端口号", "主端口号"], [["在线", marker, "1069"]]),
+        group["id"],
+    )
+    assert created.status_code == 200, created.text
+    changed = _import_file(
+        client, superuser_token_headers,
+        _build_excel(["子端口号", "状态"], [[marker, "整改"]]),
+        group["id"], "/import/status",
+    )
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["updated_count"] == 1
+
+
+def test_import_preserves_date_only_and_explicit_time(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex[:8]
+    group = _create_group([("auth_start_date", "授权开始日期")])
+    for suffix, value, expected in (
+        ("date", date(2024, 1, 2), "2024-01-02"),
+        ("time", datetime(2024, 1, 2, 13, 14, 15), "2024-01-02 13:14:15"),
+        ("midnight", datetime(2024, 1, 2, 0, 0, 0), "2024-01-02 00:00:00"),
+    ):
+        result = _import_file(
+            client, superuser_token_headers,
+            _build_excel(
+                ["状态", "子端口号", "主端口号", "授权开始日期"],
+                [["在线", f"{marker}{suffix}", "1069", value]],
+            ),
+            group["id"],
+        )
+        assert result.status_code == 200, result.text
+        listed = client.get(
+            f"{settings.API_V1_STR}/sub-port-library",
+            headers=superuser_token_headers,
+            params={"sub_port_number": f"{marker}{suffix}"},
+        )
+        assert listed.json()["data"][0]["field_values"]["auth_start_date"] == expected
+
+
+def test_carrier_and_name_filter_and_business_type_export(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex[:8]
+    group = _create_group([])
+    imported = _import_file(
+        client, superuser_token_headers,
+        _build_excel(
+            ["状态", "子端口号", "主端口号", "运营商", "命名"],
+            [["在线", f"{marker}1", "1069", "中国联通", f"资源{marker}"],
+             ["在线", f"{marker}2", "1069", "中国电信", "其他资源"]],
+        ), group["id"],
+    )
+    assert imported.status_code == 200, imported.text
+    response = client.get(
+        f"{settings.API_V1_STR}/sub-port-library",
+        headers=superuser_token_headers,
+        params={"carrier": "中国联通", "resource_name": marker},
+    )
+    assert response.status_code == 200, response.text
+    assert [item["sub_port_number"] for item in response.json()["data"]] == [f"{marker}1"]
+    exported = client.get(
+        f"{settings.API_V1_STR}/sub-port-library/export",
+        headers=superuser_token_headers,
+        params={
+            "group_id": group["id"], "carrier": "中国联通",
+            "field_names": "", "business_type": "B01-操作验证",
+        },
+    )
+    assert exported.status_code == 200, exported.text
+    sheet = load_workbook(BytesIO(exported.content), read_only=True).active
+    values = list(sheet.values)
+    assert values[0] == ("状态", "子端口号", "主端口号", "业务类型")
+    assert len(values) == 2
+    assert values[1][3] == "B01-操作验证"
+    mixed = client.get(
+        f"{settings.API_V1_STR}/sub-port-library/export",
+        headers=superuser_token_headers,
+        params={"group_id": group["id"], "field_names": "", "business_type": "B01-操作验证", "main_port_number": "1069"},
+    )
+    assert mixed.status_code == 200, mixed.text
+    rows = list(load_workbook(BytesIO(mixed.content), read_only=True).active.values)
+    business_by_sub = {row[1]: row[3] for row in rows[1:]}
+    assert business_by_sub[f"{marker}1"] == "B01-操作验证"
+    assert business_by_sub[f"{marker}2"] in (None, "")
+
+
 def test_download_template(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
@@ -121,6 +238,8 @@ def test_download_template(
         "短信子端口号",
         "短信签名",
         "企业名称",
+            "运营商",
+            "命名",
         "是否四类",
         "其他举证图片",
         "子端口失败原因",
@@ -201,6 +320,59 @@ def test_import_duplicate_existing_is_rejected(
     assert data[0]["field_values"]["sms_signature"] == f"旧签名{marker}"
 
 
+def test_import_can_overwrite_existing_record_without_changing_id(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    group = _create_group([("sms_signature", "短信签名")])
+    marker = uuid.uuid4().hex[:8]
+    main, sub = f"1069{marker}", f"9001{marker}"
+    original = _build_excel(
+        ["主端口号", "子端口号", "状态", "短信签名"],
+        [[main, sub, "在线", f"旧签名{marker}"]],
+    )
+    assert _import_file(client, superuser_token_headers, original, group["id"]).status_code == 200
+    before = client.get(
+        f"{settings.API_V1_STR}/sub-port-library",
+        headers=superuser_token_headers,
+        params={"keyword": marker},
+    ).json()["data"][0]
+    with Session(engine) as session:
+        session.add(FileAttachment(
+            original_name="old.png", stored_path=f"test/{marker}.png", file_size=1,
+            mime_type="image/png", md5_hash="0" * 32,
+            entity_type="sub_port_record", entity_id=uuid.UUID(before["id"]),
+            field_name="旧附件",
+        ))
+        session.commit()
+
+    replacement = _build_excel(
+        ["主端口号", "子端口号", "状态", "短信签名"],
+        [[main, sub, "整改", f"新签名{marker}"]],
+    )
+    r = client.post(
+        f"{settings.API_V1_STR}/sub-port-library/import",
+        headers=superuser_token_headers,
+        files={"file": ("data.xlsx", replacement)},
+        data={"group_id": group["id"], "overwrite": "true"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["success_count"] == 1
+    assert r.json()["error_count"] == 0
+    after = client.get(
+        f"{settings.API_V1_STR}/sub-port-library",
+        headers=superuser_token_headers,
+        params={"keyword": marker},
+    ).json()["data"]
+    assert len(after) == 1
+    assert after[0]["id"] == before["id"]
+    assert after[0]["status"] == "整改"
+    assert after[0]["field_values"]["sms_signature"] == f"新签名{marker}"
+    with Session(engine) as session:
+        assert not session.exec(select(FileAttachment).where(
+            FileAttachment.entity_id == uuid.UUID(before["id"])
+        )).all()
+
+
 def test_import_validation_errors(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
@@ -250,6 +422,50 @@ def test_import_duplicate_in_file(
     assert body["success_count"] == 1
     assert body["error_count"] == 1
     assert body["errors"][0]["row"] == 3
+
+
+def test_status_import_updates_only_matching_main_and_sub_port(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex[:8]
+    sub_port = f"8001{marker}"
+    main_ports = [f"1068{marker}", f"1069{marker}"]
+    record_ids = []
+    for main_port in main_ports:
+        r = client.post(
+            f"{settings.API_V1_STR}/sub-port-library",
+            headers=superuser_token_headers,
+            json={"main_port_number": main_port, "sub_port_number": sub_port},
+        )
+        assert r.status_code == 200, r.text
+        record_ids.append(r.json()["id"])
+
+    content = _build_excel(
+        ["主端口号", "子端口号", "状态"],
+        [
+            [main_ports[0], sub_port, "整改"],
+            [main_ports[1], sub_port, "停机"],
+            [f"9999{marker}", sub_port, "下线"],
+        ],
+    )
+    r = client.post(
+        f"{settings.API_V1_STR}/sub-port-library/import/status",
+        headers=superuser_token_headers,
+        files={"file": ("status.xlsx", content)},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["updated_count"] == 1
+    assert [error["row"] for error in r.json()["errors"]] == [3, 4]
+
+    statuses = []
+    for record_id in record_ids:
+        record = client.get(
+            f"{settings.API_V1_STR}/sub-port-library",
+            headers=superuser_token_headers,
+            params={"keyword": marker},
+        ).json()["data"]
+        statuses.append(next(item["status"] for item in record if item["id"] == record_id))
+    assert statuses == ["整改", "在线"]
 
 
 def test_create_duplicate_400(
@@ -441,6 +657,30 @@ def test_list_filters(
     assert len(body["data"]) == 1
 
 
+def test_filter_by_is_four_category(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    group = _create_group([])
+    marker = uuid.uuid4().hex[:8]
+    main = f"1069{marker}"
+    content = _build_excel(
+        ["主端口号", "子端口号", "状态", "是否四类"],
+        [[main, f"8001{marker}", "在线", "是"], [main, f"8002{marker}", "在线", "否"]],
+    )
+    assert _import_file(client, superuser_token_headers, content, group["id"]).json()[
+        "success_count"
+    ] == 2
+    r = client.get(
+        f"{settings.API_V1_STR}/sub-port-library",
+        headers=superuser_token_headers,
+        params={"main_port_number": main, "is_four_category": "是"},
+    )
+    assert r.status_code == 200, r.text
+    assert [item["sub_port_number"] for item in r.json()["data"]] == [
+        f"8001{marker}"
+    ]
+
+
 def test_export_selected_fields(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
@@ -477,7 +717,60 @@ def test_export_selected_fields(
     ws = wb.active
     assert [c.value for c in ws[1]] == ["状态", "子端口号", "主端口号", "短信签名"]
     assert ws.max_row == 3
-    assert ws.cell(row=2, column=4).value in {f"签名A{marker}", f"签名B{marker}"}
+    assert [ws.cell(row=i, column=4).value for i in (2, 3)] == [
+        f"签名A{marker}",
+        f"签名B{marker}",
+    ]
+
+
+def test_list_and_export_filter_by_selected_sub_ports_and_signatures(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    group = _create_group([("sms_signature", "短信签名")])
+    marker = uuid.uuid4().hex[:8]
+    main = f"1069{marker}"
+    rows = [
+        [main, f"8001{marker}", "在线", f"签名A{marker}"],
+        [main, f"8002{marker}", "在线", f"签名B{marker}"],
+        [main, f"8003{marker}", "在线", f"签名A{marker}"],
+    ]
+    content = _build_excel(["主端口号", "子端口号", "状态", "短信签名"], rows)
+    assert _import_file(client, superuser_token_headers, content, group["id"]).json()[
+        "success_count"
+    ] == 3
+    r = client.get(
+        f"{settings.API_V1_STR}/sub-port-library/filter-options",
+        headers=superuser_token_headers,
+        params={"field": "sms_signature"},
+    )
+    assert r.status_code == 200, r.text
+    assert {f"签名A{marker}", f"签名B{marker}"}.issubset(set(r.json()))
+    filters = [
+        ("main_port_number", main),
+        ("sub_port_numbers", f"8001{marker}"),
+        ("sub_port_numbers", f"8002{marker}"),
+        ("sms_signatures", f"签名A{marker}"),
+    ]
+    r = client.get(
+        f"{settings.API_V1_STR}/sub-port-library",
+        headers=superuser_token_headers,
+        params=filters,
+    )
+    assert r.status_code == 200, r.text
+    assert [item["sub_port_number"] for item in r.json()["data"]] == [
+        f"8001{marker}"
+    ]
+
+    r = client.get(
+        f"{settings.API_V1_STR}/sub-port-library/export",
+        headers=superuser_token_headers,
+        params=[("group_id", group["id"]), *filters],
+    )
+    assert r.status_code == 200, r.text
+    ws = load_workbook(BytesIO(r.content)).active
+    assert [ws.cell(row=i, column=2).value for i in range(2, ws.max_row + 1)] == [
+        f"8001{marker}"
+    ]
 
 
 def test_export_embeds_attachment_instead_of_dispimg_formula(

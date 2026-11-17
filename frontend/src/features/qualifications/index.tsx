@@ -35,6 +35,13 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
@@ -46,10 +53,10 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { QualificationDetailDialog } from './components/qualification-detail-dialog'
 import { QualificationDialog } from './components/qualification-dialog'
 
-const PAGE_SIZE = 10
 
 export function QualificationsPage() {
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [selected, setSelected] = useState<QualificationInfo | undefined>()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -60,17 +67,23 @@ export function QualificationsPage() {
     QualificationInfo | undefined
   >()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [signatureMode, setSignatureMode] = useState<'contains' | 'exact'>(
+    'contains'
+  )
   const [searchInputs, setSearchInputs] = useState({
     enterprise_name: '',
     cert_number: '',
     identity_cert_number: '',
     sms_signature: '',
+    diversion_info: '',
   })
   const [appliedFilters, setAppliedFilters] = useState<{
     enterprise_name?: string
     cert_number?: string
     identity_cert_number?: string
     sms_signature?: string
+    sms_signature_mode?: 'contains' | 'exact'
+    diversion_info?: string
   }>({})
   const queryClient = useQueryClient()
   const { has } = usePermissions()
@@ -78,10 +91,10 @@ export function QualificationsPage() {
   const { data, isLoading } = useQuery({
     queryKey: [
       'qualifications',
-      { page, page_size: PAGE_SIZE, ...appliedFilters },
+      { page, page_size: pageSize, ...appliedFilters },
     ],
     queryFn: () =>
-      getQualifications({ page, page_size: PAGE_SIZE, ...appliedFilters }),
+      getQualifications({ page, page_size: pageSize, ...appliedFilters }),
   })
 
   const handleSearch = () => {
@@ -91,6 +104,8 @@ export function QualificationsPage() {
       identity_cert_number:
         searchInputs.identity_cert_number.trim() || undefined,
       sms_signature: searchInputs.sms_signature.trim() || undefined,
+      sms_signature_mode: signatureMode,
+      diversion_info: searchInputs.diversion_info.trim() || undefined,
     })
     setPage(1)
   }
@@ -101,8 +116,10 @@ export function QualificationsPage() {
       cert_number: '',
       identity_cert_number: '',
       sms_signature: '',
+      diversion_info: '',
     })
     setAppliedFilters({})
+    setSignatureMode('contains')
     setPage(1)
   }
 
@@ -306,6 +323,23 @@ export function QualificationsPage() {
             </div>
           </div>
           <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>匹配方式</label>
+            <Select
+              value={signatureMode}
+              onValueChange={(value: 'contains' | 'exact') =>
+                setSignatureMode(value)
+              }
+            >
+              <SelectTrigger className='w-28'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='contains'>模糊</SelectItem>
+                <SelectItem value='exact'>精确</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className='flex flex-col gap-1'>
             <label className='text-muted-foreground text-sm'>企业名称</label>
             <div className='relative'>
               <SearchIcon className='text-muted-foreground pointer-events-none absolute top-2.5 left-2.5 h-4 w-4' />
@@ -365,6 +399,16 @@ export function QualificationsPage() {
               />
             </div>
           </div>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>引流信息</label>
+            <Input
+              placeholder='搜索引流链接或手机号码'
+              value={searchInputs.diversion_info}
+              onChange={(e) => setSearchInputs((s) => ({ ...s, diversion_info: e.target.value }))}
+              className='w-56'
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
+            />
+          </div>
           <div className='flex gap-2'>
             <Button size='sm' onClick={handleSearch}>
               搜索
@@ -379,7 +423,8 @@ export function QualificationsPage() {
           columns={columns}
           data={qualifications}
           page={page}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
           total={total}
           onPageChange={setPage}
           enableRowSelection

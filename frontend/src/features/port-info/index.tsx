@@ -48,12 +48,12 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { PortInfoDetailDialog } from './components/port-info-detail-dialog'
 import { PortInfoDialog } from './components/port-info-dialog'
 
-const PAGE_SIZE = 10
 const CARRIERS = ['中国移动', '中国联通', '中国电信', '中国广电']
 const PORT_TYPE_OPTIONS = ['普通短信端口', '5G消息端口']
 
 export function PortInfoPage() {
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [selected, setSelected] = useState<PortInfo | undefined>()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -78,7 +78,7 @@ export function PortInfoPage() {
 
   const filters = {
     page,
-    page_size: PAGE_SIZE,
+    page_size: pageSize,
     carrier: appliedFilters.carrier,
     province: appliedFilters.province,
     keyword: keyword || undefined,
@@ -415,7 +415,8 @@ export function PortInfoPage() {
           data={portInfos}
           total={total}
           page={page}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
           onPageChange={setPage}
           enableRowSelection
           onRowSelectionChange={setRowSelection}

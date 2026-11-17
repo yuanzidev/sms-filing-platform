@@ -214,6 +214,118 @@ def test_create_filing_task_qualification_only_allows_empty_port_ids(
     assert ws.cell(row=2, column=1).value == "仅资质企业"
 
 
+def test_same_signature_with_different_diversion_exports_both_qualifications(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex[:8]
+    signature = f"同签名{marker}"
+    for suffix in ("a", "b"):
+        r = client.post(
+            f"{settings.API_V1_STR}/qualifications",
+            headers=superuser_token_headers,
+            json={
+                "enterprise_name": f"企业{suffix}{marker}",
+                "sms_signature": signature,
+                "diversion_short_link": f"https://example.com/{marker}/{suffix}",
+            },
+        )
+        assert r.status_code == 200, r.text
+    group = client.post(
+        f"{settings.API_V1_STR}/export-groups",
+        headers=superuser_token_headers,
+        json={
+            "name": f"引流导出{marker}",
+            "fields": [
+                {"field_name": "sms_signature", "field_label": "短信签名", "sort_order": 1},
+                {"field_name": "diversion_short_link", "field_label": "引流短链", "sort_order": 2},
+            ],
+        },
+    )
+    assert group.status_code == 200, group.text
+    matches = client.post(
+        f"{settings.API_V1_STR}/qualifications/batch-by-signatures",
+        headers=superuser_token_headers,
+        json={"signatures": [signature]},
+    ).json()["matched_qualifications"]
+    assert len(matches) == 2
+    task = client.post(
+        f"{settings.API_V1_STR}/filing-tasks",
+        headers=superuser_token_headers,
+        json={
+            "qualification_ids": [item["id"] for item in matches],
+            "port_ids": [],
+            "export_group_id": group.json()["id"],
+            "allocation_mode": "qualification_only",
+        },
+    )
+    assert task.status_code == 200, task.text
+    downloaded = client.get(
+        f"{settings.API_V1_STR}/filing-tasks/{task.json()['id']}/download",
+        headers=superuser_token_headers,
+    )
+    assert downloaded.status_code == 200, downloaded.text
+    sheet = load_workbook(BytesIO(downloaded.content)).active
+    assert {sheet.cell(row, 2).value for row in (2, 3)} == {
+        f"https://example.com/{marker}/a",
+        f"https://example.com/{marker}/b",
+    }
+
+
+def test_handler_phone_in_export_comes_from_port(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex[:8]
+    qualification = client.post(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        json={
+            "enterprise_name": f"经办人资质{marker}",
+            "handler_phone": "13900000001",
+        },
+    )
+    assert qualification.status_code == 200, qualification.text
+    port = client.post(
+        f"{settings.API_V1_STR}/port-info",
+        headers=superuser_token_headers,
+        json={
+            "carrier": "中国联通",
+            "main_port_number": f"1069{marker}",
+            "enterprise_name": f"端口企业{marker}",
+            "port_type": "普通短信端口",
+            "handler_phone": "13900000002",
+        },
+    )
+    assert port.status_code == 200, port.text
+    group = client.post(
+        f"{settings.API_V1_STR}/export-groups",
+        headers=superuser_token_headers,
+        json={
+            "name": f"经办人导出{marker}",
+            "fields": [
+                {"field_name": "handler_phone", "field_label": "经办人手机号", "sort_order": 1}
+            ],
+        },
+    )
+    assert group.status_code == 200, group.text
+    task = client.post(
+        f"{settings.API_V1_STR}/filing-tasks",
+        headers=superuser_token_headers,
+        json={
+            "qualification_ids": [qualification.json()["id"]],
+            "port_ids": [port.json()["id"]],
+            "export_group_id": group.json()["id"],
+        },
+    )
+    assert task.status_code == 200, task.text
+    downloaded = client.get(
+        f"{settings.API_V1_STR}/filing-tasks/{task.json()['id']}/download",
+        headers=superuser_token_headers,
+    )
+    assert downloaded.status_code == 200, downloaded.text
+    sheet = load_workbook(BytesIO(downloaded.content)).active
+    assert sheet.cell(2, 1).value == "13900000002"
+
+
 def test_create_filing_task_rejects_invalid_port_ids(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:

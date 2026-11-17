@@ -34,6 +34,7 @@ class PortInfoBase(SQLModel):
     audit_form: str | None = Field(default=None, max_length=500)
     customer_type: str | None = Field(default=None, max_length=50)
     basic_telecom_enterprise_id: str | None = Field(default=None, max_length=100)
+    handler_phone: str | None = Field(default=None, max_length=20)
 
 
 class PortInfo(PortInfoBase, table=True):
@@ -73,6 +74,7 @@ class PortInfoUpdate(SQLModel):
     audit_form: str | None = None
     customer_type: str | None = None
     basic_telecom_enterprise_id: str | None = None
+    handler_phone: str | None = None
 
 
 class PortInfoPublic(PortInfoBase):

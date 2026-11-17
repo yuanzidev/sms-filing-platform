@@ -48,7 +48,6 @@ import { ActionIconButton } from '@/components/shared/action-icon-button'
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { ThemeSwitch } from '@/components/theme-switch'
 
-const PAGE_SIZE = 10
 
 function formatFileSize(bytes: number | null): string {
   if (bytes == null) return '-'
@@ -95,6 +94,7 @@ async function parseDownloadErrorDetail(
 
 export function FilingManagementPage() {
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [keyword, setKeyword] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -110,7 +110,7 @@ export function FilingManagementPage() {
 
   const filters = {
     page,
-    page_size: PAGE_SIZE,
+    page_size: pageSize,
     keyword: keyword || undefined,
     start_date: startDate || undefined,
     end_date: endDate || undefined,
@@ -389,7 +389,8 @@ export function FilingManagementPage() {
           columns={columns}
           data={tasks}
           page={page}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
           total={total}
           onPageChange={setPage}
           enableRowSelection

@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from sqlmodel import Session, col, func, or_, select
 
@@ -25,6 +26,8 @@ def list_qualifications(
     cert_number: str | None = None,
     identity_cert_number: str | None = None,
     sms_signature: str | None = None,
+    sms_signature_mode: Literal["contains", "exact"] = "contains",
+    diversion_info: str | None = None,
 ) -> tuple[list[QualificationInfo], int]:
     query = select(QualificationInfo)
 
@@ -47,7 +50,20 @@ def list_qualifications(
             )
         )
     if sms_signature:
-        query = query.where(QualificationInfo.sms_signature.contains(sms_signature))
+        query = query.where(
+            QualificationInfo.sms_signature == sms_signature
+            if sms_signature_mode == "exact"
+            else QualificationInfo.sms_signature.contains(sms_signature)
+        )
+    if diversion_info:
+        query = query.where(
+            or_(
+                QualificationInfo.diversion_number.contains(diversion_info),
+                QualificationInfo.diversion_short_link.contains(diversion_info),
+                QualificationInfo.diversion_long_link.contains(diversion_info),
+                QualificationInfo.link_address.contains(diversion_info),
+            )
+        )
 
     count = session.exec(select(func.count()).select_from(query.subquery())).one()
     results = session.exec(

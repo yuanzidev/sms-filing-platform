@@ -99,7 +99,6 @@ const formSchema = z.object({
   handler_cert_type: z.string().optional(),
   handler_cert_number: z.string().optional(),
   handler_address: z.string().optional(),
-  handler_phone: z.string().optional(),
   sms_signature: z.string().optional(),
   signature_type: z.string().optional(),
   signature_verified: z.string().optional(),
@@ -342,7 +341,6 @@ export function QualificationDialog({
         handler_cert_type: qualification.handler_cert_type || '',
         handler_cert_number: qualification.handler_cert_number || '',
         handler_address: qualification.handler_address || '',
-        handler_phone: qualification.handler_phone || '',
         sms_signature: qualification.sms_signature || '',
         signature_type: qualification.signature_type || '',
         signature_verified: boolToStr(qualification.signature_verified),
@@ -385,7 +383,6 @@ export function QualificationDialog({
         handler_cert_type: '',
         handler_cert_number: '',
         handler_address: '',
-        handler_phone: '',
         sms_signature: '',
         signature_type: '',
         signature_verified: '',
@@ -774,23 +771,6 @@ export function QualificationDialog({
                         <FormControl>
                           <Input
                             placeholder='经办人地址'
-                            {...field}
-                            value={field.value || ''}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name='handler_phone'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>联系电话</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder='手机号码'
                             {...field}
                             value={field.value || ''}
                           />

@@ -114,6 +114,7 @@ const formSchema = z.object({
   audit_form: z.string().optional(),
   customer_type: z.string().optional(),
   basic_telecom_enterprise_id: z.string().optional(),
+  handler_phone: z.string().optional(),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -174,6 +175,7 @@ function toDefaultValues(p?: PortInfo): FormData {
     audit_form: p?.audit_form || '',
     customer_type: p?.customer_type || '',
     basic_telecom_enterprise_id: p?.basic_telecom_enterprise_id || '',
+    handler_phone: p?.handler_phone || '',
   }
 }
 
@@ -584,6 +586,19 @@ export function PortInfoDialog({ open, onOpenChange, portInfo, onSuccess }: Prop
                     <FormLabel>基础电信企业ID</FormLabel>
                     <FormControl>
                       <Input placeholder="基础电信企业ID" {...field} value={field.value || ''} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="handler_phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>经办人手机号</FormLabel>
+                    <FormControl>
+                      <Input placeholder="经办人手机号" {...field} value={field.value || ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

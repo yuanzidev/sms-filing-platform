@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Upload, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -44,10 +45,11 @@ interface ImportDialogProps {
   onOpenChange: (open: boolean) => void
   title: string
   onDownloadTemplate: () => void
-  onImport: (file: File) => Promise<ImportResult>
+  onImport: (file: File, overwrite: boolean) => Promise<ImportResult>
   onPreview?: (file: File) => Promise<ImportPreviewResult>
   onSuccess: () => void
   onDownloadErrorReport?: (errors: ImportErrorItem[]) => Promise<void>
+  allowOverwrite?: boolean
 }
 
 type ImportRequestError = {
@@ -106,8 +108,10 @@ export function ImportDialog({
   onPreview,
   onSuccess,
   onDownloadErrorReport,
+  allowOverwrite = false,
 }: ImportDialogProps) {
   const [file, setFile] = useState<File | null>(null)
+  const [overwrite, setOverwrite] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [importErrors, setImportErrors] = useState<ImportErrorItem[]>([])
@@ -122,6 +126,7 @@ export function ImportDialog({
   useEffect(() => {
     if (!open) {
       setFile(null)
+      setOverwrite(false)
       setError(null)
       setImportErrors([])
       setUnrecognizedHeaders([])
@@ -153,7 +158,7 @@ export function ImportDialog({
     setImportErrors([])
     setUnrecognizedHeaders([])
     try {
-      const result = await onImport(file)
+      const result = await onImport(file, overwrite)
       setUnrecognizedHeaders(result.unrecognized_headers ?? [])
       if (result.errors && result.errors.length > 0) {
         setImportErrors(result.errors)
@@ -254,6 +259,16 @@ export function ImportDialog({
             </div>
             {file && <p className='text-primary mt-2 text-sm'>{file.name}</p>}
           </div>
+
+          {allowOverwrite && (
+            <label className='flex items-center gap-2 text-sm'>
+              <Checkbox
+                checked={overwrite}
+                onCheckedChange={(checked) => setOverwrite(checked === true)}
+              />
+              覆盖已有子端口记录（主端口号和子端口号相同）
+            </label>
+          )}
 
           {error && (
             <div className='bg-destructive/10 text-destructive rounded-md p-3 text-sm'>

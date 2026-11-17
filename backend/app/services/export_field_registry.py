@@ -40,6 +40,7 @@ REGISTRY: list[ExportField] = [
     ExportField("audit_form", "端口审核表", "port", "端口信息"),
     ExportField("customer_type", "客户类型", "port", "端口信息"),
     ExportField("basic_telecom_enterprise_id", "基础电信企业ID", "port", "端口信息", "基础电信企业唯一标识"),
+    ExportField("handler_phone", "经办人手机号", "port", "端口信息"),
     ExportField("port_enterprise_name", "主端口备案公司", "port", "端口信息"),
     ExportField("sub_port_failure_reason", "子端口失败原因", "port", "端口信息"),
 
@@ -77,7 +78,6 @@ REGISTRY: list[ExportField] = [
     ExportField("handler_cert_type", "经办人证件类型", "qualification", "资质信息"),
     ExportField("handler_cert_number", "经办人证件号码", "qualification", "资质信息"),
     ExportField("handler_address", "经办人证件地址", "qualification", "资质信息"),
-    ExportField("handler_phone", "经办人手机号", "qualification", "资质信息"),
 
     # ── 引流信息（来源 qualification） ──
     ExportField("diversion_number", "引流号码", "qualification", "引流信息"),

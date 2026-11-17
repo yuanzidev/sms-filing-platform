@@ -107,6 +107,7 @@ export interface PortInfo {
   audit_form: string | null
   customer_type: string | null
   basic_telecom_enterprise_id: string | null
+  handler_phone: string | null
   created_at: string
   updated_at: string
 }

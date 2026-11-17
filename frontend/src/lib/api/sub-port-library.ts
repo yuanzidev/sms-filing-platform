@@ -58,8 +58,25 @@ export const getSubPortRecords = async (params?: {
   status?: string
   main_port_number?: string
   sub_port_number?: string
+  sub_port_numbers?: string[]
+  sms_signatures?: string[]
+  is_four_category?: string
+  carrier?: string
+  resource_name?: string
 }): Promise<SubPortRecordsResponse> => {
-  const response = await api.get('/api/v1/sub-port-library', { params })
+  const response = await api.get('/api/v1/sub-port-library', {
+    params,
+    paramsSerializer: { indexes: null },
+  })
+  return response.data
+}
+
+export const getSubPortFilterOptions = async (
+  field: 'sub_port_number' | 'sms_signature' | 'main_port_number' | 'carrier'
+): Promise<string[]> => {
+  const response = await api.get('/api/v1/sub-port-library/filter-options', {
+    params: { field },
+  })
   return response.data
 }
 
@@ -69,8 +86,14 @@ export const downloadSubPortRecords = async (params: {
   status?: string
   main_port_number?: string
   sub_port_number?: string
+  sub_port_numbers?: string[]
+  sms_signatures?: string[]
+  is_four_category?: string
+  carrier?: string
+  resource_name?: string
   ids?: string[]
   field_names?: string[]
+  business_type?: string
 }): Promise<void> => {
   const response = await api.get('/api/v1/sub-port-library/export', {
     params: {
@@ -79,9 +102,16 @@ export const downloadSubPortRecords = async (params: {
       status: params.status,
       main_port_number: params.main_port_number,
       sub_port_number: params.sub_port_number,
+      sub_port_numbers: params.sub_port_numbers,
+      sms_signatures: params.sms_signatures,
+      is_four_category: params.is_four_category,
+      carrier: params.carrier,
+      resource_name: params.resource_name,
       ids: params.ids?.join(',') || undefined,
-      field_names: params.field_names?.join(',') || undefined,
+      field_names: params.field_names?.join(','),
+      business_type: params.business_type,
     },
+    paramsSerializer: { indexes: null },
     responseType: 'blob',
   })
   const url = window.URL.createObjectURL(new Blob([response.data]))
@@ -142,6 +172,18 @@ export const downloadSubPortTemplate = async (
   window.URL.revokeObjectURL(url)
 }
 
+export const downloadSubPortStatusTemplate = async (): Promise<void> => {
+  const response = await api.get('/api/v1/sub-port-library/import/status-template', { responseType: 'blob' })
+  const url = window.URL.createObjectURL(new Blob([response.data]))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = '子端口状态批量修改模板.xlsx'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(url)
+}
+
 export interface SubPortImportErrorItem {
   row: number
   field: string
@@ -168,12 +210,29 @@ export interface SubPortImportPreviewResult {
 
 export const importSubPorts = async (
   file: File,
-  groupId: string
+  groupId: string,
+  overwrite = false
 ): Promise<SubPortImportResult> => {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('group_id', groupId)
+  formData.append('overwrite', String(overwrite))
   const response = await api.post('/api/v1/sub-port-library/import', formData)
+  return response.data
+}
+
+export interface SubPortStatusImportResult {
+  updated_count: number
+  error_count: number
+  errors: { row: number; reason: string }[]
+}
+
+export const importSubPortStatuses = async (
+  file: File
+): Promise<SubPortStatusImportResult> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  const response = await api.post('/api/v1/sub-port-library/import/status', formData)
   return response.data
 }
 

@@ -96,6 +96,42 @@ def test_import_port_info_with_empty_operation_and_group(
     assert body["success_count"] >= 1
 
 
+def test_import_port_handler_phone(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    from io import BytesIO
+    from uuid import uuid4
+
+    from openpyxl import Workbook, load_workbook
+
+    template = client.get(
+        f"{settings.API_V1_STR}/port-info/template", headers=superuser_token_headers
+    )
+    assert template.status_code == 200
+    assert "经办人手机号" in [cell.value for cell in load_workbook(BytesIO(template.content)).active[1]]
+
+    marker = uuid4().hex[:8]
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["运营商", "主端口号", "主端口备案公司", "端口类型", "经办人手机号"])
+    ws.append(["中国联通", f"1069{marker}", f"企业{marker}", "普通短信端口", "13900139000"])
+    content = BytesIO()
+    wb.save(content)
+    imported = client.post(
+        f"{settings.API_V1_STR}/port-info/import",
+        headers=superuser_token_headers,
+        files={"file": ("data.xlsx", content.getvalue())},
+    )
+    assert imported.status_code == 200, imported.text
+    listed = client.get(
+        f"{settings.API_V1_STR}/port-info",
+        headers=superuser_token_headers,
+        params={"keyword": marker},
+    )
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["data"][0]["handler_phone"] == "13900139000"
+
+
 def test_import_port_infos_collects_errors_and_writes_valid_rows(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:

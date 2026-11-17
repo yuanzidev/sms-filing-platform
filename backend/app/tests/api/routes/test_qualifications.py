@@ -36,6 +36,60 @@ def test_list_qualifications_filter_by_sms_signature(
     assert all("平台A" in item["sms_signature"] for item in body["data"])
 
 
+def test_signature_search_supports_exact_match(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex[:8]
+    short = f"抖音{marker}"
+    for signature in (short, f"{short}商城"):
+        r = client.post(
+            f"{settings.API_V1_STR}/qualifications",
+            headers=superuser_token_headers,
+            json={"enterprise_name": f"企业{signature}", "sms_signature": signature},
+        )
+        assert r.status_code == 200, r.text
+    r = client.get(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        params={"sms_signature": short, "sms_signature_mode": "exact"},
+    )
+    assert r.status_code == 200, r.text
+    assert [item["sms_signature"] for item in r.json()["data"]] == [short]
+
+
+def test_diversion_search_matches_link_and_phone(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex[:8]
+    link = f"https://example.com/path/{marker}/details"
+    phone = f"138{int(marker[:6], 16):08d}"
+    created = client.post(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        json={
+            "enterprise_name": f"引流测试{marker}",
+            "diversion_long_link": link,
+            "diversion_number": phone,
+        },
+    )
+    assert created.status_code == 200, created.text
+    other = client.post(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        json={"enterprise_name": f"无引流测试{marker}"},
+    )
+    assert other.status_code == 200, other.text
+    for keyword in (marker, phone):
+        response = client.get(
+            f"{settings.API_V1_STR}/qualifications",
+            headers=superuser_token_headers,
+            params={"diversion_info": keyword},
+        )
+        assert response.status_code == 200, response.text
+        assert any(item["id"] == created.json()["id"] for item in response.json()["data"])
+        assert all(item["id"] != other.json()["id"] for item in response.json()["data"])
+
+
 def test_list_qualifications_filter_by_identity_cert_number(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
@@ -247,25 +301,26 @@ def test_template_column_order_matches_new_spec(
     wb = load_workbook(BytesIO(r.content))
     ws = wb.active
     headers = [c.value for c in ws[1]]
-    # 新模板 45 列关键位置断言（经办人字段前置、法人字段跟随）
+    # 经办人手机号由端口管理维护，资质模板中后续列前移一位。
     assert headers[11] == "经办人姓名", f"col12 应为「经办人姓名」，实际：{headers[11]}"
-    assert headers[17] == "法人姓名", f"col18 应为「法人姓名」，实际：{headers[17]}"
-    assert headers[21] == "法人身份证正面", f"col22 应为「法人身份证正面」，实际：{headers[21]}"
-    assert headers[22] == "法人身份证反面", f"col23 应为「法人身份证反面」，实际：{headers[22]}"
-    assert headers[36] == "引流短链", f"col37 应为「引流短链」，实际：{headers[36]}"
-    assert headers[37] == "引流长链", f"col38 应为「引流长链」，实际：{headers[37]}"
-    assert headers[38] == "商标唯一性举证", f"col39 应为「商标唯一性举证」，实际：{headers[38]}"
-    assert headers[39] == "其他证明图片", f"col40 应为「其他证明图片」，实际：{headers[39]}"
-    assert headers[44] == "签名举证附件", f"col45 应为「签名举证附件」，实际：{headers[44]}"
-    assert headers[45] == "引流号码举证附件", f"col46 应为「引流号码举证附件」，实际：{headers[45]}"
-    assert headers[46] == "引流链接举证", f"col47 应为「引流链接举证」，实际：{headers[46]}"
+    assert "经办人手机号" not in headers
+    assert headers[16] == "法人姓名"
+    assert headers[20] == "法人身份证正面"
+    assert headers[21] == "法人身份证反面"
+    assert headers[35] == "引流短链"
+    assert headers[36] == "引流长链"
+    assert headers[37] == "商标唯一性举证"
+    assert headers[38] == "其他证明图片"
+    assert headers[43] == "签名举证附件"
+    assert headers[44] == "引流号码举证附件"
+    assert headers[45] == "引流链接举证"
     # 旧名不应存在
     assert "链接地址" not in headers
     assert "经办人身份证正面" not in headers
     assert "经办人身份证反面" not in headers
     assert "引流举证附件" not in headers
     # 总列数
-    assert len([h for h in headers if h]) == 48
+    assert len([h for h in headers if h]) == 47
 
 
 def test_import_accepts_renamed_link_address_header(
