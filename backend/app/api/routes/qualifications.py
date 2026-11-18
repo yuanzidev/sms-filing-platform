@@ -675,7 +675,14 @@ def download_import_error_report(body: ImportErrorReport) -> Any:
 def batch_by_signatures(*, session: SessionDep, body: BatchSignatureRequest) -> Any:
     imported_start = None
     imported_end = None
-    if body.import_date is not None:
+    if body.import_datetime is not None:
+        local_tz = get_timezone()
+        local_start = body.import_datetime.replace(microsecond=0)
+        if local_start.tzinfo is None:
+            local_start = local_start.replace(tzinfo=local_tz)
+        imported_start = local_start.astimezone(timezone.utc)
+        imported_end = imported_start + timedelta(seconds=1)
+    elif body.import_date is not None:
         local_tz = get_timezone()
         local_start = datetime.combine(body.import_date, time.min, tzinfo=local_tz)
         local_end = local_start + timedelta(days=1)

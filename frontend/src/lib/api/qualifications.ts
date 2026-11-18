@@ -172,11 +172,11 @@ export const downloadQualificationImportErrorReport = async (
 
 export const getQualificationsBySignatures = async (
   signatures: string[],
-  importDate?: string
+  importDatetime?: string
 ): Promise<BatchSignatureResponse> => {
   const response = await api.post(
     '/api/v1/qualifications/batch-by-signatures',
-    { signatures, import_date: importDate || undefined }
+    { signatures, import_datetime: importDatetime || undefined }
   )
   return response.data
 }

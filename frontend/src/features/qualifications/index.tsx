@@ -183,7 +183,7 @@ export function QualificationsPage() {
       {
         accessorKey: 'created_at',
         header: '创建时间',
-        cell: ({ getValue }) => formatCN(getValue() as string),
+        cell: ({ getValue }) => formatCN(getValue() as string, { withSeconds: true }),
       },
       {
         id: 'actions',

@@ -45,15 +45,15 @@ export function SignatureImportDialog({
   const [resultKey, setResultKey] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [importDate, setImportDate] = useState('')
+  const [importDateTime, setImportDateTime] = useState('')
 
   const signatures = useMemo(
     () => parseSignaturesFromText(pasteText),
     [pasteText]
   )
   const signatureKey = useMemo(
-    () => `${signatures.join('\n')}::${importDate}`,
-    [signatures, importDate]
+    () => `${signatures.join('\n')}::${importDateTime}`,
+    [signatures, importDateTime]
   )
 
   const querySignatures = useCallback(
@@ -66,9 +66,9 @@ export function SignatureImportDialog({
       setLoading(true)
       setError(null)
       try {
-        const res = await getQualificationsBySignatures(sigs, importDate)
+        const res = await getQualificationsBySignatures(sigs, importDateTime)
         setResult(res)
-        setResultKey(`${sigs.join('\n')}::${importDate}`)
+        setResultKey(`${sigs.join('\n')}::${importDateTime}`)
         return res
       } catch {
         setError('查询失败，请稍后重试')
@@ -77,7 +77,7 @@ export function SignatureImportDialog({
         setLoading(false)
       }
     },
-    [importDate]
+    [importDateTime]
   )
 
   const handleFileUpload = useCallback(
@@ -135,7 +135,7 @@ export function SignatureImportDialog({
     onOpenChange(false)
     // Reset
     setPasteText('')
-    setImportDate('')
+    setImportDateTime('')
     setResult(null)
     setResultKey('')
     setError(null)
@@ -164,25 +164,26 @@ export function SignatureImportDialog({
 
         <div className='min-h-0 flex-1 space-y-4 overflow-y-auto pr-1'>
           <div className='space-y-2'>
-            <label className='text-sm font-medium'>资质导入日期（选填）</label>
+            <label className='text-sm font-medium'>资质导入时间（选填，精确到秒）</label>
             <div className='flex gap-2'>
               <Input
-                type='date'
-                value={importDate}
+                type='datetime-local'
+                step='1'
+                value={importDateTime}
                 onChange={(e) => {
-                  setImportDate(e.target.value)
+                  setImportDateTime(e.target.value)
                   setResult(null)
                   setResultKey('')
                 }}
-                className='w-48'
+                className='w-60'
               />
-              {importDate && (
+              {importDateTime && (
                 <Button
                   type='button'
                   variant='ghost'
                   size='sm'
                   onClick={() => {
-                    setImportDate('')
+                    setImportDateTime('')
                     setResult(null)
                     setResultKey('')
                   }}

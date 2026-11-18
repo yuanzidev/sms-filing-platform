@@ -129,6 +129,7 @@ class QualificationInfosPublic(SQLModel):
 class BatchSignatureRequest(SQLModel):
     signatures: list[str]
     import_date: date | None = None
+    import_datetime: datetime | None = None
 
 
 class BatchSignatureResponse(SQLModel):

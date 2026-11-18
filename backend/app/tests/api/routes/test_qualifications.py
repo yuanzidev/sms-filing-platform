@@ -207,6 +207,34 @@ def test_batch_by_signatures_filters_by_import_date(
     assert names == {f"目标资质-{marker}"}
 
 
+def test_batch_by_signatures_filters_by_import_minute(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    signature = f"同日分时筛选-{marker}"
+    with Session(engine) as session:
+        for name, created_at in (
+            ("早", datetime(2026, 9, 15, 2, 30, 10, tzinfo=timezone.utc)),
+            ("晚", datetime(2026, 9, 15, 2, 30, 20, tzinfo=timezone.utc)),
+        ):
+            session.add(QualificationInfo(
+                enterprise_name=f"{name}-{marker}",
+                sms_signature=signature,
+                created_at=created_at,
+                updated_at=created_at,
+            ))
+        session.commit()
+
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/batch-by-signatures",
+        headers=superuser_token_headers,
+        json={"signatures": [signature], "import_datetime": "2026-09-15T10:30:10"},
+    )
+    assert r.status_code == 200, r.text
+    names = {item["enterprise_name"] for item in r.json()["matched_qualifications"]}
+    assert names == {f"早-{marker}"}
+
+
 def test_batch_by_signatures_preserves_duplicate_input_rows(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
