@@ -48,12 +48,12 @@ def _create_qualification(client, headers, name):
     return r.json()["id"]
 
 
-def _create_port(client, headers, main_port_number):
+def _create_port(client, headers, main_port_number, carrier="中国移动"):
     r = client.post(
         f"{settings.API_V1_STR}/port-info",
         headers=headers,
         json={
-            "carrier": "中国移动",
+            "carrier": carrier,
             "main_port_number": main_port_number,
             "enterprise_name": "测试企业",
             "group_code": "G001",
@@ -106,6 +106,50 @@ def _png_bytes(color: str) -> bytes:
     buf = BytesIO()
     image.save(buf, format="PNG")
     return buf.getvalue()
+
+
+def test_export_overrides_fill_and_survive_regeneration(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    qual_id = _create_qualification(client, superuser_token_headers, "分类填充企业")
+    port_id = _create_port(client, superuser_token_headers, "10698分类")
+    telecom_port_id = _create_port(client, superuser_token_headers, "10698电信分类", "中国电信")
+    group_id = _create_export_group(client, superuser_token_headers, "分类填充组")
+    r = client.post(
+        f"{settings.API_V1_STR}/filing-tasks",
+        headers=superuser_token_headers,
+        json={
+            "qualification_ids": [qual_id],
+            "port_ids": [port_id, telecom_port_id],
+            "export_group_id": group_id,
+            "export_overrides": {
+                "中国移动": {"port_type": "营销短信", "usage_category": "业务提醒"},
+                "中国电信": {"port_type": "5G消息端口", "usage_category": "服务通知"},
+            },
+        },
+    )
+    assert r.status_code == 200, r.text
+    task_id = r.json()["id"]
+    for _ in range(2):
+        download = client.get(
+            f"{settings.API_V1_STR}/filing-tasks/{task_id}/download",
+            headers=superuser_token_headers,
+        )
+        assert download.status_code == 200, download.text
+        ws = load_workbook(BytesIO(download.content)).active
+        headers = [cell.value for cell in ws[1]]
+        assert [ws.cell(row, headers.index("端口类型") + 1).value for row in (2, 3)] == [
+            "营销短信", "5G消息端口",
+        ]
+        assert [ws.cell(row, headers.index("用途类别") + 1).value for row in (2, 3)] == [
+            "业务提醒", "服务通知",
+        ]
+        if _ == 0:
+            regenerated = client.post(
+                f"{settings.API_V1_STR}/filing-tasks/{task_id}/regenerate",
+                headers=superuser_token_headers,
+            )
+            assert regenerated.status_code == 200, regenerated.text
 
 
 def test_export_includes_all_registry_fields(

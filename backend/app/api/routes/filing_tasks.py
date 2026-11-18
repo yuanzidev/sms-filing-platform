@@ -125,6 +125,7 @@ def generate_excel(
     port_images: dict[uuid.UUID, dict[str, bytes]] | None = None,
     allocated_sub_ports: dict[tuple[uuid.UUID, str], str] | None = None,
     auto_allocate_sub_ports: bool = False,
+    export_overrides: dict[str, dict[str, str]] | None = None,
 ) -> io.BytesIO:
     """Generate Excel bytes from qualification+port Cartesian product.
 
@@ -138,6 +139,7 @@ def generate_excel(
     qual_images = qual_images or {}
     port_images = port_images or {}
     allocated_sub_ports = allocated_sub_ports or {}
+    export_overrides = export_overrides or {}
     fm = field_map()
     img_field_names = {f.name for f in REGISTRY if f.source.startswith("image")}
     wb = Workbook()
@@ -159,6 +161,11 @@ def generate_excel(
 
     sorted_fields = sorted(export_group.fields, key=lambda f: f.sort_order)
     col_names = [f.field_name for f in sorted_fields if f.field_name in fm]
+    if any(values.get("port_type") for values in export_overrides.values()) and "port_type" not in col_names:
+        col_names.append("port_type")
+    if any(values.get("usage_category") for values in export_overrides.values()) and "usage_category" not in col_names:
+        col_names.append("usage_category")
+    fm["usage_category"] = "用途类别"
 
     # Build column index for image fields
     img_col_map: dict[str, int] = {}
@@ -211,7 +218,8 @@ def generate_excel(
             prev_group_value = current_value
 
         for col_idx, field_name in enumerate(col_names, 1):
-            value = get_field_value(q, p, field_name, allocated_sub)
+            override = export_overrides.get(p.carrier, {}) if p else {}
+            value = override.get(field_name) or get_field_value(q, p, field_name, allocated_sub)
             if field_name in img_col_map:
                 value = ""
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
@@ -639,6 +647,8 @@ def create_task(
         if len(selected_ports) != len(create.port_ids):
             raise HTTPException(status_code=400, detail="部分端口ID无效")
     selected_port_ids = [p.id for p in selected_ports]
+    if any(carrier not in {p.carrier for p in selected_ports} for carrier in create.export_overrides):
+        raise HTTPException(status_code=400, detail="导出填充的运营商不在已选端口中")
 
     # 4. Create task record first (so we have an ID)
     task = crud_create_filing_task(
@@ -734,6 +744,7 @@ def create_task(
             port_images=port_images,
             allocated_sub_ports=allocated_sub_ports,
             auto_allocate_sub_ports=auto_allocate,
+            export_overrides=create.export_overrides,
         )
     except Exception as e:
         # 任务失败未产出文件：释放本任务已分配的子端口占用，避免永久烧号
@@ -925,6 +936,7 @@ def regenerate_filing_task(
         port_images=port_images,
         allocated_sub_ports=allocated_sub_ports,
         auto_allocate_sub_ports=bool(usages),
+        export_overrides=task.export_overrides,
     )
     file_data = output.read()
     storage = get_storage()

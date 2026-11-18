@@ -316,6 +316,7 @@ export interface CreateFilingTaskRequest {
   port_ids?: string[]
   export_group_id: string
   group_by_field?: string | null
+  export_overrides?: Record<string, { port_type?: string; usage_category?: string }>
   task_name?: string
   auto_allocate_sub_ports?: boolean
   sub_port_range_start?: number

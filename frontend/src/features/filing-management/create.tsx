@@ -141,6 +141,7 @@ export function FilingCreatePage() {
   const [exportGroupId, setExportGroupId] = useState<string>('')
   const [groupByField, setGroupByField] = useState<string>('__none__')
   const [taskName, setTaskName] = useState('')
+  const [exportOverrides, setExportOverrides] = useState<Record<string, { port_type?: string; usage_category?: string }>>({})
 
   // Fetch qualifications
   const { data: qualData } = useQuery({
@@ -336,6 +337,9 @@ export function FilingCreatePage() {
         .map(([id]) => id),
     [selectedPortIds]
   )
+  const selectedCarriers = useMemo(() => Array.from(new Set(
+    selectedPortIdList.map((id) => allPorts.find((port) => port.id === id)?.carrier).filter((carrier): carrier is string => !!carrier)
+  )), [selectedPortIdList, allPorts])
 
   const selectedGroupCount = useMemo(() => {
     const set = new Set<string>()
@@ -453,6 +457,11 @@ export function FilingCreatePage() {
         port_ids:
           allocationMode === 'qualification_only' ? [] : selectedPortIdList,
         export_group_id: exportGroupId,
+        export_overrides: Object.fromEntries(
+          selectedCarriers
+            .filter((carrier) => exportOverrides[carrier]?.port_type || exportOverrides[carrier]?.usage_category)
+            .map((carrier) => [carrier, exportOverrides[carrier]])
+        ),
         group_by_field:
           groupByField === '__none__' ? undefined : groupByField || undefined,
         task_name: taskName.trim() || undefined,
@@ -1004,6 +1013,51 @@ export function FilingCreatePage() {
                     className='w-full max-w-sm'
                   />
                 </div>
+
+                {allocationMode !== 'qualification_only' && selectedCarriers.map((carrier) => {
+                  const values = exportOverrides[carrier] ?? {}
+                  const setValue = (field: 'port_type' | 'usage_category', value: string) =>
+                    setExportOverrides((prev) => ({ ...prev, [carrier]: { ...prev[carrier], [field]: value } }))
+                  const portTypes = carrier.includes('联通')
+                    ? ['A_商业性', 'B_业务管理和服务类', 'C_公益性']
+                    : carrier.includes('电信')
+                      ? ['普通短信端口', '5G消息端口']
+                      : []
+                  const usageCategories = carrier.includes('联通')
+                    ? ['A01-金融推销（包含贷款理财和保险推销）', 'A02-零售业推销', 'A03-电信业务宣传', 'A04-网络游戏推广', 'A05-教育培训推销', 'A06-房产中介推销', 'A07-股票证券推销', 'A08-医疗卫生推销', 'A09-猎头招聘推广', 'A10-旅游推广', 'A11-其它营销类别', 'B01-操作验证', 'B02-民生服务', 'B03-业务提醒（非金融类）', 'B04-业务提醒（金融类）', 'B05-还款通知', 'B06-其他业务管理服务类', 'C01-非应急公益性', 'C02-应急公益性']
+                    : []
+                  return (
+                    <div key={carrier} className='space-y-3 rounded-md border p-4'>
+                      <p className='font-medium'>{carrier}导出填充（选填）</p>
+                      <div className='grid gap-3 sm:grid-cols-2'>
+                        <div className='space-y-1'>
+                          <Label>端口类型</Label>
+                          {portTypes.length ? (
+                            <Select value={values.port_type || '__none__'} onValueChange={(value) => setValue('port_type', value === '__none__' ? '' : value)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value='__none__'>使用记录原值</SelectItem>
+                                {portTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          ) : <Input placeholder='填写端口类型' value={values.port_type || ''} onChange={(e) => setValue('port_type', e.target.value)} />}
+                        </div>
+                        <div className='space-y-1'>
+                          <Label>用途类别</Label>
+                          {usageCategories.length ? (
+                            <Select value={values.usage_category || '__none__'} onValueChange={(value) => setValue('usage_category', value === '__none__' ? '' : value)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value='__none__'>不填充</SelectItem>
+                                {usageCategories.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          ) : <Input placeholder='填写用途类别' value={values.usage_category || ''} onChange={(e) => setValue('usage_category', e.target.value)} />}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
 
                 <div className='space-y-2'>
                   <label className='text-sm font-medium'>
