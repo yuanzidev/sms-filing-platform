@@ -16,6 +16,7 @@ import {
   importSubPorts,
   importSubPortStatuses,
   previewSubPortsImport,
+  renameMainPort,
   SUB_PORT_STATUSES,
 } from '@/lib/api/sub-port-library'
 import type { SubPortRecord } from '@/lib/api/sub-port-library'
@@ -109,6 +110,8 @@ export function SubPortLibraryPage() {
   const [statusImportDialogOpen, setStatusImportDialogOpen] = useState(false)
   const [deleteListDialogOpen, setDeleteListDialogOpen] = useState(false)
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [namingRecord, setNamingRecord] = useState<SubPortRecord | null>(null)
+  const [mainPortName, setMainPortName] = useState('')
   const [unicomBusinessType, setUnicomBusinessType] = useState('__none__')
   const [exportFieldNames, setExportFieldNames] = useState<
     Record<string, boolean>
@@ -226,6 +229,20 @@ export function SubPortLibraryPage() {
     onError: () => toast.error('批量删除失败'),
   })
 
+  const renameMutation = useMutation({
+    mutationFn: () => renameMainPort(
+      namingRecord!.main_port_number,
+      namingRecord!.field_values.carrier,
+      mainPortName,
+    ),
+    onSuccess: () => {
+      toast.success('主端口命名已更新')
+      setNamingRecord(null)
+      invalidate()
+    },
+    onError: () => toast.error('主端口命名失败'),
+  })
+
   const sortedFields = useMemo(() => {
     if (!selectedGroup) return []
     return getSubPortLibraryFields(selectedGroup)
@@ -274,7 +291,22 @@ export function SubPortLibraryPage() {
       {
         accessorKey: 'main_port_number',
         header: '主端口号',
-        cell: ({ getValue }) => getValue() || '-',
+        cell: ({ row }) => (
+          <div className='flex items-center gap-2'>
+            <span>{row.original.main_port_number || '-'}</span>
+            {has('sub_port:write') && row.original.field_values.carrier && (
+              <Button
+                type='button'
+                size='sm'
+                variant='ghost'
+                onClick={() => {
+                  setNamingRecord(row.original)
+                  setMainPortName(row.original.field_values.resource_name || '')
+                }}
+              >命名</Button>
+            )}
+          </div>
+        ),
       },
       {
         accessorKey: 'sub_port_number',
@@ -663,6 +695,27 @@ export function SubPortLibraryPage() {
         onSuccess={invalidate}
       />
 
+      <Dialog open={!!namingRecord} onOpenChange={(open) => { if (!open) setNamingRecord(null) }}>
+        <DialogContent className='sm:max-w-[420px]'>
+          <DialogHeader>
+            <DialogTitle>主端口命名</DialogTitle>
+          </DialogHeader>
+          <p className='text-muted-foreground text-sm'>
+            {namingRecord?.main_port_number} · {namingRecord?.field_values.carrier}，将同步更新该运营商下的所有子端口。
+          </p>
+          <Input
+            aria-label='主端口名称'
+            placeholder='输入主端口名称'
+            value={mainPortName}
+            onChange={(event) => setMainPortName(event.target.value)}
+          />
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setNamingRecord(null)}>取消</Button>
+            <Button disabled={renameMutation.isPending} onClick={() => renameMutation.mutate()}>保存</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -755,7 +808,19 @@ export function SubPortLibraryPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className='max-h-72 space-y-2 overflow-y-auto rounded-md border p-3'>
+            <div className='space-y-2 rounded-md border p-3'>
+              <div className='flex items-center justify-between'>
+                <span className='text-sm font-medium'>导出字段</span>
+                <div className='flex gap-1'>
+                  <Button type='button' size='sm' variant='ghost' onClick={() =>
+                    setExportFieldNames(Object.fromEntries(sortedFields.map((field) => [field.field_name, true])))
+                  }>全选</Button>
+                  <Button type='button' size='sm' variant='ghost' onClick={() =>
+                    setExportFieldNames(Object.fromEntries(sortedFields.map((field) => [field.field_name, false])))
+                  }>全不选</Button>
+                </div>
+              </div>
+              <div className='max-h-64 space-y-2 overflow-y-auto'>
               {sortedFields.map((field) => (
                 <label
                   key={field.field_name}
@@ -773,6 +838,7 @@ export function SubPortLibraryPage() {
                   <span>{field.field_label}</span>
                 </label>
               ))}
+              </div>
             </div>
           </div>
           <DialogFooter>

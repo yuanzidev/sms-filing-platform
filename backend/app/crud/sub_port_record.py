@@ -112,6 +112,21 @@ def list_sub_port_filter_options(*, session: Session, field: str) -> list[str]:
     return sorted({value for value in values if value})
 
 
+def get_main_port_names(*, session: Session, main_port_numbers: set[str]) -> dict[tuple[str, str], str]:
+    if not main_port_numbers:
+        return {}
+    records = session.exec(
+        select(SubPortRecord).where(SubPortRecord.main_port_number.in_(main_port_numbers))
+    ).all()
+    names: dict[tuple[str, str], str] = {}
+    for record in records:
+        carrier = record.field_values.get("carrier", "")
+        name = record.field_values.get("resource_name", "")
+        if carrier and name:
+            names.setdefault((record.main_port_number, carrier), name)
+    return names
+
+
 def get_by_main_and_sub(
     *, session: Session, main_port_number: str, sub_port_number: str
 ) -> SubPortRecord | None:
@@ -157,6 +172,22 @@ def update_sub_port_record_statuses(
         session.add(record)
     session.commit()
     return len(updates)
+
+
+def rename_main_port_records(
+    *, session: Session, main_port_number: str, carrier: str, name: str
+) -> int:
+    statement = select(SubPortRecord).where(
+        SubPortRecord.main_port_number == main_port_number,
+        SubPortRecord.field_values["carrier"].as_string() == carrier,
+    )
+    records = session.exec(statement).all()
+    for record in records:
+        record.field_values = {**record.field_values, "resource_name": name}
+        record.updated_at = utcnow()
+        session.add(record)
+    session.commit()
+    return len(records)
 
 
 def overwrite_sub_port_record(

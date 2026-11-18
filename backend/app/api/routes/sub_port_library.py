@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from openpyxl.drawing.image import Image as XLImage
+from pydantic import BaseModel
 
 from app.api.deps import SessionDep, require_permission
 from app.core.storage import get_storage
@@ -20,11 +21,13 @@ from app.crud.sub_port_record import (
     delete_sub_port_record,
     delete_sub_port_records,
     get_by_main_and_sub,
+    get_main_port_names,
     get_sub_port_record,
     list_records_by_sub_port,
     list_sub_port_filter_options,
     list_sub_port_records,
     overwrite_sub_port_record,
+    rename_main_port_records,
     update_sub_port_record,
     update_sub_port_record_statuses,
 )
@@ -46,6 +49,12 @@ from app.services.excel_image_extractor import (
 )
 
 router = APIRouter(prefix="/sub-port-library", tags=["sub-port-library"])
+
+
+class MainPortRename(BaseModel):
+    main_port_number: str
+    carrier: str
+    name: str
 
 read_perm = Depends(require_permission("sub_port:read"))
 write_perm = Depends(require_permission("sub_port:write"))
@@ -568,12 +577,23 @@ def import_sub_ports(
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
     content = file.file.read()
     headers, records, errors, total_data_rows = _parse_sub_port_excel(content, group)
+    main_port_names = get_main_port_names(
+        session=session,
+        main_port_numbers={record["main_port_number"] for record in records},
+    )
 
     importable_records = []
     imported_objects: list[SubPortRecord] = []
     old_attachments = []
     data_row_indices: list[int] = []
     for record in records:
+        values = record["field_values"]
+        if not values.get("resource_name"):
+            inherited_name = main_port_names.get(
+                (record["main_port_number"], values.get("carrier", ""))
+            )
+            if inherited_name:
+                values["resource_name"] = inherited_name
         existing = get_by_main_and_sub(
             session=session,
             main_port_number=record["main_port_number"],
@@ -905,6 +925,23 @@ def create_sub_port_record_endpoint(
     _validate_status(create.status)
     _check_unique(session, create.main_port_number, create.sub_port_number)
     return create_sub_port_record(session=session, create=create)
+
+
+@router.patch("/main-port-name", dependencies=[write_perm])
+def rename_main_port(*, session: SessionDep, body: MainPortRename) -> Any:
+    main_port_number = body.main_port_number.strip()
+    carrier = body.carrier.strip()
+    if not main_port_number or not carrier:
+        raise HTTPException(status_code=400, detail="请选择主端口号和运营商")
+    count = rename_main_port_records(
+        session=session,
+        main_port_number=main_port_number,
+        carrier=carrier,
+        name=body.name.strip(),
+    )
+    if not count:
+        raise HTTPException(status_code=404, detail="未找到对应的主端口和运营商")
+    return {"updated_count": count}
 
 
 @router.patch("/{id}", dependencies=[write_perm], response_model=SubPortRecordPublic)

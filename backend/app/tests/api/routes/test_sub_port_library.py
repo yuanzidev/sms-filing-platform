@@ -217,6 +217,50 @@ def test_carrier_and_name_filter_and_business_type_export(
     assert business_by_sub[f"{marker}2"] in (None, "")
 
 
+def test_rename_main_port_only_updates_selected_carrier(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex[:8]
+    main = f"1069{marker}"
+    with Session(engine) as session:
+        records = [
+            SubPortRecord(main_port_number=main, sub_port_number=str(i), field_values={"carrier": carrier})
+            for i, carrier in enumerate(("中国联通", "中国联通", "中国电信"), 1)
+        ]
+        session.add_all(records)
+        session.commit()
+        ids = [record.id for record in records]
+
+    r = client.patch(
+        f"{settings.API_V1_STR}/sub-port-library/main-port-name",
+        headers=superuser_token_headers,
+        json={"main_port_number": main, "carrier": "中国联通", "name": "测试联通主端口"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["updated_count"] == 2
+    with Session(engine) as session:
+        assert [session.get(SubPortRecord, record_id).field_values.get("resource_name") for record_id in ids] == [
+            "测试联通主端口", "测试联通主端口", None,
+        ]
+    group = _create_group([])
+    imported = _import_file(
+        client,
+        superuser_token_headers,
+        _build_excel(
+            ["状态", "子端口号", "主端口号", "运营商"],
+            [["在线", "4", main, "中国联通"]],
+        ),
+        group["id"],
+    )
+    assert imported.status_code == 200, imported.text
+    with Session(engine) as session:
+        added = session.exec(select(SubPortRecord).where(
+            SubPortRecord.main_port_number == main,
+            SubPortRecord.sub_port_number == "4",
+        )).one()
+        assert added.field_values["resource_name"] == "测试联通主端口"
+
+
 def test_download_template(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
