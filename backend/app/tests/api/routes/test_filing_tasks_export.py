@@ -123,7 +123,7 @@ def test_export_overrides_fill_and_survive_regeneration(
             "port_ids": [port_id, telecom_port_id],
             "export_group_id": group_id,
             "export_overrides": {
-                "中国移动": {"port_type": "营销短信", "usage_category": "业务提醒"},
+                "中国移动": {"port_type": "营销短信", "usage_category": "业务提醒", "specific_usage": "验证码、通知、订单信息", "sms_template_content": "您的订单号***已受理"},
                 "中国电信": {"port_type": "5G消息端口", "usage_category": "服务通知"},
             },
         },
@@ -144,12 +144,54 @@ def test_export_overrides_fill_and_survive_regeneration(
         assert [ws.cell(row, headers.index("用途类别") + 1).value for row in (2, 3)] == [
             "业务提醒", "服务通知",
         ]
+        assert ws.cell(2, headers.index("具体用途") + 1).value == "验证码、通知、订单信息"
+        assert ws.cell(2, headers.index("短信模板内容") + 1).value == "您的订单号***已受理"
         if _ == 0:
             regenerated = client.post(
                 f"{settings.API_V1_STR}/filing-tasks/{task_id}/regenerate",
                 headers=superuser_token_headers,
             )
             assert regenerated.status_code == 200, regenerated.text
+
+
+def test_filing_fill_options_can_be_managed(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex[:8]
+    endpoint = f"{settings.API_V1_STR}/filing-tasks/fill-options"
+    created = client.post(endpoint, headers=superuser_token_headers,
+                          json={"field_name": "specific_usage", "value": f"通知-{marker}"})
+    assert created.status_code == 200, created.text
+    option_id = created.json()["id"]
+    listed = client.get(endpoint, headers=superuser_token_headers)
+    assert any(item["id"] == option_id for item in listed.json())
+    updated = client.patch(f"{endpoint}/{option_id}", headers=superuser_token_headers,
+                           json={"field_name": "specific_usage", "value": f"订单-{marker}"})
+    assert updated.status_code == 200
+    assert updated.json()["value"] == f"订单-{marker}"
+    deleted = client.delete(f"{endpoint}/{option_id}", headers=superuser_token_headers)
+    assert deleted.status_code == 200
+
+
+def test_filing_task_rejects_qualification_from_other_library(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex[:8]
+    backup = client.post(
+        f"{settings.API_V1_STR}/qualifications", headers=superuser_token_headers,
+        json={"enterprise_name": f"备用报备-{marker}", "library": "backup"},
+    )
+    assert backup.status_code == 200
+    group_id = _create_export_group(client, superuser_token_headers, f"备用报备组-{marker}")
+    payload = {"qualification_ids": [backup.json()["id"]], "port_ids": [],
+               "export_group_id": group_id, "allocation_mode": "qualification_only"}
+    rejected = client.post(f"{settings.API_V1_STR}/filing-tasks", headers=superuser_token_headers,
+                           json={**payload, "library": "primary"})
+    assert rejected.status_code == 400
+    allowed = client.post(f"{settings.API_V1_STR}/filing-tasks", headers=superuser_token_headers,
+                          json={**payload, "library": "backup"})
+    assert allowed.status_code == 200, allowed.text
+    assert allowed.json()["library"] == "backup"
 
 
 def test_export_includes_all_registry_fields(

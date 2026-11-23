@@ -55,6 +55,7 @@ class MainPortRename(BaseModel):
     main_port_number: str
     carrier: str
     name: str
+    record_id: uuid.UUID | None = None
 
 read_perm = Depends(require_permission("sub_port:read"))
 write_perm = Depends(require_permission("sub_port:write"))
@@ -933,11 +934,18 @@ def rename_main_port(*, session: SessionDep, body: MainPortRename) -> Any:
     carrier = body.carrier.strip()
     if not main_port_number or not carrier:
         raise HTTPException(status_code=400, detail="请选择主端口号和运营商")
+    if body.record_id is not None:
+        selected = get_sub_port_record(session=session, id=body.record_id)
+        if not selected or selected.main_port_number != main_port_number:
+            raise HTTPException(status_code=400, detail="所选子端口不属于该主端口")
+        if selected.field_values.get("carrier") not in (None, "", carrier):
+            raise HTTPException(status_code=400, detail="已归类记录不能直接改为其他运营商")
     count = rename_main_port_records(
         session=session,
         main_port_number=main_port_number,
         carrier=carrier,
         name=body.name.strip(),
+        record_id=body.record_id,
     )
     if not count:
         raise HTTPException(status_code=404, detail="未找到对应的主端口和运营商")

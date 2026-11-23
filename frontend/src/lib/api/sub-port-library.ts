@@ -80,11 +80,12 @@ export const getSubPortFilterOptions = async (
   return response.data
 }
 
-export const renameMainPort = async (mainPortNumber: string, carrier: string, name: string): Promise<void> => {
+export const renameMainPort = async (mainPortNumber: string, carrier: string, name: string, recordId: string): Promise<void> => {
   await api.patch('/api/v1/sub-port-library/main-port-name', {
     main_port_number: mainPortNumber,
     carrier,
     name,
+    record_id: recordId,
   })
 }
 

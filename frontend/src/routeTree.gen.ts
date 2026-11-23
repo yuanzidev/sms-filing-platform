@@ -29,6 +29,7 @@ import { Route as AuthenticatedQualificationsIndexRouteImport } from './routes/_
 import { Route as AuthenticatedPortInfoIndexRouteImport } from './routes/_authenticated/port-info/index'
 import { Route as AuthenticatedFilingManagementIndexRouteImport } from './routes/_authenticated/filing-management/index'
 import { Route as AuthenticatedExportGroupsIndexRouteImport } from './routes/_authenticated/export-groups/index'
+import { Route as AuthenticatedBackupQualificationsIndexRouteImport } from './routes/_authenticated/backup-qualifications/index'
 import { Route as AuthenticatedApiDataIndexRouteImport } from './routes/_authenticated/api-data/index'
 import { Route as AuthenticatedUsersRolesRouteImport } from './routes/_authenticated/users/roles'
 import { Route as AuthenticatedUsersOperationLogsRouteImport } from './routes/_authenticated/users/operation-logs'
@@ -145,6 +146,12 @@ const AuthenticatedExportGroupsIndexRoute =
     path: '/export-groups/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedBackupQualificationsIndexRoute =
+  AuthenticatedBackupQualificationsIndexRouteImport.update({
+    id: '/backup-qualifications/',
+    path: '/backup-qualifications/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedApiDataIndexRoute =
   AuthenticatedApiDataIndexRouteImport.update({
     id: '/api-data/',
@@ -220,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/users/operation-logs': typeof AuthenticatedUsersOperationLogsRoute
   '/users/roles': typeof AuthenticatedUsersRolesRoute
   '/api-data': typeof AuthenticatedApiDataIndexRoute
+  '/backup-qualifications': typeof AuthenticatedBackupQualificationsIndexRoute
   '/export-groups': typeof AuthenticatedExportGroupsIndexRoute
   '/filing-management': typeof AuthenticatedFilingManagementIndexRoute
   '/port-info': typeof AuthenticatedPortInfoIndexRoute
@@ -249,6 +257,7 @@ export interface FileRoutesByTo {
   '/users/operation-logs': typeof AuthenticatedUsersOperationLogsRoute
   '/users/roles': typeof AuthenticatedUsersRolesRoute
   '/api-data': typeof AuthenticatedApiDataIndexRoute
+  '/backup-qualifications': typeof AuthenticatedBackupQualificationsIndexRoute
   '/export-groups': typeof AuthenticatedExportGroupsIndexRoute
   '/filing-management': typeof AuthenticatedFilingManagementIndexRoute
   '/port-info': typeof AuthenticatedPortInfoIndexRoute
@@ -281,6 +290,7 @@ export interface FileRoutesById {
   '/_authenticated/users/operation-logs': typeof AuthenticatedUsersOperationLogsRoute
   '/_authenticated/users/roles': typeof AuthenticatedUsersRolesRoute
   '/_authenticated/api-data/': typeof AuthenticatedApiDataIndexRoute
+  '/_authenticated/backup-qualifications/': typeof AuthenticatedBackupQualificationsIndexRoute
   '/_authenticated/export-groups/': typeof AuthenticatedExportGroupsIndexRoute
   '/_authenticated/filing-management/': typeof AuthenticatedFilingManagementIndexRoute
   '/_authenticated/port-info/': typeof AuthenticatedPortInfoIndexRoute
@@ -313,6 +323,7 @@ export interface FileRouteTypes {
     | '/users/operation-logs'
     | '/users/roles'
     | '/api-data'
+    | '/backup-qualifications'
     | '/export-groups'
     | '/filing-management'
     | '/port-info'
@@ -342,6 +353,7 @@ export interface FileRouteTypes {
     | '/users/operation-logs'
     | '/users/roles'
     | '/api-data'
+    | '/backup-qualifications'
     | '/export-groups'
     | '/filing-management'
     | '/port-info'
@@ -373,6 +385,7 @@ export interface FileRouteTypes {
     | '/_authenticated/users/operation-logs'
     | '/_authenticated/users/roles'
     | '/_authenticated/api-data/'
+    | '/_authenticated/backup-qualifications/'
     | '/_authenticated/export-groups/'
     | '/_authenticated/filing-management/'
     | '/_authenticated/port-info/'
@@ -538,6 +551,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedExportGroupsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/backup-qualifications/': {
+      id: '/_authenticated/backup-qualifications/'
+      path: '/backup-qualifications'
+      fullPath: '/backup-qualifications'
+      preLoaderRoute: typeof AuthenticatedBackupQualificationsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/api-data/': {
       id: '/_authenticated/api-data/'
       path: '/api-data'
@@ -635,6 +655,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedUsersOperationLogsRoute: typeof AuthenticatedUsersOperationLogsRoute
   AuthenticatedUsersRolesRoute: typeof AuthenticatedUsersRolesRoute
   AuthenticatedApiDataIndexRoute: typeof AuthenticatedApiDataIndexRoute
+  AuthenticatedBackupQualificationsIndexRoute: typeof AuthenticatedBackupQualificationsIndexRoute
   AuthenticatedExportGroupsIndexRoute: typeof AuthenticatedExportGroupsIndexRoute
   AuthenticatedFilingManagementIndexRoute: typeof AuthenticatedFilingManagementIndexRoute
   AuthenticatedPortInfoIndexRoute: typeof AuthenticatedPortInfoIndexRoute
@@ -652,6 +673,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedUsersOperationLogsRoute: AuthenticatedUsersOperationLogsRoute,
   AuthenticatedUsersRolesRoute: AuthenticatedUsersRolesRoute,
   AuthenticatedApiDataIndexRoute: AuthenticatedApiDataIndexRoute,
+  AuthenticatedBackupQualificationsIndexRoute:
+    AuthenticatedBackupQualificationsIndexRoute,
   AuthenticatedExportGroupsIndexRoute: AuthenticatedExportGroupsIndexRoute,
   AuthenticatedFilingManagementIndexRoute:
     AuthenticatedFilingManagementIndexRoute,

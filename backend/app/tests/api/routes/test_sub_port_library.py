@@ -261,6 +261,55 @@ def test_rename_main_port_only_updates_selected_carrier(
         assert added.field_values["resource_name"] == "测试联通主端口"
 
 
+def test_rename_main_port_backfills_legacy_record_without_carrier(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    main = f"1069{uuid.uuid4().hex[:8]}"
+    with Session(engine) as session:
+        current = SubPortRecord(main_port_number=main, sub_port_number="1", field_values={"carrier": "中国联通"})
+        legacy = SubPortRecord(main_port_number=main, sub_port_number="2", field_values={})
+        session.add_all([current, legacy])
+        session.commit()
+        legacy_id = legacy.id
+    response = client.patch(
+        f"{settings.API_V1_STR}/sub-port-library/main-port-name",
+        headers=superuser_token_headers,
+        json={"main_port_number": main, "carrier": "中国联通", "name": "旧端口归类", "record_id": str(legacy_id)},
+    )
+    assert response.status_code == 200
+    assert response.json()["updated_count"] == 2
+    with Session(engine) as session:
+        values = session.get(SubPortRecord, legacy_id).field_values
+        assert values["carrier"] == "中国联通"
+        assert values["resource_name"] == "旧端口归类"
+
+
+def test_rename_legacy_record_does_not_claim_other_unknown_carriers(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    main = f"1069{uuid.uuid4().hex[:8]}"
+    with Session(engine) as session:
+        records = [
+            SubPortRecord(main_port_number=main, sub_port_number=str(i), field_values=values)
+            for i, values in enumerate((
+                {"carrier": "中国联通"}, {"carrier": "中国电信"}, {}, {},
+            ), 1)
+        ]
+        session.add_all(records)
+        session.commit()
+        selected_id, other_id = records[2].id, records[3].id
+    response = client.patch(
+        f"{settings.API_V1_STR}/sub-port-library/main-port-name",
+        headers=superuser_token_headers,
+        json={"main_port_number": main, "carrier": "中国联通", "name": "联通归类", "record_id": str(selected_id)},
+    )
+    assert response.status_code == 200
+    assert response.json()["updated_count"] == 2
+    with Session(engine) as session:
+        assert session.get(SubPortRecord, selected_id).field_values["carrier"] == "中国联通"
+        assert session.get(SubPortRecord, other_id).field_values.get("carrier") is None
+
+
 def test_download_template(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:

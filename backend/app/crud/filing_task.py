@@ -36,6 +36,7 @@ def create_filing_task(
     )
     db_obj = FilingTask(
         task_name=task_name,
+        library=create.library,
         qualification_ids=[str(qid) for qid in create.qualification_ids],
         port_ids=[],  # will be set by the route after random port selection
         export_group_id=create.export_group_id,

@@ -1,6 +1,7 @@
 """Qualification info model — enterprise qualification attributes."""
 import uuid
 from datetime import date, datetime
+from typing import Literal
 
 from sqlmodel import Field, SQLModel
 
@@ -8,6 +9,7 @@ from app.core.timezone import utcnow
 
 
 class QualificationInfoBase(SQLModel):
+    library: str = Field(default="primary", max_length=20, index=True)
     # 企业信息
     enterprise_name: str = Field(max_length=200, index=True)
     cert_type: str | None = Field(default=None, max_length=50)
@@ -36,6 +38,7 @@ class QualificationInfoBase(SQLModel):
 
     # 签名与模板
     sms_signature: str | None = Field(default=None, max_length=200)
+    signature_series: str | None = Field(default=None, max_length=100, index=True)
     signature_type: str | None = Field(default=None, max_length=100)
     signature_verified: bool | None = Field(default=None)
     is_gateway_signature: bool | None = Field(default=None)
@@ -66,6 +69,7 @@ class QualificationInfo(QualificationInfoBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
+    archived: bool = Field(default=False, index=True)
 
 
 class QualificationInfoCreate(QualificationInfoBase):
@@ -128,8 +132,14 @@ class QualificationInfosPublic(SQLModel):
 
 class BatchSignatureRequest(SQLModel):
     signatures: list[str]
+    library: Literal["primary", "backup"] = "primary"
+    business_type: str | None = None
+    business_attribute: str | None = None
     import_date: date | None = None
     import_datetime: datetime | None = None
+    import_start: str | None = None
+    import_end: str | None = None
+    import_precision: Literal["month", "day", "second"] | None = None
 
 
 class BatchSignatureResponse(SQLModel):

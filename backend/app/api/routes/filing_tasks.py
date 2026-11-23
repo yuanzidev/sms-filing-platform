@@ -31,6 +31,8 @@ from app.crud.filing_task import (
 )
 from app.models import (
     ExportGroup,
+    FilingFillOption,
+    FilingFillOptionInput,
     FilingTaskCreate,
     FilingTaskDetail,
     FilingTaskPortSummary,
@@ -55,6 +57,7 @@ router = APIRouter(prefix="/filing-tasks", tags=["filing-tasks"])
 read_perm = Depends(require_permission("filing:read"))
 write_perm = Depends(require_permission("filing:write"))
 export_perm = Depends(require_permission("filing:export"))
+FILL_OPTION_FIELDS = {"usage_category", "specific_usage", "sms_template_content"}
 
 
 class FilingTaskBatchDelete(BaseModel):
@@ -165,6 +168,9 @@ def generate_excel(
         col_names.append("port_type")
     if any(values.get("usage_category") for values in export_overrides.values()) and "usage_category" not in col_names:
         col_names.append("usage_category")
+    for name in ("specific_usage", "sms_template_content"):
+        if any(values.get(name) for values in export_overrides.values()) and name not in col_names:
+            col_names.append(name)
     fm["usage_category"] = "用途类别"
 
     # Build column index for image fields
@@ -427,6 +433,7 @@ def _task_to_public(session, task) -> FilingTaskPublic:
     return FilingTaskPublic(
         id=task.id,
         task_name=task.task_name,
+        library=task.library,
         qualification_count=task.qualification_count,
         port_count=task.port_count,
         export_group_name=task.export_group_name or "未知",
@@ -500,6 +507,7 @@ def _task_to_detail(session, task) -> FilingTaskDetail:
     return FilingTaskDetail(
         id=public.id,
         task_name=public.task_name,
+        library=public.library,
         qualification_count=public.qualification_count,
         port_count=public.port_count,
         export_group_name=public.export_group_name,
@@ -514,6 +522,46 @@ def _task_to_detail(session, task) -> FilingTaskDetail:
         file_path=task.file_path,
         download_url=download_url,
     )
+
+
+@router.get("/fill-options", dependencies=[read_perm], response_model=list[FilingFillOption])
+def list_fill_options(session: SessionDep) -> Any:
+    return session.exec(select(FilingFillOption).order_by(FilingFillOption.field_name, FilingFillOption.value)).all()
+
+
+@router.post("/fill-options", dependencies=[write_perm], response_model=FilingFillOption)
+def create_fill_option(session: SessionDep, body: FilingFillOptionInput) -> Any:
+    if body.field_name not in FILL_OPTION_FIELDS or not body.value.strip():
+        raise HTTPException(status_code=400, detail="填充选项无效")
+    option = FilingFillOption(field_name=body.field_name, value=body.value.strip())
+    session.add(option)
+    session.commit()
+    session.refresh(option)
+    return option
+
+
+@router.patch("/fill-options/{option_id}", dependencies=[write_perm], response_model=FilingFillOption)
+def update_fill_option(session: SessionDep, option_id: uuid.UUID, body: FilingFillOptionInput) -> Any:
+    option = session.get(FilingFillOption, option_id)
+    if not option:
+        raise HTTPException(status_code=404, detail="填充选项不存在")
+    if body.field_name not in FILL_OPTION_FIELDS or not body.value.strip():
+        raise HTTPException(status_code=400, detail="填充选项无效")
+    option.field_name, option.value = body.field_name, body.value.strip()
+    session.add(option)
+    session.commit()
+    session.refresh(option)
+    return option
+
+
+@router.delete("/fill-options/{option_id}", dependencies=[write_perm])
+def delete_fill_option(session: SessionDep, option_id: uuid.UUID) -> Any:
+    option = session.get(FilingFillOption, option_id)
+    if not option:
+        raise HTTPException(status_code=404, detail="填充选项不存在")
+    session.delete(option)
+    session.commit()
+    return {"message": "填充选项已删除"}
 
 
 @router.get("/sub-port-availability", dependencies=[read_perm])
@@ -618,12 +666,14 @@ def create_task(
     qualifications = list(
         session.exec(
             select(QualificationInfo).where(
-                QualificationInfo.id.in_(create.qualification_ids)
+                QualificationInfo.id.in_(create.qualification_ids),
+                QualificationInfo.library == create.library,
+                QualificationInfo.archived == False,  # noqa: E712
             )  # type: ignore
         ).all()
     )
-    if not qualifications:
-        raise HTTPException(status_code=404, detail="未找到匹配的资质信息")
+    if len(qualifications) != len(set(create.qualification_ids)):
+        raise HTTPException(status_code=400, detail="所选资质与资质库不一致或不存在")
     qualifications_by_id = {q.id: q for q in qualifications}
     qualifications = [
         qualifications_by_id[qid]

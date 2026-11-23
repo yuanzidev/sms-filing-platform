@@ -24,6 +24,7 @@ export interface ImportErrorItem {
 export interface ImportResult {
   total: number
   success_count: number
+  updated_count?: number
   error_count: number
   errors: ImportErrorItem[]
   message?: string
@@ -163,13 +164,15 @@ export function ImportDialog({
       if (result.errors && result.errors.length > 0) {
         setImportErrors(result.errors)
         toast.error(
-          `导入完成：成功 ${result.success_count} 条，失败 ${result.error_count} 条，跳过 ${result.skipped_count ?? 0} 条`
+          `导入完成：新增 ${result.success_count} 条，更新 ${result.updated_count ?? 0} 条，失败 ${result.error_count} 条，跳过 ${result.skipped_count ?? 0} 条`
         )
       } else {
         const skippedCount = result.skipped_count ?? 0
         toast.success(
           result.message ||
-            (skippedCount > 0
+            (result.updated_count
+              ? `导入成功，新增 ${result.success_count} 条，更新 ${result.updated_count} 条，重复跳过 ${skippedCount} 条`
+              : skippedCount > 0
               ? `导入成功，新增 ${result.success_count} 条，重复跳过 ${skippedCount} 条`
               : '导入成功')
         )

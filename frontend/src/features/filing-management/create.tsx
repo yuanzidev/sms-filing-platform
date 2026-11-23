@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getExportGroups } from '@/lib/api/export-groups'
+import { deleteFilingFillOption, getFilingFillOptions, saveFilingFillOption } from '@/lib/api/filing-fill-options'
 import { getSubPortAvailability } from '@/lib/api/filing-sub-port-availability'
 import { getPortInfos } from '@/lib/api/port-info'
 import { getQualifications } from '@/lib/api/qualifications'
@@ -57,6 +58,7 @@ import { SignatureImportDialog } from './components/signature-import-dialog'
 type Step = 1 | 2 | 3 | 4 | 5
 type SubPortRuleMode = 'random' | 'sequential' | 'fixed_suffix'
 type AllocationMode = SubPortRuleMode | 'qualification_only'
+type FillField = 'usage_category' | 'specific_usage' | 'sms_template_content'
 
 const FIELD_LABEL_MAP: Record<string, string> = {
   carrier: '运营商',
@@ -111,6 +113,7 @@ export function FilingCreatePage() {
   const navigate = useNavigate()
   const { has } = usePermissions()
   const [step, setStep] = useState<Step>(1)
+  const [library, setLibrary] = useState<'primary' | 'backup'>('primary')
 
   // Step 1 state
   const [qualPage, setQualPage] = useState(1)
@@ -141,21 +144,27 @@ export function FilingCreatePage() {
   const [exportGroupId, setExportGroupId] = useState<string>('')
   const [groupByField, setGroupByField] = useState<string>('__none__')
   const [taskName, setTaskName] = useState('')
-  const [exportOverrides, setExportOverrides] = useState<Record<string, { port_type?: string; usage_category?: string }>>({})
+  const [exportOverrides, setExportOverrides] = useState<Record<string, { port_type?: string; usage_category?: string; specific_usage?: string; sms_template_content?: string }>>({})
+  const [fillOptionsOpen, setFillOptionsOpen] = useState(false)
+  const [fillField, setFillField] = useState<FillField>('specific_usage')
+  const [fillValue, setFillValue] = useState('')
+  const [editingFillId, setEditingFillId] = useState<string | undefined>()
 
   // Fetch qualifications
   const { data: qualData } = useQuery({
     queryKey: [
       'qualifications',
-      { page: qualPage, page_size: 10, sms_signature: qualSearch || undefined },
+      { page: qualPage, page_size: 10, sms_signature: qualSearch || undefined, library },
     ],
     queryFn: () =>
       getQualifications({
         page: qualPage,
         page_size: 10,
         sms_signature: qualSearch || undefined,
+        library,
       }),
   })
+  const { data: fillOptions = [] } = useQuery({ queryKey: ['filing-fill-options'], queryFn: getFilingFillOptions })
 
   // Fetch export groups
   const {
@@ -185,6 +194,23 @@ export function FilingCreatePage() {
   )
 
   const queryClient = useQueryClient()
+  const saveFillOption = useMutation({
+    mutationFn: () => saveFilingFillOption({ field_name: fillField, value: fillValue.trim() }, editingFillId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['filing-fill-options'] })
+      setFillValue(''); setEditingFillId(undefined)
+      toast.success('填充选项已保存')
+    },
+    onError: () => toast.error('填充选项保存失败'),
+  })
+  const removeFillOption = useMutation({
+    mutationFn: deleteFilingFillOption,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['filing-fill-options'] })
+      toast.success('填充选项已删除')
+    },
+    onError: () => toast.error('填充选项删除失败'),
+  })
   const createMutation = useCreateFilingTask()
 
   const saveRuleMutation = useMutation({
@@ -454,12 +480,13 @@ export function FilingCreatePage() {
     createMutation.mutate(
       {
         qualification_ids: selectedIds,
+        library,
         port_ids:
           allocationMode === 'qualification_only' ? [] : selectedPortIdList,
         export_group_id: exportGroupId,
         export_overrides: Object.fromEntries(
           selectedCarriers
-            .filter((carrier) => exportOverrides[carrier]?.port_type || exportOverrides[carrier]?.usage_category)
+            .filter((carrier) => Object.values(exportOverrides[carrier] ?? {}).some(Boolean))
             .map((carrier) => [carrier, exportOverrides[carrier]])
         ),
         group_by_field:
@@ -585,6 +612,20 @@ export function FilingCreatePage() {
                 <CardTitle>选择资质</CardTitle>
               </CardHeader>
               <CardContent className='space-y-4'>
+                <div className='flex items-center gap-3'>
+                  <Label>资质库</Label>
+                  <Select value={library} onValueChange={(value: 'primary' | 'backup') => {
+                    setLibrary(value)
+                    setSelectedRows({})
+                    setQualPage(1)
+                  }}>
+                    <SelectTrigger className='w-40'><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='primary'>主资质库</SelectItem>
+                      <SelectItem value='backup'>备用资质库</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className='flex items-center gap-3'>
                   <Input
                     placeholder='搜索签名'
@@ -1016,19 +1057,29 @@ export function FilingCreatePage() {
 
                 {allocationMode !== 'qualification_only' && selectedCarriers.map((carrier) => {
                   const values = exportOverrides[carrier] ?? {}
-                  const setValue = (field: 'port_type' | 'usage_category', value: string) =>
-                    setExportOverrides((prev) => ({ ...prev, [carrier]: { ...prev[carrier], [field]: value } }))
+                  const setValue = (field: 'port_type' | FillField, value: string) =>
+                    setExportOverrides((prev) => ({
+                      ...prev,
+                      [carrier]: {
+                        ...prev[carrier],
+                        [field]: value,
+                        ...(field === 'port_type' && value.match(/^[ABC]_/) && !prev[carrier]?.usage_category?.startsWith(value[0])
+                          ? { usage_category: '' } : {}),
+                      },
+                    }))
                   const portTypes = carrier.includes('联通')
                     ? ['A_商业性', 'B_业务管理和服务类', 'C_公益性']
                     : carrier.includes('电信')
                       ? ['普通短信端口', '5G消息端口']
                       : []
                   const usageCategories = carrier.includes('联通')
-                    ? ['A01-金融推销（包含贷款理财和保险推销）', 'A02-零售业推销', 'A03-电信业务宣传', 'A04-网络游戏推广', 'A05-教育培训推销', 'A06-房产中介推销', 'A07-股票证券推销', 'A08-医疗卫生推销', 'A09-猎头招聘推广', 'A10-旅游推广', 'A11-其它营销类别', 'B01-操作验证', 'B02-民生服务', 'B03-业务提醒（非金融类）', 'B04-业务提醒（金融类）', 'B05-还款通知', 'B06-其他业务管理服务类', 'C01-非应急公益性', 'C02-应急公益性']
+                    ? fillOptions.filter((item) => item.field_name === 'usage_category').map((item) => item.value)
                     : []
+                  const visibleUsageCategories = values.port_type?.match(/^[ABC]_/) ? usageCategories.filter((item) => item.startsWith(values.port_type![0])) : usageCategories
                   return (
                     <div key={carrier} className='space-y-3 rounded-md border p-4'>
                       <p className='font-medium'>{carrier}导出填充（选填）</p>
+                      {has('filing:write') && <Button type='button' variant='outline' size='sm' onClick={() => setFillOptionsOpen(true)}>管理填充选项</Button>}
                       <div className='grid gap-3 sm:grid-cols-2'>
                         <div className='space-y-1'>
                           <Label>端口类型</Label>
@@ -1044,16 +1095,28 @@ export function FilingCreatePage() {
                         </div>
                         <div className='space-y-1'>
                           <Label>用途类别</Label>
-                          {usageCategories.length ? (
+                          {visibleUsageCategories.length ? (
                             <Select value={values.usage_category || '__none__'} onValueChange={(value) => setValue('usage_category', value === '__none__' ? '' : value)}>
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value='__none__'>不填充</SelectItem>
-                                {usageCategories.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
+                                {visibleUsageCategories.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
                               </SelectContent>
                             </Select>
                           ) : <Input placeholder='填写用途类别' value={values.usage_category || ''} onChange={(e) => setValue('usage_category', e.target.value)} />}
                         </div>
+                        {(['specific_usage', 'sms_template_content'] as const).map((field) => (
+                          <div key={field} className='space-y-1'>
+                            <Label>{field === 'specific_usage' ? '具体用途' : '短信模板内容'}</Label>
+                            <Select value={values[field] || '__none__'} onValueChange={(value) => setValue(field, value === '__none__' ? '' : value)}>
+                              <SelectTrigger><SelectValue placeholder='不填充' /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value='__none__'>使用资质原值</SelectItem>
+                                {fillOptions.filter((item) => item.field_name === field).map((item) => <SelectItem key={item.id} value={item.value}>{item.value}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )
@@ -1175,10 +1238,37 @@ export function FilingCreatePage() {
           )}
         </div>
         <SignatureImportDialog
+          library={library}
           open={signatureImportOpen}
           onOpenChange={setSignatureImportOpen}
           onConfirm={handleSignatureImport}
         />
+        <Dialog open={fillOptionsOpen} onOpenChange={setFillOptionsOpen}>
+          <DialogContent className='max-h-[85vh] overflow-y-auto'>
+            <DialogHeader><DialogTitle>管理报备填充选项</DialogTitle></DialogHeader>
+            <div className='flex gap-2'>
+              <Select value={fillField} onValueChange={(value: FillField) => { setFillField(value); setFillValue(''); setEditingFillId(undefined) }}>
+                <SelectTrigger className='w-36'><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='usage_category'>用途类别</SelectItem>
+                  <SelectItem value='specific_usage'>具体用途</SelectItem>
+                  <SelectItem value='sms_template_content'>短信模板内容</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input aria-label='选项内容' value={fillValue} onChange={(e) => setFillValue(e.target.value)} placeholder='填写选项内容' />
+              <Button disabled={!fillValue.trim() || saveFillOption.isPending} onClick={() => saveFillOption.mutate()}>{editingFillId ? '保存' : '添加'}</Button>
+            </div>
+            <div className='space-y-2'>{fillOptions.filter((item) => item.field_name === fillField).map((item) => (
+              <div key={item.id} className='flex items-start justify-between gap-2 border-b py-2 text-sm'>
+                <span className='break-all'>{item.value}</span>
+                <div className='flex shrink-0 gap-1'>
+                  <Button size='sm' variant='ghost' onClick={() => { setEditingFillId(item.id); setFillValue(item.value) }}>编辑</Button>
+                  <Button size='sm' variant='ghost' onClick={() => removeFillOption.mutate(item.id)}>删除</Button>
+                </div>
+              </div>
+            ))}</div>
+          </DialogContent>
+        </Dialog>
         <Dialog open={saveRuleOpen} onOpenChange={setSaveRuleOpen}>
           <DialogContent className='sm:max-w-md'>
             <DialogHeader>

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import { Loader2, Upload, ClipboardPaste } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { getQualificationsBySignatures } from '@/lib/api/qualifications'
@@ -20,6 +20,7 @@ interface SignatureImportDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: (matchedIds: string[]) => void
+  library: 'primary' | 'backup'
 }
 
 function parseSignaturesFromText(text: string): string[] {
@@ -38,22 +39,28 @@ export function SignatureImportDialog({
   open,
   onOpenChange,
   onConfirm,
+  library,
 }: SignatureImportDialogProps) {
   const [activeTab, setActiveTab] = useState('paste')
   const [pasteText, setPasteText] = useState('')
   const [result, setResult] = useState<BatchSignatureResponse | null>(null)
   const [resultKey, setResultKey] = useState('')
   const [loading, setLoading] = useState(false)
+  const requestIdRef = useRef(0)
   const [error, setError] = useState<string | null>(null)
-  const [importDateTime, setImportDateTime] = useState('')
+  const [timePrecision, setTimePrecision] = useState<'month' | 'day' | 'second'>('day')
+  const [importStart, setImportStart] = useState('')
+  const [importEnd, setImportEnd] = useState('')
+  const [businessType, setBusinessType] = useState('')
+  const [businessAttribute, setBusinessAttribute] = useState('')
 
   const signatures = useMemo(
     () => parseSignaturesFromText(pasteText),
     [pasteText]
   )
   const signatureKey = useMemo(
-    () => `${signatures.join('\n')}::${importDateTime}`,
-    [signatures, importDateTime]
+    () => `${signatures.join('\n')}::${timePrecision}::${importStart}::${importEnd}::${library}::${businessType}::${businessAttribute}`,
+    [signatures, timePrecision, importStart, importEnd, library, businessType, businessAttribute]
   )
 
   const querySignatures = useCallback(
@@ -63,21 +70,34 @@ export function SignatureImportDialog({
         setResultKey('')
         return null
       }
+      const requestId = ++requestIdRef.current
       setLoading(true)
       setError(null)
       try {
-        const res = await getQualificationsBySignatures(sigs, importDateTime)
-        setResult(res)
-        setResultKey(`${sigs.join('\n')}::${importDateTime}`)
+        if ((importStart && !importEnd) || (!importStart && importEnd)) {
+          setError('请同时选择开始和结束时间')
+          return null
+        }
+        const res = await getQualificationsBySignatures(sigs,
+          importStart && importEnd
+            ? { import_start: importStart, import_end: importEnd, import_precision: timePrecision }
+            : undefined,
+          library,
+          { business_type: businessType.trim() || undefined, business_attribute: businessAttribute.trim() || undefined }
+        )
+        if (requestId === requestIdRef.current) {
+          setResult(res)
+          setResultKey(`${sigs.join('\n')}::${timePrecision}::${importStart}::${importEnd}::${library}::${businessType}::${businessAttribute}`)
+        }
         return res
       } catch {
-        setError('查询失败，请稍后重试')
+        if (requestId === requestIdRef.current) setError('查询失败，请稍后重试')
         return null
       } finally {
-        setLoading(false)
+        if (requestId === requestIdRef.current) setLoading(false)
       }
     },
-    [importDateTime]
+    [timePrecision, importStart, importEnd, library, businessType, businessAttribute]
   )
 
   const handleFileUpload = useCallback(
@@ -135,7 +155,10 @@ export function SignatureImportDialog({
     onOpenChange(false)
     // Reset
     setPasteText('')
-    setImportDateTime('')
+    setImportStart('')
+    setImportEnd('')
+    setBusinessType('')
+    setBusinessAttribute('')
     setResult(null)
     setResultKey('')
     setError(null)
@@ -149,8 +172,9 @@ export function SignatureImportDialog({
     onOpenChange,
   ])
 
-  const matchedCount = result?.matched_qualifications.length ?? 0
-  const unmatchedCount = result?.unmatched_signatures.length ?? 0
+  const currentResult = resultKey === signatureKey ? result : null
+  const matchedCount = currentResult?.matched_qualifications.length ?? 0
+  const unmatchedCount = currentResult?.unmatched_signatures.length ?? 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -163,27 +187,61 @@ export function SignatureImportDialog({
         </DialogHeader>
 
         <div className='min-h-0 flex-1 space-y-4 overflow-y-auto pr-1'>
+          <div className='flex gap-2'>
+            <Input aria-label='业务类型筛选' placeholder='业务类型（选填）' value={businessType} onChange={(e) => { setBusinessType(e.target.value); setResult(null) }} />
+            <Input aria-label='业务属性筛选' placeholder='业务属性（选填）' value={businessAttribute} onChange={(e) => { setBusinessAttribute(e.target.value); setResult(null) }} />
+          </div>
           <div className='space-y-2'>
-            <label className='text-sm font-medium'>资质导入时间（选填，精确到秒）</label>
-            <div className='flex gap-2'>
-              <Input
-                type='datetime-local'
-                step='1'
-                value={importDateTime}
+            <label className='text-sm font-medium'>资质导入时间范围（选填）</label>
+            <div className='flex flex-wrap gap-2'>
+              <select
+                aria-label='时间精度'
+                className='border-input bg-background rounded-md border px-3 text-sm'
+                value={timePrecision}
                 onChange={(e) => {
-                  setImportDateTime(e.target.value)
+                  setTimePrecision(e.target.value as 'month' | 'day' | 'second')
+                  setImportStart('')
+                  setImportEnd('')
+                  setResult(null)
+                }}
+              >
+                <option value='month'>年月</option>
+                <option value='day'>年月日</option>
+                <option value='second'>年月日时分秒</option>
+              </select>
+              <Input
+                aria-label='开始时间'
+                type={timePrecision === 'month' ? 'month' : timePrecision === 'day' ? 'date' : 'datetime-local'}
+                step={timePrecision === 'second' ? '1' : undefined}
+                value={importStart}
+                onChange={(e) => {
+                  setImportStart(e.target.value)
                   setResult(null)
                   setResultKey('')
                 }}
-                className='w-60'
+                className='w-48'
               />
-              {importDateTime && (
+              <span className='self-center text-sm'>至</span>
+              <Input
+                aria-label='结束时间'
+                type={timePrecision === 'month' ? 'month' : timePrecision === 'day' ? 'date' : 'datetime-local'}
+                step={timePrecision === 'second' ? '1' : undefined}
+                value={importEnd}
+                onChange={(e) => {
+                  setImportEnd(e.target.value)
+                  setResult(null)
+                  setResultKey('')
+                }}
+                className='w-48'
+              />
+              {(importStart || importEnd) && (
                 <Button
                   type='button'
                   variant='ghost'
                   size='sm'
                   onClick={() => {
-                    setImportDateTime('')
+                    setImportStart('')
+                    setImportEnd('')
                     setResult(null)
                     setResultKey('')
                   }}
@@ -251,12 +309,12 @@ export function SignatureImportDialog({
           )}
 
           {/* Result */}
-          {result && !loading && (
+          {currentResult && !loading && (
             <div className='space-y-2 rounded-lg border p-3'>
               <p className='text-sm font-medium'>匹配结果</p>
               <div className='flex gap-4 text-sm'>
                 <span className='text-green-600'>
-                  匹配成功：{matchedCount} 次
+                  匹配成功：{matchedCount} 条资质
                 </span>
                 <span className='text-red-500'>
                   无匹配：{unmatchedCount} 条
@@ -268,7 +326,7 @@ export function SignatureImportDialog({
                     查看无匹配签名
                   </summary>
                   <ul className='text-muted-foreground mt-1 max-h-40 list-disc overflow-y-auto pl-5'>
-                    {result.unmatched_signatures.map((s, index) => (
+                    {currentResult.unmatched_signatures.map((s, index) => (
                       <li key={`${index}-${s}`}>{s}</li>
                     ))}
                   </ul>

@@ -78,6 +78,8 @@ from .qualification_info import (
     QualificationInfosPublic,
     QualificationInfoUpdate,
 )
+from .signature_series_rule import SignatureSeriesRule, SignatureSeriesRuleInput
+from .filing_fill_option import FilingFillOption, FilingFillOptionInput
 from .role import (
     Role,
     RoleBase,
@@ -125,6 +127,10 @@ from .user import (
 )
 
 __all__ = [
+    "FilingFillOption",
+    "FilingFillOptionInput",
+    "SignatureSeriesRule",
+    "SignatureSeriesRuleInput",
     "User",
     "UserBase",
     "UserCreate",

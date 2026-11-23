@@ -65,6 +65,7 @@ import { ValueFilter } from './components/value-filter'
 import { getSubPortLibraryFields } from './fields'
 
 const GROUP_ID_STORAGE_KEY = 'sub-port-library-group-id'
+const NO_GROUP: ExportGroup = { id: '__none__', name: '不按字段组', description: null, fields: [], created_at: '', updated_at: '' }
 const carrierForGroup = (name: string) => {
   const matches = ['联通', '电信', '移动', '广电'].filter((carrier) =>
     name.includes(carrier)
@@ -112,6 +113,7 @@ export function SubPortLibraryPage() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [namingRecord, setNamingRecord] = useState<SubPortRecord | null>(null)
   const [mainPortName, setMainPortName] = useState('')
+  const [mainPortCarrier, setMainPortCarrier] = useState('')
   const [unicomBusinessType, setUnicomBusinessType] = useState('__none__')
   const [exportFieldNames, setExportFieldNames] = useState<
     Record<string, boolean>
@@ -144,14 +146,14 @@ export function SubPortLibraryPage() {
     queryFn: () => getSubPortFilterOptions('carrier'),
   })
 
-  // 默认选中第一个字段组；持久化的 groupId 不在列表中时回退
+  // 可清除字段组，直接查看全部子端口。
   const selectedGroup: ExportGroup | undefined = useMemo(() => {
-    return groups.find((g) => g.id === groupId) ?? groups[0]
+    return groupId === '__none__' ? NO_GROUP : groups.find((g) => g.id === groupId) ?? groups[0] ?? NO_GROUP
   }, [groups, groupId])
 
   useEffect(() => {
     if (groups.length > 0) {
-      if (!groups.some((g) => g.id === groupId)) {
+      if (groupId !== '__none__' && !groups.some((g) => g.id === groupId)) {
         setGroupId(groups[0].id)
       }
     }
@@ -232,8 +234,9 @@ export function SubPortLibraryPage() {
   const renameMutation = useMutation({
     mutationFn: () => renameMainPort(
       namingRecord!.main_port_number,
-      namingRecord!.field_values.carrier,
+      mainPortCarrier,
       mainPortName,
+      namingRecord!.id,
     ),
     onSuccess: () => {
       toast.success('主端口命名已更新')
@@ -294,7 +297,7 @@ export function SubPortLibraryPage() {
         cell: ({ row }) => (
           <div className='flex items-center gap-2'>
             <span>{row.original.main_port_number || '-'}</span>
-            {has('sub_port:write') && row.original.field_values.carrier && (
+            {has('sub_port:write') && (
               <Button
                 type='button'
                 size='sm'
@@ -302,12 +305,14 @@ export function SubPortLibraryPage() {
                 onClick={() => {
                   setNamingRecord(row.original)
                   setMainPortName(row.original.field_values.resource_name || '')
+                  setMainPortCarrier(row.original.field_values.carrier || '')
                 }}
               >命名</Button>
             )}
           </div>
         ),
       },
+      { id: 'resource_name_front', header: '命名', cell: ({ row }) => row.original.field_values.resource_name || '-' },
       {
         accessorKey: 'sub_port_number',
         header: '子端口号',
@@ -324,7 +329,7 @@ export function SubPortLibraryPage() {
         ),
       },
     ]
-    const dynamic: ColumnDef<SubPortRecord>[] = sortedFields.map((field) => ({
+    const dynamic: ColumnDef<SubPortRecord>[] = sortedFields.filter((field) => field.field_name !== 'resource_name').map((field) => ({
       id: `field_${field.field_name}`,
       header: field.field_label,
       cell: ({ row }) => row.original.field_values?.[field.field_name] || '-',
@@ -430,7 +435,7 @@ export function SubPortLibraryPage() {
             </p>
           </div>
           <div className='flex space-x-2'>
-            {has('sub_port:write') && (
+            {has('sub_port:write') && selectedGroup.id !== '__none__' && (
               <Button
                 onClick={() => {
                   setEditing(undefined)
@@ -445,6 +450,7 @@ export function SubPortLibraryPage() {
               <>
                 <Button
                   variant='outline'
+                  disabled={selectedGroup.id === '__none__'}
                   onClick={() => setImportDialogOpen(true)}
                 >
                   <Upload className='mr-2 h-4 w-4' />
@@ -459,6 +465,7 @@ export function SubPortLibraryPage() {
                 </Button>
                 <Button
                   variant='outline'
+                  disabled={selectedGroup.id === '__none__'}
                   onClick={() => downloadSubPortTemplate(selectedGroup.id)}
                 >
                   <Download className='mr-2 h-4 w-4' />
@@ -466,6 +473,7 @@ export function SubPortLibraryPage() {
                 </Button>
                 <Button
                   variant='outline'
+                  disabled={selectedGroup.id === '__none__'}
                   onClick={() => setExportDialogOpen(true)}
                 >
                   <Download className='mr-2 h-4 w-4' />
@@ -512,6 +520,7 @@ export function SubPortLibraryPage() {
                 <SelectValue placeholder='选择字段组' />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value='__none__'>不按字段组</SelectItem>
                 {groups.map((g) => (
                   <SelectItem key={g.id} value={g.id}>
                     {g.name}
@@ -532,6 +541,7 @@ export function SubPortLibraryPage() {
               className='w-44'
             />
           </div>
+          <Button size='sm' onClick={invalidate}>搜索</Button>
           <div className='flex flex-col gap-1'>
             <label className='text-muted-foreground text-sm'>状态</label>
             <Select
@@ -580,8 +590,9 @@ export function SubPortLibraryPage() {
               <SelectTrigger className='w-32'><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value='__all__'>全部</SelectItem>
+                <SelectItem value='__empty__'>未归类</SelectItem>
                 {Array.from(new Set([...(carrierOptionsQuery.data ?? []), selectedCarrier]))
-                  .filter((carrier) => carrier !== '__all__')
+                  .filter((carrier) => carrier !== '__all__' && carrier !== '__empty__')
                   .map((carrier) => <SelectItem key={carrier} value={carrier}>{carrier}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -701,8 +712,12 @@ export function SubPortLibraryPage() {
             <DialogTitle>主端口命名</DialogTitle>
           </DialogHeader>
           <p className='text-muted-foreground text-sm'>
-            {namingRecord?.main_port_number} · {namingRecord?.field_values.carrier}，将同步更新该运营商下的所有子端口。
+            {namingRecord?.main_port_number}，将同步更新该运营商下的所有子端口。
           </p>
+          <Select value={mainPortCarrier} onValueChange={setMainPortCarrier}>
+            <SelectTrigger><SelectValue placeholder='选择运营商' /></SelectTrigger>
+            <SelectContent>{['中国联通', '中国电信', '中国移动', '中国广电'].map((carrier) => <SelectItem key={carrier} value={carrier}>{carrier}</SelectItem>)}</SelectContent>
+          </Select>
           <Input
             aria-label='主端口名称'
             placeholder='输入主端口名称'
@@ -711,7 +726,7 @@ export function SubPortLibraryPage() {
           />
           <DialogFooter>
             <Button variant='outline' onClick={() => setNamingRecord(null)}>取消</Button>
-            <Button disabled={renameMutation.isPending} onClick={() => renameMutation.mutate()}>保存</Button>
+            <Button disabled={renameMutation.isPending || !mainPortCarrier} onClick={() => renameMutation.mutate()}>保存</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -144,6 +144,7 @@ interface Props {
   onOpenChange: (open: boolean) => void
   qualification?: QualificationInfo
   onSuccess: () => void
+  library?: 'primary' | 'backup'
 }
 
 export function QualificationDialog({
@@ -151,6 +152,7 @@ export function QualificationDialog({
   onOpenChange,
   qualification,
   onSuccess,
+  library = 'primary',
 }: Props) {
   const queryClient = useQueryClient()
   const [uploading, setUploading] = useState(false)
@@ -184,6 +186,7 @@ export function QualificationDialog({
       } = data
       const apiData: Partial<QualificationInfo> = {
         ...rest,
+        library,
         signature_verified: strToBool(signature_verified),
         is_gateway_signature: strToBool(is_gateway_signature),
         template_has_variable: strToBool(template_has_variable),

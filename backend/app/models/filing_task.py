@@ -1,6 +1,7 @@
 """Filing task model — records each Excel export operation."""
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from sqlalchemy import JSON, Column, ForeignKey
 from sqlmodel import Field, Relationship, SQLModel
@@ -10,6 +11,7 @@ from app.core.timezone import utcnow
 
 class FilingTaskBase(SQLModel):
     task_name: str = Field(max_length=256)
+    library: str = Field(default="primary", max_length=20)
     qualification_ids: list[str] = Field(sa_column=Column(JSON))
     port_ids: list[str] = Field(sa_column=Column(JSON))
     export_group_id: uuid.UUID | None = Field(
@@ -42,6 +44,7 @@ class FilingTask(FilingTaskBase, table=True):
 class FilingTaskCreate(SQLModel):
     task_name: str | None = None  # auto-generated if not provided
     qualification_ids: list[uuid.UUID]
+    library: Literal["primary", "backup"] = "primary"
     port_ids: list[uuid.UUID] = Field(default_factory=list)
     export_group_id: uuid.UUID
     group_by_field: str | None = None
@@ -57,6 +60,7 @@ class FilingTaskCreate(SQLModel):
 class FilingTaskPublic(SQLModel):
     id: uuid.UUID
     task_name: str
+    library: str
     qualification_count: int
     port_count: int
     export_group_name: str

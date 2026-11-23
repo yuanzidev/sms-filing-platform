@@ -19,6 +19,10 @@ import {
   getQualifications,
   importQualifications,
   previewQualificationsImport,
+  getSignatureSeriesRules,
+  saveSignatureSeriesRule,
+  deleteSignatureSeriesRule,
+  cleanupBackupQualifications,
 } from '@/lib/api/qualifications'
 import type { QualificationInfo } from '@/lib/api/types'
 import { formatCN } from '@/lib/time'
@@ -35,6 +39,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
@@ -54,7 +59,7 @@ import { QualificationDetailDialog } from './components/qualification-detail-dia
 import { QualificationDialog } from './components/qualification-dialog'
 
 
-export function QualificationsPage() {
+export function QualificationsPage({ library = 'primary' }: { library?: 'primary' | 'backup' }) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [selected, setSelected] = useState<QualificationInfo | undefined>()
@@ -63,6 +68,14 @@ export function QualificationsPage() {
   const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false)
   const [toDelete, setToDelete] = useState<QualificationInfo | undefined>()
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [rulesOpen, setRulesOpen] = useState(false)
+  const [cleanupBefore, setCleanupBefore] = useState('')
+  const [cleanupReported, setCleanupReported] = useState<'all' | 'yes' | 'no'>('all')
+  const [cleanupCount, setCleanupCount] = useState<number | null>(null)
+  const [cleanupIds, setCleanupIds] = useState<string[]>([])
+  const [rulePattern, setRulePattern] = useState('')
+  const [ruleSeries, setRuleSeries] = useState('')
+  const [editingRuleId, setEditingRuleId] = useState<string | undefined>()
   const [detailTarget, setDetailTarget] = useState<
     QualificationInfo | undefined
   >()
@@ -76,6 +89,9 @@ export function QualificationsPage() {
     identity_cert_number: '',
     sms_signature: '',
     diversion_info: '',
+    signature_series: '',
+    business_type: '',
+    business_attribute: '',
   })
   const [appliedFilters, setAppliedFilters] = useState<{
     enterprise_name?: string
@@ -84,17 +100,54 @@ export function QualificationsPage() {
     sms_signature?: string
     sms_signature_mode?: 'contains' | 'exact'
     diversion_info?: string
+    signature_series?: string
+    business_type?: string
+    business_attribute?: string
   }>({})
   const queryClient = useQueryClient()
+  const { data: seriesRules = [] } = useQuery({ queryKey: ['signature-series-rules'], queryFn: getSignatureSeriesRules })
+  const saveRule = useMutation({
+    mutationFn: () => saveSignatureSeriesRule({ pattern: rulePattern.trim(), series_name: ruleSeries.trim() }, editingRuleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['signature-series-rules'] })
+      queryClient.invalidateQueries({ queryKey: ['qualifications'] })
+      setRulePattern(''); setRuleSeries(''); setEditingRuleId(undefined)
+      toast.success('系列规则已保存')
+    },
+    onError: () => toast.error('系列规则保存失败'),
+  })
+  const removeRule = useMutation({
+    mutationFn: deleteSignatureSeriesRule,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['signature-series-rules'] })
+      queryClient.invalidateQueries({ queryKey: ['qualifications'] })
+      toast.success('系列规则已删除')
+    },
+    onError: () => toast.error('系列规则删除失败'),
+  })
+  const cleanupFilters = {
+    before: cleanupBefore || undefined,
+    reported: cleanupReported === 'all' ? undefined : cleanupReported === 'yes',
+  }
+  const archiveBackup = useMutation({
+    mutationFn: () => cleanupBackupQualifications({ ...cleanupFilters, dry_run: false, ids: cleanupIds }),
+    onSuccess: (result) => {
+      setCleanupCount(null)
+      setCleanupIds([])
+      queryClient.invalidateQueries({ queryKey: ['qualifications'] })
+      toast.success(`已归档 ${result.count} 条备用资质`)
+    },
+    onError: () => toast.error('归档失败'),
+  })
   const { has } = usePermissions()
 
   const { data, isLoading } = useQuery({
     queryKey: [
       'qualifications',
-      { page, page_size: pageSize, ...appliedFilters },
+      { page, page_size: pageSize, library, ...appliedFilters },
     ],
     queryFn: () =>
-      getQualifications({ page, page_size: pageSize, ...appliedFilters }),
+      getQualifications({ page, page_size: pageSize, library, ...appliedFilters }),
   })
 
   const handleSearch = () => {
@@ -106,6 +159,9 @@ export function QualificationsPage() {
       sms_signature: searchInputs.sms_signature.trim() || undefined,
       sms_signature_mode: signatureMode,
       diversion_info: searchInputs.diversion_info.trim() || undefined,
+      signature_series: searchInputs.signature_series || undefined,
+      business_type: searchInputs.business_type.trim() || undefined,
+      business_attribute: searchInputs.business_attribute.trim() || undefined,
     })
     setPage(1)
   }
@@ -117,6 +173,9 @@ export function QualificationsPage() {
       identity_cert_number: '',
       sms_signature: '',
       diversion_info: '',
+      signature_series: '',
+      business_type: '',
+      business_attribute: '',
     })
     setAppliedFilters({})
     setSignatureMode('contains')
@@ -180,6 +239,7 @@ export function QualificationsPage() {
         header: '业务类型',
         cell: ({ getValue }) => getValue() || '-',
       },
+      { accessorKey: 'signature_series', header: '签名系列', cell: ({ getValue }) => getValue() || '-' },
       {
         accessorKey: 'created_at',
         header: '创建时间',
@@ -240,12 +300,20 @@ export function QualificationsPage() {
       <Main>
         <div className='mb-2 flex flex-wrap items-center justify-between space-y-2'>
           <div>
-            <h2 className='text-2xl font-bold tracking-tight'>资质管理</h2>
+            <h2 className='text-2xl font-bold tracking-tight'>{library === 'backup' ? '备用资质库' : '资质管理'}</h2>
             <p className='text-muted-foreground'>
               管理企业资质信息（企业名称、证件、负责人、经办人等）
             </p>
           </div>
           <div className='flex space-x-2'>
+            {library === 'backup' && has('qualification:write') && <Button variant='outline' disabled={!cleanupBefore && cleanupReported === 'all'} onClick={async () => {
+              try {
+                const result = await cleanupBackupQualifications(cleanupFilters)
+                if (!result.count) toast.info('没有符合条件的备用资质')
+                else { setCleanupIds(result.ids); setCleanupCount(result.count) }
+              } catch { toast.error('清理预览失败') }
+            }}>按条件归档</Button>}
+            {has('qualification:write') && <Button variant='outline' onClick={() => setRulesOpen(true)}>管理签名系列</Button>}
             {has('qualification:write') && (
               <Button
                 onClick={() => {
@@ -302,6 +370,28 @@ export function QualificationsPage() {
 
         {/* Filters */}
         <div className='border-border/80 bg-card mt-4 mb-4 flex flex-wrap items-end gap-3 rounded-lg border p-4 shadow-sm shadow-slate-950/5'>
+          {library === 'backup' && <>
+            <div className='flex flex-col gap-1'><label className='text-muted-foreground text-sm'>归档早于此入库日期</label><Input type='date' className='w-40' value={cleanupBefore} onChange={(e) => setCleanupBefore(e.target.value)} /></div>
+            <div className='flex flex-col gap-1'><label className='text-muted-foreground text-sm'>归档报备状态</label>
+              <Select value={cleanupReported} onValueChange={(value: 'all' | 'yes' | 'no') => setCleanupReported(value)}>
+                <SelectTrigger className='w-32'><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value='all'>全部</SelectItem><SelectItem value='yes'>已报备</SelectItem><SelectItem value='no'>未报备</SelectItem></SelectContent>
+              </Select>
+            </div>
+          </>}
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>签名系列</label>
+            <Select value={searchInputs.signature_series || '__all__'} onValueChange={(value) => setSearchInputs((s) => ({ ...s, signature_series: value === '__all__' ? '' : value }))}>
+              <SelectTrigger className='w-40'><SelectValue placeholder='全部' /></SelectTrigger>
+              <SelectContent><SelectItem value='__all__'>全部</SelectItem>{[...new Set(seriesRules.map((rule) => rule.series_name))].map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          {(['business_type', 'business_attribute'] as const).map((field) => (
+            <div key={field} className='flex flex-col gap-1'>
+              <label className='text-muted-foreground text-sm'>{field === 'business_type' ? '业务类型' : '业务属性'}</label>
+              <Input className='w-36' value={searchInputs[field]} onChange={(e) => setSearchInputs((s) => ({ ...s, [field]: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }} />
+            </div>
+          ))}
           <div className='flex flex-col gap-1'>
             <label className='text-muted-foreground text-sm'>签名</label>
             <div className='relative'>
@@ -438,17 +528,50 @@ export function QualificationsPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         qualification={selected}
+        library={library}
         onSuccess={() =>
           queryClient.invalidateQueries({ queryKey: ['qualifications'] })
         }
       />
+
+      <Dialog open={rulesOpen} onOpenChange={setRulesOpen}>
+        <DialogContent className='max-h-[85vh] overflow-y-auto'>
+          <DialogHeader><DialogTitle>签名系列规则</DialogTitle></DialogHeader>
+          <p className='text-muted-foreground text-sm'>签名包含匹配词时归入系列；多个规则命中时使用最长匹配词。</p>
+          <div className='flex gap-2'>
+            <Input aria-label='匹配词' placeholder='签名匹配词' value={rulePattern} onChange={(e) => setRulePattern(e.target.value)} />
+            <Input aria-label='系列名称' placeholder='系列名称' value={ruleSeries} onChange={(e) => setRuleSeries(e.target.value)} />
+            <Button disabled={!rulePattern.trim() || !ruleSeries.trim() || saveRule.isPending} onClick={() => saveRule.mutate()}>{editingRuleId ? '保存' : '添加'}</Button>
+          </div>
+          <div className='space-y-2'>{seriesRules.map((rule) => (
+            <div key={rule.id} className='flex items-center justify-between gap-2 border-b py-2 text-sm'>
+              <span>{rule.pattern} → {rule.series_name}</span>
+              <div className='flex gap-2'>
+                <Button variant='ghost' size='sm' onClick={() => { setEditingRuleId(rule.id); setRulePattern(rule.pattern); setRuleSeries(rule.series_name) }}>编辑</Button>
+                <Button variant='ghost' size='sm' onClick={() => removeRule.mutate(rule.id)}>删除</Button>
+              </div>
+            </div>
+          ))}</div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={cleanupCount !== null} onOpenChange={(open) => { if (!open) { setCleanupCount(null); setCleanupIds([]) } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>确认归档备用资质</AlertDialogTitle>
+            <AlertDialogDescription>符合条件的 {cleanupCount} 条资质将从备用库列表和后续报备选择中隐藏。历史报备文件不受影响。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction disabled={archiveBackup.isPending} onClick={() => archiveBackup.mutate()}>确认归档</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ImportDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
         title='资质信息'
         onDownloadTemplate={downloadQualificationTemplate}
-        onImport={importQualifications}
+        onImport={(file) => importQualifications(file, library)}
         onPreview={previewQualificationsImport}
         onDownloadErrorReport={downloadQualificationImportErrorReport}
         onSuccess={() =>

@@ -47,6 +47,7 @@ REGISTRY: list[ExportField] = [
     # ── 业务信息（来源 qualification：这些字段实际在 qualification_info 模型上） ──
     ExportField("business_attribute", "业务属性", "qualification", "业务信息"),
     ExportField("business_type", "业务类型", "qualification", "业务信息"),
+    ExportField("usage_category", "用途类别", "qualification", "业务信息"),
     ExportField("business_subtype", "业务细类", "qualification", "业务信息"),
     ExportField("specific_usage", "具体用途", "qualification", "业务信息"),
 

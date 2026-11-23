@@ -82,7 +82,8 @@ def list_sub_port_records(
             SubPortRecord.field_values["resource_name"].as_string().contains(resource_name)
         )
     if carrier:
-        query = query.where(SubPortRecord.field_values["carrier"].as_string() == carrier)
+        carrier_value = SubPortRecord.field_values["carrier"].as_string()
+        query = query.where(or_(carrier_value.is_(None), carrier_value == "") if carrier == "__empty__" else carrier_value == carrier)
     if ids:
         query = query.where(SubPortRecord.id.in_(ids))  # type: ignore[attr-defined]
 
@@ -175,15 +176,14 @@ def update_sub_port_record_statuses(
 
 
 def rename_main_port_records(
-    *, session: Session, main_port_number: str, carrier: str, name: str
+    *, session: Session, main_port_number: str, carrier: str, name: str, record_id: uuid.UUID | None = None
 ) -> int:
-    statement = select(SubPortRecord).where(
+    records_for_main = session.exec(select(SubPortRecord).where(
         SubPortRecord.main_port_number == main_port_number,
-        SubPortRecord.field_values["carrier"].as_string() == carrier,
-    )
-    records = session.exec(statement).all()
+    )).all()
+    records = [record for record in records_for_main if record.field_values.get("carrier") == carrier or (record.id == record_id and not record.field_values.get("carrier"))]
     for record in records:
-        record.field_values = {**record.field_values, "resource_name": name}
+        record.field_values = {**record.field_values, "carrier": carrier, "resource_name": name}
         record.updated_at = utcnow()
         session.add(record)
     session.commit()

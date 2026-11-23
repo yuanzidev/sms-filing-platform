@@ -2,11 +2,14 @@
 import uuid
 from datetime import datetime, timezone
 
+import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
+from app.api.routes import qualifications as qualifications_routes
 from app.core.config import settings
 from app.core.db import engine
+from app.core.timezone import get_timezone
 from app.models import QualificationInfo
 
 
@@ -235,7 +238,7 @@ def test_batch_by_signatures_filters_by_import_minute(
     assert names == {f"早-{marker}"}
 
 
-def test_batch_by_signatures_preserves_duplicate_input_rows(
+def test_batch_by_signatures_deduplicates_matched_qualifications(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
     marker = _unique_marker()
@@ -254,8 +257,211 @@ def test_batch_by_signatures_preserves_duplicate_input_rows(
     )
     assert r.status_code == 200, r.text
     body = r.json()
-    assert [q["id"] for q in body["matched_qualifications"]] == [item_id, item_id]
+    assert [q["id"] for q in body["matched_qualifications"]] == [item_id]
     assert body["unmatched_signatures"] == [missing, missing]
+
+
+def test_batch_by_signatures_filters_by_month_range(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    signature = f"月份范围-{marker}"
+    with Session(engine) as session:
+        for label, month in (("之前", 1), ("范围内", 2), ("之后", 4)):
+            session.add(QualificationInfo(
+                enterprise_name=f"{label}-{marker}", sms_signature=signature,
+                created_at=datetime(2026, month, 15, tzinfo=timezone.utc),
+            ))
+        session.commit()
+    r = client.post(
+        f"{settings.API_V1_STR}/qualifications/batch-by-signatures",
+        headers=superuser_token_headers,
+        json={"signatures": [signature], "import_start": "2026-02", "import_end": "2026-03", "import_precision": "month"},
+    )
+    assert r.status_code == 200, r.text
+    assert [item["enterprise_name"] for item in r.json()["matched_qualifications"]] == [f"范围内-{marker}"]
+
+
+def test_batch_by_signatures_day_and_second_ranges_use_inclusive_end(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    signature = f"时间边界-{marker}"
+    with Session(engine) as session:
+        for label, second in (("命中", 10), ("超出", 11)):
+            session.add(QualificationInfo(
+                enterprise_name=f"{label}-{marker}", sms_signature=signature,
+                created_at=datetime(2026, 9, 15, 2, 30, second, tzinfo=timezone.utc),
+            ))
+        session.commit()
+    endpoint = f"{settings.API_V1_STR}/qualifications/batch-by-signatures"
+    seconds = client.post(endpoint, headers=superuser_token_headers, json={
+        "signatures": [signature], "import_start": "2026-09-15T10:30:10",
+        "import_end": "2026-09-15T10:30:10", "import_precision": "second",
+    })
+    assert seconds.status_code == 200
+    assert [item["enterprise_name"] for item in seconds.json()["matched_qualifications"]] == [f"命中-{marker}"]
+    day = client.post(endpoint, headers=superuser_token_headers, json={
+        "signatures": [signature], "import_start": "2026-09-15",
+        "import_end": "2026-09-15", "import_precision": "day",
+    })
+    assert day.status_code == 200
+    assert len(day.json()["matched_qualifications"]) == 2
+
+
+def test_backup_qualifications_are_isolated_from_primary_search(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    signature = f"备用签名-{marker}"
+    created = client.post(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        json={"enterprise_name": f"备用企业-{marker}", "sms_signature": signature, "library": "backup"},
+    )
+    assert created.status_code == 200, created.text
+    assert created.json()["library"] == "backup"
+    primary = client.get(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        params={"sms_signature": signature},
+    )
+    backup = client.get(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        params={"sms_signature": signature, "library": "backup"},
+    )
+    assert primary.json()["total"] == 0
+    assert backup.json()["total"] == 1
+    for library, expected in (("primary", 0), ("backup", 1)):
+        matched = client.post(
+            f"{settings.API_V1_STR}/qualifications/batch-by-signatures",
+            headers=superuser_token_headers,
+            json={"signatures": [signature], "library": library},
+        )
+        assert matched.status_code == 200
+        assert len(matched.json()["matched_qualifications"]) == expected
+
+
+def test_signature_series_rule_backfills_existing_qualifications(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    signature = f"京东快递{marker}"
+    series_name = f"京东系-{marker}"
+    created = client.post(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        json={"enterprise_name": f"系列企业-{marker}", "sms_signature": signature,
+              "business_type": "通知", "business_attribute": "业务类"},
+    )
+    assert created.status_code == 200
+    rule = client.post(
+        f"{settings.API_V1_STR}/qualifications/series-rules",
+        headers=superuser_token_headers,
+        json={"pattern": f"京东快递{marker}", "series_name": series_name},
+    )
+    assert rule.status_code == 200, rule.text
+    listed = client.get(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        params={"signature_series": series_name, "business_type": "通知", "business_attribute": "业务类"},
+    )
+    assert listed.status_code == 200
+    assert [q["id"] for q in listed.json()["data"]] == [created.json()["id"]]
+    assert listed.json()["data"][0]["signature_series"] == series_name
+    rule_id = rule.json()["id"]
+    renamed = client.patch(f"{settings.API_V1_STR}/qualifications/series-rules/{rule_id}",
+                           headers=superuser_token_headers,
+                           json={"pattern": signature, "series_name": f"物流系-{marker}"})
+    assert renamed.status_code == 200
+    after_update = client.get(f"{settings.API_V1_STR}/qualifications/{created.json()['id']}",
+                              headers=superuser_token_headers)
+    assert after_update.json()["signature_series"] == f"物流系-{marker}"
+    removed = client.delete(f"{settings.API_V1_STR}/qualifications/series-rules/{rule_id}",
+                            headers=superuser_token_headers)
+    assert removed.status_code == 200
+    after_delete = client.get(f"{settings.API_V1_STR}/qualifications/{created.json()['id']}",
+                              headers=superuser_token_headers)
+    assert after_delete.json()["signature_series"] is None
+
+
+def test_signature_series_rule_rolls_back_when_backfill_fails(
+    client: TestClient, superuser_token_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pattern = f"失败回填-{_unique_marker()}"
+    def fail(_session: Session) -> None:
+        raise RuntimeError("归类失败")
+    monkeypatch.setattr(qualifications_routes, "reclassify_qualifications", fail)
+    with pytest.raises(RuntimeError, match="归类失败"):
+        client.post(f"{settings.API_V1_STR}/qualifications/series-rules",
+                    headers=superuser_token_headers,
+                    json={"pattern": pattern, "series_name": "失败系列"})
+    rules = client.get(f"{settings.API_V1_STR}/qualifications/series-rules",
+                       headers=superuser_token_headers)
+    assert all(rule["pattern"] != pattern for rule in rules.json())
+
+
+def test_backup_cleanup_requires_condition_and_supports_preview(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    created = client.post(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        json={"enterprise_name": f"待清理-{marker}", "library": "backup"},
+    )
+    assert created.status_code == 200
+    endpoint = f"{settings.API_V1_STR}/qualifications/backup-cleanup"
+    missing = client.post(endpoint, headers=superuser_token_headers, json={})
+    assert missing.status_code == 400
+    request = {"before": "2099-01-01", "reported": False}
+    unsafe = client.post(endpoint, headers=superuser_token_headers,
+                         json={**request, "dry_run": False})
+    assert unsafe.status_code == 400
+    preview = client.post(endpoint, headers=superuser_token_headers, json=request)
+    assert preview.status_code == 200, preview.text
+    assert created.json()["id"] in preview.json()["ids"]
+    present = client.get(f"{settings.API_V1_STR}/qualifications", headers=superuser_token_headers,
+                         params={"library": "backup", "enterprise_name": f"待清理-{marker}"})
+    assert present.json()["total"] == 1
+    later = client.post(f"{settings.API_V1_STR}/qualifications", headers=superuser_token_headers,
+                        json={"enterprise_name": f"预览后新增-{marker}", "library": "backup"})
+    assert later.status_code == 200
+    deleted = client.post(endpoint, headers=superuser_token_headers,
+                          json={**request, "dry_run": False, "ids": preview.json()["ids"]})
+    assert deleted.status_code == 200
+    assert created.json()["id"] in deleted.json()["ids"]
+    hidden = client.get(f"{settings.API_V1_STR}/qualifications", headers=superuser_token_headers,
+                        params={"library": "backup", "enterprise_name": f"待清理-{marker}"})
+    assert hidden.json()["total"] == 0
+    still_present = client.get(f"{settings.API_V1_STR}/qualifications", headers=superuser_token_headers,
+                               params={"library": "backup", "enterprise_name": f"预览后新增-{marker}"})
+    assert still_present.json()["total"] == 1
+
+
+def test_archived_backup_qualification_can_be_imported_again(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    name, signature = f"重新导入-{marker}", f"归档签名-{marker}"
+    content = _build_xlsx(["企业名称", "短信签名"], [[name, signature]])
+    endpoint = f"{settings.API_V1_STR}/qualifications/import"
+    files = {"file": ("backup.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    first = client.post(endpoint, headers=superuser_token_headers, files=files, data={"library": "backup"})
+    assert first.status_code == 200
+    assert first.json()["success_count"] == 1
+    preview = client.post(f"{settings.API_V1_STR}/qualifications/backup-cleanup",
+                          headers=superuser_token_headers,
+                          json={"before": "2099-01-01", "reported": False})
+    archived = client.post(f"{settings.API_V1_STR}/qualifications/backup-cleanup",
+                           headers=superuser_token_headers,
+                           json={"before": "2099-01-01", "reported": False,
+                                 "dry_run": False, "ids": preview.json()["ids"]})
+    assert archived.status_code == 200
+    second = client.post(endpoint, headers=superuser_token_headers, files=files, data={"library": "backup"})
+    assert second.status_code == 200
+    assert second.json()["success_count"] == 1
 
 
 def test_import_rejects_missing_enterprise_name(
@@ -633,6 +839,14 @@ def test_import_skips_duplicate_qualification_rows(
     assert body["skipped_count"] == 1
     assert body["skipped_rows"] == [3]
 
+    with Session(engine) as session:
+        original = session.exec(select(QualificationInfo).where(QualificationInfo.sms_signature == f"重复签名-{marker}")).one()
+        original_id = original.id
+        original.created_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        original.updated_at = original.created_at
+        session.add(original)
+        session.commit()
+
     r2 = client.post(
         f"{settings.API_V1_STR}/qualifications/import",
         headers=superuser_token_headers,
@@ -641,7 +855,21 @@ def test_import_skips_duplicate_qualification_rows(
     assert r2.status_code == 200, r2.text
     body2 = r2.json()
     assert body2["success_count"] == 0
-    assert body2["skipped_count"] == 2
+    assert body2["updated_count"] == 1
+    assert body2["skipped_count"] == 1
+    with Session(engine) as session:
+        same = session.exec(select(QualificationInfo).where(QualificationInfo.sms_signature == f"重复签名-{marker}")).one()
+        assert same.id == original_id
+        assert same.created_at.year > 2020
+        assert abs((same.updated_at - same.created_at).total_seconds()) < 1
+        import_date = same.created_at.replace(tzinfo=timezone.utc).astimezone(get_timezone()).date().isoformat()
+    matched = client.post(
+        f"{settings.API_V1_STR}/qualifications/batch-by-signatures",
+        headers=superuser_token_headers,
+        json={"signatures": [f"重复签名-{marker}"], "import_date": import_date},
+    )
+    assert matched.status_code == 200
+    assert [item["id"] for item in matched.json()["matched_qualifications"]] == [str(original_id)]
 
 
 

@@ -15,6 +15,10 @@ export const getQualifications = async (params?: {
   sms_signature?: string
   sms_signature_mode?: 'contains' | 'exact'
   diversion_info?: string
+  library?: 'primary' | 'backup'
+  signature_series?: string
+  business_type?: string
+  business_attribute?: string
 }): Promise<QualificationListResponse> => {
   const response = await api.get('/api/v1/qualifications', { params })
   return response.data
@@ -106,6 +110,7 @@ export interface ImportErrorItem {
 export interface ImportResult {
   total: number
   success_count: number
+  updated_count?: number
   error_count: number
   errors: ImportErrorItem[]
   skipped_count?: number
@@ -125,10 +130,12 @@ export interface ImportPreviewResult {
 const IMPORT_TIMEOUT = 5 * 60 * 1000
 
 export const importQualifications = async (
-  file: File
+  file: File,
+  library: 'primary' | 'backup' = 'primary'
 ): Promise<ImportResult> => {
   const formData = new FormData()
   formData.append('file', file)
+  formData.append('library', library)
   const response = await api.post('/api/v1/qualifications/import', formData, {
     timeout: IMPORT_TIMEOUT,
   })
@@ -172,11 +179,34 @@ export const downloadQualificationImportErrorReport = async (
 
 export const getQualificationsBySignatures = async (
   signatures: string[],
-  importDatetime?: string
+  timeFilter?: { import_start: string; import_end: string; import_precision: 'month' | 'day' | 'second' },
+  library: 'primary' | 'backup' = 'primary',
+  businessFilters?: { business_type?: string; business_attribute?: string }
 ): Promise<BatchSignatureResponse> => {
   const response = await api.post(
     '/api/v1/qualifications/batch-by-signatures',
-    { signatures, import_datetime: importDatetime || undefined }
+    { signatures, ...timeFilter, library, ...businessFilters }
   )
   return response.data
 }
+
+export interface SignatureSeriesRule {
+  id: string
+  pattern: string
+  series_name: string
+}
+
+export const getSignatureSeriesRules = async (): Promise<SignatureSeriesRule[]> =>
+  (await api.get('/api/v1/qualifications/series-rules')).data
+
+export const saveSignatureSeriesRule = async (data: { pattern: string; series_name: string }, id?: string): Promise<SignatureSeriesRule> =>
+  (await (id
+    ? api.patch(`/api/v1/qualifications/series-rules/${id}`, data)
+    : api.post('/api/v1/qualifications/series-rules', data))).data
+
+export const deleteSignatureSeriesRule = async (id: string): Promise<void> => {
+  await api.delete(`/api/v1/qualifications/series-rules/${id}`)
+}
+
+export const cleanupBackupQualifications = async (filters: { before?: string; reported?: boolean; dry_run?: boolean; ids?: string[] }): Promise<{ count: number; ids: string[]; dry_run: boolean }> =>
+  (await api.post('/api/v1/qualifications/backup-cleanup', filters)).data

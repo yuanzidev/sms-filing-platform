@@ -12,6 +12,7 @@ export type ApiDataStatus = '待处理' | '已入库' | '校验失败' | '已忽
 
 export interface QualificationInfo {
   id: string
+  library: 'primary' | 'backup'
   // 企业信息
   enterprise_name: string
   cert_type: string | null
@@ -36,6 +37,7 @@ export interface QualificationInfo {
   handler_phone: string | null
   // 签名与模板
   sms_signature: string | null
+  signature_series: string | null
   signature_type: string | null
   signature_verified: boolean | null
   is_gateway_signature: boolean | null
@@ -286,6 +288,7 @@ export interface FilingTaskPortSummary {
 }
 
 export interface FilingTask {
+  library: 'primary' | 'backup'
   id: string
   task_name: string
   qualification_count: number
@@ -313,10 +316,11 @@ export interface FilingTasksResponse {
 
 export interface CreateFilingTaskRequest {
   qualification_ids: string[]
+  library?: 'primary' | 'backup'
   port_ids?: string[]
   export_group_id: string
   group_by_field?: string | null
-  export_overrides?: Record<string, { port_type?: string; usage_category?: string }>
+  export_overrides?: Record<string, { port_type?: string; usage_category?: string; specific_usage?: string; sms_template_content?: string }>
   task_name?: string
   auto_allocate_sub_ports?: boolean
   sub_port_range_start?: number

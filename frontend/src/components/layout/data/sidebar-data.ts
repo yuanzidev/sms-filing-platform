@@ -47,6 +47,12 @@ export const sidebarData: SidebarData = {
           permissions: ['qualification:read'],
         },
         {
+          title: '备用资质库',
+          url: '/backup-qualifications',
+          icon: IconFileDescription,
+          permissions: ['qualification:read'],
+        },
+        {
           title: '端口管理',
           url: '/port-info',
           icon: IconPlugConnected,

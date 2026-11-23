@@ -2,11 +2,20 @@
 
 import io
 import uuid
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Literal
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
@@ -14,24 +23,29 @@ from pydantic import BaseModel
 from sqlmodel import select
 
 from app.api.deps import CurrentUser, SessionDep, require_permission
-from app.core.timezone import get_timezone
+from app.core.timezone import get_timezone, utcnow
 from app.crud.qualification import (
     create_qualification,
     delete_qualification,
     get_qualification,
     get_qualifications_by_signatures,
     list_qualifications,
+    matching_series,
+    reclassify_qualifications,
     update_qualification,
 )
 from app.models import (
     BatchSignatureRequest,
     BatchSignatureResponse,
+    FilingTask,
     Message,
     QualificationInfo,
     QualificationInfoCreate,
     QualificationInfoPublic,
     QualificationInfosPublic,
     QualificationInfoUpdate,
+    SignatureSeriesRule,
+    SignatureSeriesRuleInput,
 )
 from app.services.excel_image_extractor import (
     extract_cell_images_from_xlsx,
@@ -315,9 +329,15 @@ def _qualification_dedup_key(obj: QualificationInfo) -> tuple[str, ...]:
     return tuple(_dedup_value(getattr(obj, field, None)) for field in _QUALIFICATION_DEDUP_FIELDS)
 
 
-def _load_existing_qualification_keys(session: SessionDep) -> set[tuple[str, ...]]:
-    existing = session.exec(select(QualificationInfo)).all()
-    return {_qualification_dedup_key(item) for item in existing}
+def _load_existing_qualifications(session: SessionDep, library: str = "primary") -> dict[tuple[str, ...], QualificationInfo]:
+    existing = session.exec(select(QualificationInfo).where(
+        QualificationInfo.library == library,
+        QualificationInfo.archived == False,  # noqa: E712
+    ).order_by(QualificationInfo.created_at.desc())).all()
+    by_key: dict[tuple[str, ...], QualificationInfo] = {}
+    for item in existing:
+        by_key.setdefault(_qualification_dedup_key(item), item)
+    return by_key
 
 
 @router.post("/import/preview", dependencies=[import_perm])
@@ -378,7 +398,7 @@ def preview_qualifications_import(file: UploadFile = File(...)) -> Any:
 
 
 @router.post("/import", dependencies=[import_perm])
-def import_qualifications(*, session: SessionDep, file: UploadFile = File(...)) -> Any:
+def import_qualifications(*, session: SessionDep, file: UploadFile = File(...), library: Literal["primary", "backup"] = Form("primary")) -> Any:
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 文件")
 
@@ -501,6 +521,7 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...)) 
 
             objects.append(
                 QualificationInfo(
+                    library=library,
                     enterprise_name=enterprise_name,
                     cert_type=cell("cert_type"),
                     cert_number=cell("cert_number"),
@@ -543,29 +564,39 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...)) 
             )
             data_row_indices.append(row_idx)
 
-    # Phase 2: de-duplicate rows against existing data and earlier valid rows in this file.
+    # Phase 2: refresh import time for existing matches; skip repeats within this file.
     skipped_rows: list[int] = []
+    updated_rows: list[int] = []
     if objects:
-        existing_keys = _load_existing_qualification_keys(session)
+        existing_by_key = _load_existing_qualifications(session, library)
         seen_keys: set[tuple[str, ...]] = set()
         deduped_objects: list[QualificationInfo] = []
         deduped_row_indices: list[int] = []
+        imported_at = utcnow()
         for obj, row_idx in zip(objects, data_row_indices, strict=True):
             key = _qualification_dedup_key(obj)
-            if key in existing_keys or key in seen_keys:
+            if key in seen_keys:
                 skipped_rows.append(row_idx)
                 continue
             seen_keys.add(key)
+            existing = existing_by_key.get(key)
+            if existing is not None:
+                existing.created_at = imported_at
+                existing.updated_at = imported_at
+                session.add(existing)
+                updated_rows.append(row_idx)
+                continue
             deduped_objects.append(obj)
             deduped_row_indices.append(row_idx)
         objects = deduped_objects
         data_row_indices = deduped_row_indices
 
     # Phase 3: If no valid rows need writing, return collected errors/skips.
-    if not objects and (errors or skipped_rows):
+    if not objects and not updated_rows and (errors or skipped_rows):
         return {
             "total": len({e["row"] for e in errors}) + len(skipped_rows),
             "success_count": 0,
+            "updated_count": 0,
             "error_count": len(errors),
             "errors": errors,
             "skipped_count": len(skipped_rows),
@@ -573,15 +604,17 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...)) 
             "unrecognized_headers": unrecognized_headers,
         }
 
-    if not objects:
+    if not objects and not updated_rows:
         raise HTTPException(status_code=400, detail="文件中没有有效数据")
 
     # Phase 4: Write valid rows + extract images with fixed indices
+    for obj in objects:
+        obj.signature_series = matching_series(session, obj.sms_signature)
     session.add_all(objects)
     session.flush()
 
     warnings: list[str] = []
-    if file.filename.endswith(".xlsx"):
+    if objects and file.filename.endswith(".xlsx"):
         all_images: list = []
         try:
             all_images.extend(
@@ -616,8 +649,9 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...)) 
     session.commit()
 
     return {
-        "total": len(objects) + len({e["row"] for e in errors}),
+        "total": len(objects) + len(updated_rows) + len(skipped_rows) + len({e["row"] for e in errors}),
         "success_count": len(objects),
+        "updated_count": len(updated_rows),
         "error_count": len(errors),
         "errors": errors,
         "skipped_count": len(skipped_rows),
@@ -633,6 +667,13 @@ class ImportErrorReport(BaseModel):
 
 class QualificationBatchDelete(BaseModel):
     ids: list[uuid.UUID]
+
+
+class BackupCleanupRequest(BaseModel):
+    before: date | None = None
+    reported: bool | None = None
+    dry_run: bool = True
+    ids: list[uuid.UUID] | None = None
 
 
 @router.post("/import/error-report", dependencies=[import_perm])
@@ -675,7 +716,28 @@ def download_import_error_report(body: ImportErrorReport) -> Any:
 def batch_by_signatures(*, session: SessionDep, body: BatchSignatureRequest) -> Any:
     imported_start = None
     imported_end = None
-    if body.import_datetime is not None:
+    if body.import_precision is not None:
+        if not body.import_start or not body.import_end:
+            raise HTTPException(status_code=400, detail="请选择完整的导入时间范围")
+        try:
+            if body.import_precision == "month":
+                start = datetime.strptime(body.import_start, "%Y-%m")
+                end = datetime.strptime(body.import_end, "%Y-%m")
+                end = end.replace(year=end.year + 1, month=1) if end.month == 12 else end.replace(month=end.month + 1)
+            elif body.import_precision == "day":
+                start = datetime.strptime(body.import_start, "%Y-%m-%d")
+                end = datetime.strptime(body.import_end, "%Y-%m-%d") + timedelta(days=1)
+            else:
+                start = datetime.fromisoformat(body.import_start)
+                end = datetime.fromisoformat(body.import_end).replace(microsecond=0) + timedelta(seconds=1)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="导入时间格式无效")
+        local_tz = get_timezone()
+        imported_start = start.replace(tzinfo=start.tzinfo or local_tz).astimezone(timezone.utc)
+        imported_end = end.replace(tzinfo=end.tzinfo or local_tz).astimezone(timezone.utc)
+        if imported_start >= imported_end:
+            raise HTTPException(status_code=400, detail="开始时间不能晚于结束时间")
+    elif body.import_datetime is not None:
         local_tz = get_timezone()
         local_start = body.import_datetime.replace(microsecond=0)
         if local_start.tzinfo is None:
@@ -694,6 +756,9 @@ def batch_by_signatures(*, session: SessionDep, body: BatchSignatureRequest) -> 
         signatures=body.signatures,
         imported_start=imported_start,
         imported_end=imported_end,
+        library=body.library,
+        business_type=body.business_type,
+        business_attribute=body.business_attribute,
     )
     return BatchSignatureResponse(
         matched_qualifications=qualified,
@@ -713,6 +778,10 @@ def read_qualifications(
     sms_signature: str | None = None,
     sms_signature_mode: Literal["contains", "exact"] = "contains",
     diversion_info: str | None = None,
+    library: Literal["primary", "backup"] = "primary",
+    signature_series: str | None = None,
+    business_type: str | None = None,
+    business_attribute: str | None = None,
 ) -> Any:
     skip = (page - 1) * page_size
     items, total = list_qualifications(
@@ -725,10 +794,109 @@ def read_qualifications(
         sms_signature=sms_signature,
         sms_signature_mode=sms_signature_mode,
         diversion_info=diversion_info,
+        library=library,
+        signature_series=signature_series,
+        business_type=business_type,
+        business_attribute=business_attribute,
     )
     return QualificationInfosPublic(
         data=items, total=total, page=page, page_size=page_size
     )
+
+
+@router.get("/series-rules", dependencies=[read_perm], response_model=list[SignatureSeriesRule])
+def list_series_rules(session: SessionDep) -> Any:
+    return session.exec(select(SignatureSeriesRule).order_by(SignatureSeriesRule.pattern)).all()
+
+
+@router.post("/series-rules", dependencies=[write_perm], response_model=SignatureSeriesRule)
+def create_series_rule(session: SessionDep, body: SignatureSeriesRuleInput) -> Any:
+    pattern, name = body.pattern.strip(), body.series_name.strip()
+    if not pattern or not name:
+        raise HTTPException(status_code=400, detail="匹配词和系列名称不能为空")
+    if session.exec(select(SignatureSeriesRule).where(SignatureSeriesRule.pattern == pattern)).first():
+        raise HTTPException(status_code=409, detail="匹配词已存在")
+    rule = SignatureSeriesRule(pattern=pattern, series_name=name)
+    session.add(rule)
+    try:
+        session.flush()
+        reclassify_qualifications(session)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    session.refresh(rule)
+    return rule
+
+
+@router.post("/backup-cleanup", dependencies=[write_perm])
+def archive_backup_qualifications(session: SessionDep, body: BackupCleanupRequest) -> Any:
+    if body.before is None and body.reported is None:
+        raise HTTPException(status_code=400, detail="至少选择入库时间或报备状态")
+    if not body.dry_run and not body.ids:
+        raise HTTPException(status_code=400, detail="请先预览并确认要归档的记录")
+    query = select(QualificationInfo).where(
+        QualificationInfo.library == "backup",
+        QualificationInfo.archived == False,  # noqa: E712
+    )
+    if body.before is not None:
+        cutoff = datetime.combine(body.before, time.min, tzinfo=get_timezone()).astimezone(timezone.utc)
+        query = query.where(QualificationInfo.created_at < cutoff)
+    candidates = session.exec(query).all()
+    reported_ids = {
+        qualification_id
+        for task in session.exec(select(FilingTask)).all()
+        for qualification_id in task.qualification_ids
+    }
+    selected = [item for item in candidates if
+                (body.reported is None or (str(item.id) in reported_ids) == body.reported)
+                and (body.dry_run or item.id in body.ids)]
+    if not body.dry_run:
+        for item in selected:
+            item.archived = True
+            session.add(item)
+        session.commit()
+    return {"count": len(selected), "ids": [str(item.id) for item in selected], "dry_run": body.dry_run}
+
+
+@router.patch("/series-rules/{rule_id}", dependencies=[write_perm], response_model=SignatureSeriesRule)
+def update_series_rule(session: SessionDep, rule_id: uuid.UUID, body: SignatureSeriesRuleInput) -> Any:
+    rule = session.get(SignatureSeriesRule, rule_id)
+    if not rule:
+        raise HTTPException(status_code=404, detail="系列规则不存在")
+    pattern, name = body.pattern.strip(), body.series_name.strip()
+    if not pattern or not name:
+        raise HTTPException(status_code=400, detail="匹配词和系列名称不能为空")
+    conflict = session.exec(select(SignatureSeriesRule).where(SignatureSeriesRule.pattern == pattern)).first()
+    if conflict and conflict.id != rule_id:
+        raise HTTPException(status_code=409, detail="匹配词已存在")
+    rule.pattern, rule.series_name = pattern, name
+    session.add(rule)
+    try:
+        session.flush()
+        reclassify_qualifications(session)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    session.refresh(rule)
+    return rule
+
+
+@router.delete("/series-rules/{rule_id}", dependencies=[write_perm])
+def delete_series_rule(session: SessionDep, rule_id: uuid.UUID) -> Any:
+    rule = session.get(SignatureSeriesRule, rule_id)
+    if not rule:
+        raise HTTPException(status_code=404, detail="系列规则不存在")
+    session.delete(rule)
+    try:
+        session.flush()
+        reclassify_qualifications(session)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    return {"message": "系列规则已删除"}
 
 
 @router.post("", dependencies=[write_perm], response_model=QualificationInfoPublic)
@@ -740,6 +908,8 @@ def create_qualification_endpoint(
     current_user: CurrentUser,
     request: Request,
 ) -> Any:
+    if create.library not in ("primary", "backup"):
+        raise HTTPException(status_code=400, detail="资质库无效")
     _sync_diversion_short_link(create)
     result = create_qualification(session=session, create=create)
     log_operation(

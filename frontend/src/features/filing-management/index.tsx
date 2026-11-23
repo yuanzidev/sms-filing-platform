@@ -222,6 +222,7 @@ export function FilingManagementPage() {
       },
       { accessorKey: 'operator_name', header: '操作人' },
       { accessorKey: 'qualification_count', header: '资质数' },
+      { accessorKey: 'library', header: '资质库', cell: ({ getValue }) => getValue() === 'backup' ? '备用库' : '主库' },
       { accessorKey: 'port_count', header: '端口数' },
       {
         id: 'group',
@@ -423,6 +424,10 @@ export function FilingManagementPage() {
                   <div>
                     <span className='text-muted-foreground'>操作人：</span>
                     {taskDetail.operator_name}
+                  </div>
+                  <div>
+                    <span className='text-muted-foreground'>资质库：</span>
+                    {taskDetail.library === 'backup' ? '备用库' : '主库'}
                   </div>
                   <div>
                     <span className='text-muted-foreground'>字段组：</span>
