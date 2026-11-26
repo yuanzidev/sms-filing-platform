@@ -10,7 +10,7 @@ from app.api.routes import qualifications as qualifications_routes
 from app.core.config import settings
 from app.core.db import engine
 from app.core.timezone import get_timezone
-from app.models import QualificationInfo
+from app.models import FilingSubPortUsage, QualificationInfo, User
 
 
 def test_list_qualifications_filter_by_sms_signature(
@@ -384,6 +384,123 @@ def test_signature_series_rule_backfills_existing_qualifications(
     after_delete = client.get(f"{settings.API_V1_STR}/qualifications/{created.json()['id']}",
                               headers=superuser_token_headers)
     assert after_delete.json()["signature_series"] is None
+
+
+def test_signature_can_match_multiple_series_and_filter_by_either(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    signature = f"物流{marker}金融{marker}"
+    created = client.post(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        json={"enterprise_name": f"多系列企业-{marker}", "sms_signature": signature},
+    )
+    assert created.status_code == 200
+    for pattern, name in (("物流", f"物流系-{marker}"), ("金融", f"金融类-{marker}")):
+        response = client.post(
+            f"{settings.API_V1_STR}/qualifications/series-rules",
+            headers=superuser_token_headers,
+            json={"pattern": f"{pattern}{marker}", "series_name": name},
+        )
+        assert response.status_code == 200, response.text
+    detail = client.get(
+        f"{settings.API_V1_STR}/qualifications/{created.json()['id']}",
+        headers=superuser_token_headers,
+    )
+    assert set(detail.json()["signature_series_names"]) == {f"物流系-{marker}", f"金融类-{marker}"}
+    for name in detail.json()["signature_series_names"]:
+        listed = client.get(
+            f"{settings.API_V1_STR}/qualifications",
+            headers=superuser_token_headers,
+            params={"signature_series": name},
+        )
+        assert created.json()["id"] in [item["id"] for item in listed.json()["data"]]
+
+
+def test_bulk_levels_can_be_replaced_cleared_and_filtered(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    created = client.post(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        json={"enterprise_name": f"级别企业-{_unique_marker()}"},
+    )
+    qualification_id = created.json()["id"]
+    endpoint = f"{settings.API_V1_STR}/qualifications/batch-levels"
+    response = client.patch(endpoint, headers=superuser_token_headers,
+                            json={"ids": [qualification_id], "levels": ["P0", "P2"]})
+    assert response.status_code == 200, response.text
+    assert response.json()["updated_count"] == 1
+    for level in ("P0", "P2"):
+        listed = client.get(f"{settings.API_V1_STR}/qualifications",
+                            headers=superuser_token_headers, params={"qualification_level": level})
+        assert qualification_id in [item["id"] for item in listed.json()["data"]]
+    replaced = client.patch(endpoint, headers=superuser_token_headers,
+                            json={"ids": [qualification_id], "levels": ["P1"]})
+    assert replaced.status_code == 200
+    detail = client.get(f"{settings.API_V1_STR}/qualifications/{qualification_id}",
+                        headers=superuser_token_headers)
+    assert detail.json()["qualification_levels"] == ["P1"]
+    cleared = client.patch(endpoint, headers=superuser_token_headers,
+                           json={"ids": [qualification_id], "levels": []})
+    assert cleared.status_code == 200
+    detail = client.get(f"{settings.API_V1_STR}/qualifications/{qualification_id}",
+                        headers=superuser_token_headers)
+    assert detail.json()["qualification_levels"] == []
+
+
+def test_batch_classify_imported_signatures_reports_unmatched(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    signature = f"快递{marker}"
+    rule = client.post(
+        f"{settings.API_V1_STR}/qualifications/series-rules",
+        headers=superuser_token_headers,
+        json={"pattern": f"快递{marker}", "series_name": f"物流系-{marker}"},
+    )
+    assert rule.status_code == 200
+    created = client.post(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        json={"enterprise_name": f"批量签名企业-{marker}", "sms_signature": signature},
+    )
+    assert created.status_code == 200
+    response = client.post(
+        f"{settings.API_V1_STR}/qualifications/series-rules/classify-signatures",
+        headers=superuser_token_headers,
+        json={"signatures": [signature, f"不存在{marker}"], "library": "primary"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json() == {"updated_count": 1, "unmatched_signatures": [f"不存在{marker}"]}
+    detail = client.get(
+        f"{settings.API_V1_STR}/qualifications/{created.json()['id']}",
+        headers=superuser_token_headers,
+    )
+    assert detail.json()["signature_series_names"] == [f"物流系-{marker}"]
+
+
+def test_series_accepts_multiple_keywords_in_one_request(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    response = client.post(
+        f"{settings.API_V1_STR}/qualifications/series-rules/batch",
+        headers=superuser_token_headers,
+        json={"series_name": f"物流系-{marker}",
+              "patterns": [f"物流{marker}", f"快递{marker}"]},
+    )
+    assert response.status_code == 200, response.text
+    assert len(response.json()) == 2
+    for keyword in ("物流", "快递"):
+        created = client.post(
+            f"{settings.API_V1_STR}/qualifications",
+            headers=superuser_token_headers,
+            json={"enterprise_name": f"企业-{keyword}-{marker}", "sms_signature": f"{keyword}{marker}"},
+        )
+        assert created.status_code == 200
+        assert created.json()["signature_series_names"] == [f"物流系-{marker}"]
 
 
 def test_signature_series_rule_rolls_back_when_backfill_fails(
@@ -783,6 +900,51 @@ def test_batch_delete_qualifications(
             headers=superuser_token_headers,
         )
         assert get_r.status_code == 404
+
+
+def test_batch_delete_qualification_keeps_historical_sub_port_usage(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    created = client.post(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        json={"enterprise_name": f"历史报备资质-{_unique_marker()}"},
+    )
+    assert created.status_code == 200
+    qualification_id = uuid.UUID(created.json()["id"])
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.is_superuser == True)).first()  # noqa: E712
+        assert user is not None
+        usage = FilingSubPortUsage(
+            main_port_number="10690000",
+            port_number=uuid.uuid4().hex[:6],
+            qualification_id=qualification_id,
+            operator_id=user.id,
+        )
+        session.add(usage)
+        session.commit()
+        usage_id = usage.id
+
+    try:
+        response = client.post(
+            f"{settings.API_V1_STR}/qualifications/batch-delete",
+            headers=superuser_token_headers,
+            json={"ids": [str(qualification_id)]},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["deleted_count"] == 1
+        assert client.get(
+            f"{settings.API_V1_STR}/qualifications/{qualification_id}",
+            headers=superuser_token_headers,
+        ).status_code == 404
+        with Session(engine) as session:
+            assert session.get(FilingSubPortUsage, usage_id) is not None
+    finally:
+        with Session(engine) as session:
+            stored_usage = session.get(FilingSubPortUsage, usage_id)
+            if stored_usage is not None:
+                session.delete(stored_usage)
+                session.commit()
 
 
 def test_import_skips_duplicate_qualification_rows(

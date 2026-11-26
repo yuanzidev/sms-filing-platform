@@ -167,6 +167,8 @@ export function QualificationDetailDialog({
 
                 <Section title='签名与模板'>
                   <FieldRow label='短信签名' value={d.sms_signature} />
+                  <FieldRow label='签名系列' value={d.signature_series_names?.join('、')} />
+                  <FieldRow label='资质级别' value={d.qualification_levels?.join('、')} />
                   <FieldRow label='签名类型' value={d.signature_type} />
                   <FieldRow
                     label='签名是否已认证'

@@ -17,6 +17,7 @@ export const getQualifications = async (params?: {
   diversion_info?: string
   library?: 'primary' | 'backup'
   signature_series?: string
+  qualification_level?: 'P0' | 'P1' | 'P2'
   business_type?: string
   business_attribute?: string
 }): Promise<QualificationListResponse> => {
@@ -82,6 +83,13 @@ export const batchDeleteQualifications = async (
   const response = await api.post('/api/v1/qualifications/batch-delete', {
     ids,
   })
+  return response.data
+}
+
+export const batchSetQualificationLevels = async (
+  ids: string[], levels: ('P0' | 'P1' | 'P2')[]
+): Promise<{ updated_count: number }> => {
+  const response = await api.patch('/api/v1/qualifications/batch-levels', { ids, levels })
   return response.data
 }
 
@@ -204,9 +212,17 @@ export const saveSignatureSeriesRule = async (data: { pattern: string; series_na
     ? api.patch(`/api/v1/qualifications/series-rules/${id}`, data)
     : api.post('/api/v1/qualifications/series-rules', data))).data
 
+export const saveSignatureSeriesRulesBatch = async (data: { patterns: string[]; series_name: string }): Promise<SignatureSeriesRule[]> =>
+  (await api.post('/api/v1/qualifications/series-rules/batch', data)).data
+
 export const deleteSignatureSeriesRule = async (id: string): Promise<void> => {
   await api.delete(`/api/v1/qualifications/series-rules/${id}`)
 }
+
+export const classifySignatures = async (
+  signatures: string[], library: 'primary' | 'backup'
+): Promise<{ updated_count: number; unmatched_signatures: string[] }> =>
+  (await api.post('/api/v1/qualifications/series-rules/classify-signatures', { signatures, library })).data
 
 export const cleanupBackupQualifications = async (filters: { before?: string; reported?: boolean; dry_run?: boolean; ids?: string[] }): Promise<{ count: number; ids: string[]; dry_run: boolean }> =>
   (await api.post('/api/v1/qualifications/backup-cleanup', filters)).data

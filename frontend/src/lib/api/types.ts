@@ -38,6 +38,8 @@ export interface QualificationInfo {
   // 签名与模板
   sms_signature: string | null
   signature_series: string | null
+  signature_series_names: string[]
+  qualification_levels: ('P0' | 'P1' | 'P2')[]
   signature_type: string | null
   signature_verified: boolean | null
   is_gateway_signature: boolean | null
@@ -321,6 +323,7 @@ export interface CreateFilingTaskRequest {
   export_group_id: string
   group_by_field?: string | null
   export_overrides?: Record<string, { port_type?: string; usage_category?: string; specific_usage?: string; sms_template_content?: string }>
+  template_fill_empty_only?: boolean
   task_name?: string
   auto_allocate_sub_ports?: boolean
   sub_port_range_start?: number

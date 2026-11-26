@@ -3,6 +3,8 @@ import uuid
 from datetime import date, datetime
 from typing import Literal
 
+from sqlalchemy import Column
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
 from app.core.timezone import utcnow
@@ -39,6 +41,8 @@ class QualificationInfoBase(SQLModel):
     # 签名与模板
     sms_signature: str | None = Field(default=None, max_length=200)
     signature_series: str | None = Field(default=None, max_length=100, index=True)
+    signature_series_names: list[str] = Field(default_factory=list, sa_column=Column(JSONB, nullable=False, server_default="[]"))
+    qualification_levels: list[str] = Field(default_factory=list, sa_column=Column(JSONB, nullable=False, server_default="[]"))
     signature_type: str | None = Field(default=None, max_length=100)
     signature_verified: bool | None = Field(default=None)
     is_gateway_signature: bool | None = Field(default=None)

@@ -11,8 +11,11 @@ import {
   Upload,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import * as XLSX from 'xlsx'
 import {
   batchDeleteQualifications,
+  batchSetQualificationLevels,
+  classifySignatures,
   deleteQualification,
   downloadQualificationImportErrorReport,
   downloadQualificationTemplate,
@@ -21,6 +24,7 @@ import {
   previewQualificationsImport,
   getSignatureSeriesRules,
   saveSignatureSeriesRule,
+  saveSignatureSeriesRulesBatch,
   deleteSignatureSeriesRule,
   cleanupBackupQualifications,
 } from '@/lib/api/qualifications'
@@ -38,7 +42,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Select,
@@ -66,6 +72,8 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false)
+  const [levelsDialogOpen, setLevelsDialogOpen] = useState(false)
+  const [levelsToSet, setLevelsToSet] = useState<('P0' | 'P1' | 'P2')[]>([])
   const [toDelete, setToDelete] = useState<QualificationInfo | undefined>()
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
@@ -75,6 +83,7 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
   const [cleanupIds, setCleanupIds] = useState<string[]>([])
   const [rulePattern, setRulePattern] = useState('')
   const [ruleSeries, setRuleSeries] = useState('')
+  const [batchSignatures, setBatchSignatures] = useState('')
   const [editingRuleId, setEditingRuleId] = useState<string | undefined>()
   const [detailTarget, setDetailTarget] = useState<
     QualificationInfo | undefined
@@ -90,6 +99,7 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
     sms_signature: '',
     diversion_info: '',
     signature_series: '',
+    qualification_level: '',
     business_type: '',
     business_attribute: '',
   })
@@ -101,13 +111,20 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
     sms_signature_mode?: 'contains' | 'exact'
     diversion_info?: string
     signature_series?: string
+    qualification_level?: 'P0' | 'P1' | 'P2'
     business_type?: string
     business_attribute?: string
   }>({})
   const queryClient = useQueryClient()
   const { data: seriesRules = [] } = useQuery({ queryKey: ['signature-series-rules'], queryFn: getSignatureSeriesRules })
   const saveRule = useMutation({
-    mutationFn: () => saveSignatureSeriesRule({ pattern: rulePattern.trim(), series_name: ruleSeries.trim() }, editingRuleId),
+    mutationFn: async () => {
+      if (editingRuleId) {
+        await saveSignatureSeriesRule({ pattern: rulePattern.trim(), series_name: ruleSeries.trim() }, editingRuleId)
+      } else {
+        await saveSignatureSeriesRulesBatch({ patterns: rulePattern.split(/[,，、\n]/).map((value) => value.trim()).filter(Boolean), series_name: ruleSeries.trim() })
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['signature-series-rules'] })
       queryClient.invalidateQueries({ queryKey: ['qualifications'] })
@@ -125,6 +142,26 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
     },
     onError: () => toast.error('系列规则删除失败'),
   })
+  const classifyBatch = useMutation({
+    mutationFn: () => classifySignatures(batchSignatures.split(/\r?\n/).map((value) => value.trim()).filter(Boolean), library),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['qualifications'] })
+      toast.success(`已归类 ${result.updated_count} 条资质；未匹配 ${result.unmatched_signatures.length} 个签名`)
+    },
+    onError: () => toast.error('批量归类失败'),
+  })
+  const readSignatureFile = async (file?: File) => {
+    if (!file) return
+    try {
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+      const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 })
+      const signatures = rows.map((row) => String(row[0] ?? '').trim()).filter((value) => value && value !== '签名')
+      setBatchSignatures(signatures.join('\n'))
+    } catch {
+      toast.error('签名表格解析失败')
+    }
+  }
   const cleanupFilters = {
     before: cleanupBefore || undefined,
     reported: cleanupReported === 'all' ? undefined : cleanupReported === 'yes',
@@ -160,10 +197,12 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
       sms_signature_mode: signatureMode,
       diversion_info: searchInputs.diversion_info.trim() || undefined,
       signature_series: searchInputs.signature_series || undefined,
+      qualification_level: searchInputs.qualification_level ? searchInputs.qualification_level as 'P0' | 'P1' | 'P2' : undefined,
       business_type: searchInputs.business_type.trim() || undefined,
       business_attribute: searchInputs.business_attribute.trim() || undefined,
     })
     setPage(1)
+    setRowSelection({})
   }
 
   const handleReset = () => {
@@ -174,12 +213,14 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
       sms_signature: '',
       diversion_info: '',
       signature_series: '',
+      qualification_level: '',
       business_type: '',
       business_attribute: '',
     })
     setAppliedFilters({})
     setSignatureMode('contains')
     setPage(1)
+    setRowSelection({})
   }
 
   const deleteMutation = useMutation({
@@ -216,6 +257,17 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
     onError: () => toast.error('批量删除失败'),
   })
 
+  const batchLevelsMutation = useMutation({
+    mutationFn: () => batchSetQualificationLevels(selectedIds, levelsToSet),
+    onSuccess: (result) => {
+      toast.success(`已更新 ${result.updated_count} 条资质级别`)
+      setLevelsDialogOpen(false)
+      setRowSelection({})
+      queryClient.invalidateQueries({ queryKey: ['qualifications'] })
+    },
+    onError: () => toast.error('批量设置级别失败'),
+  })
+
   const columns = useMemo<ColumnDef<QualificationInfo>[]>(
     () => [
       { accessorKey: 'enterprise_name', header: '企业名称' },
@@ -239,7 +291,8 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
         header: '业务类型',
         cell: ({ getValue }) => getValue() || '-',
       },
-      { accessorKey: 'signature_series', header: '签名系列', cell: ({ getValue }) => getValue() || '-' },
+      { accessorKey: 'signature_series_names', header: '签名系列', cell: ({ getValue }) => (getValue() as string[]).join('、') || '-' },
+      { accessorKey: 'qualification_levels', header: '资质级别', cell: ({ getValue }) => (getValue() as string[]).join('、') || '-' },
       {
         accessorKey: 'created_at',
         header: '创建时间',
@@ -344,6 +397,11 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
               </>
             )}
             {has('qualification:write') && selectedCount > 0 && (
+              <Button variant='outline' onClick={() => { setLevelsToSet([]); setLevelsDialogOpen(true) }}>
+                设置级别 ({selectedCount})
+              </Button>
+            )}
+            {has('qualification:write') && selectedCount > 0 && (
               <Button
                 variant='destructive'
                 onClick={() => setBatchDeleteDialogOpen(true)}
@@ -384,6 +442,13 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
             <Select value={searchInputs.signature_series || '__all__'} onValueChange={(value) => setSearchInputs((s) => ({ ...s, signature_series: value === '__all__' ? '' : value }))}>
               <SelectTrigger className='w-40'><SelectValue placeholder='全部' /></SelectTrigger>
               <SelectContent><SelectItem value='__all__'>全部</SelectItem>{[...new Set(seriesRules.map((rule) => rule.series_name))].map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className='flex flex-col gap-1'>
+            <label className='text-muted-foreground text-sm'>资质级别</label>
+            <Select value={searchInputs.qualification_level || '__all__'} onValueChange={(value) => setSearchInputs((s) => ({ ...s, qualification_level: value === '__all__' ? '' : value }))}>
+              <SelectTrigger className='w-32'><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value='__all__'>全部</SelectItem>{(['P0', 'P1', 'P2'] as const).map((level) => <SelectItem key={level} value={level}>{level}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           {(['business_type', 'business_attribute'] as const).map((field) => (
@@ -537,9 +602,9 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
       <Dialog open={rulesOpen} onOpenChange={setRulesOpen}>
         <DialogContent className='max-h-[85vh] overflow-y-auto'>
           <DialogHeader><DialogTitle>签名系列规则</DialogTitle></DialogHeader>
-          <p className='text-muted-foreground text-sm'>签名包含匹配词时归入系列；多个规则命中时使用最长匹配词。</p>
+          <p className='text-muted-foreground text-sm'>签名命中任一匹配词即归入对应系列；可为同一系列添加多个匹配词，也可命中多个系列。</p>
           <div className='flex gap-2'>
-            <Input aria-label='匹配词' placeholder='签名匹配词' value={rulePattern} onChange={(e) => setRulePattern(e.target.value)} />
+            <Input aria-label='匹配词' placeholder={editingRuleId ? '签名匹配词' : '多个匹配词用逗号分隔'} value={rulePattern} onChange={(e) => setRulePattern(e.target.value)} />
             <Input aria-label='系列名称' placeholder='系列名称' value={ruleSeries} onChange={(e) => setRuleSeries(e.target.value)} />
             <Button disabled={!rulePattern.trim() || !ruleSeries.trim() || saveRule.isPending} onClick={() => saveRule.mutate()}>{editingRuleId ? '保存' : '添加'}</Button>
           </div>
@@ -552,6 +617,32 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
               </div>
             </div>
           ))}</div>
+          <div className='space-y-2 border-t pt-4'>
+            <p className='text-sm font-medium'>批量导入签名并归类</p>
+            <p className='text-muted-foreground text-xs'>匹配当前资质库中已有的签名，按上方关键字规则重新归类。每行一个签名，也可导入 Excel 第一列。</p>
+            <Textarea rows={4} placeholder='每行一个签名' value={batchSignatures} onChange={(event) => setBatchSignatures(event.target.value)} />
+            <Input type='file' accept='.xlsx,.xls' aria-label='导入签名表格' onChange={(event) => readSignatureFile(event.target.files?.[0])} />
+            <Button disabled={!batchSignatures.trim() || classifyBatch.isPending} onClick={() => classifyBatch.mutate()}>批量归类</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={levelsDialogOpen} onOpenChange={setLevelsDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>批量设置资质级别</DialogTitle></DialogHeader>
+          <p className='text-muted-foreground text-sm'>将替换已选 {selectedCount} 条资质的级别；不选任何级别可清除标记。</p>
+          <div className='flex gap-6'>
+            {(['P0', 'P1', 'P2'] as const).map((level) => (
+              <label key={level} className='flex items-center gap-2'>
+                <Checkbox checked={levelsToSet.includes(level)} onCheckedChange={(checked) => setLevelsToSet((current) => checked ? [...current, level] : current.filter((item) => item !== level))} />
+                {level}
+              </label>
+            ))}
+          </div>
+          <div className='flex justify-end gap-2'>
+            <Button variant='outline' onClick={() => setLevelsDialogOpen(false)}>取消</Button>
+            <Button disabled={!selectedCount || batchLevelsMutation.isPending} onClick={() => batchLevelsMutation.mutate()}>保存</Button>
+          </div>
         </DialogContent>
       </Dialog>
 

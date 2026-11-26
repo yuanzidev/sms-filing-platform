@@ -20,6 +20,7 @@ from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 from pydantic import BaseModel
+from sqlmodel import col as sql_col
 from sqlmodel import select
 
 from app.api.deps import CurrentUser, SessionDep, require_permission
@@ -30,7 +31,7 @@ from app.crud.qualification import (
     get_qualification,
     get_qualifications_by_signatures,
     list_qualifications,
-    matching_series,
+    matching_series_names,
     reclassify_qualifications,
     update_qualification,
 )
@@ -608,8 +609,10 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...), 
         raise HTTPException(status_code=400, detail="文件中没有有效数据")
 
     # Phase 4: Write valid rows + extract images with fixed indices
+    series_rules = list(session.exec(select(SignatureSeriesRule)).all())
     for obj in objects:
-        obj.signature_series = matching_series(session, obj.sms_signature)
+        obj.signature_series_names = matching_series_names(session, obj.sms_signature, series_rules)
+        obj.signature_series = obj.signature_series_names[0] if obj.signature_series_names else None
     session.add_all(objects)
     session.flush()
 
@@ -667,6 +670,21 @@ class ImportErrorReport(BaseModel):
 
 class QualificationBatchDelete(BaseModel):
     ids: list[uuid.UUID]
+
+
+class QualificationBatchLevels(BaseModel):
+    ids: list[uuid.UUID]
+    levels: list[Literal["P0", "P1", "P2"]]
+
+
+class SignatureBatchClassify(BaseModel):
+    signatures: list[str]
+    library: Literal["primary", "backup"] = "primary"
+
+
+class SignatureSeriesRuleBatch(BaseModel):
+    series_name: str
+    patterns: list[str]
 
 
 class BackupCleanupRequest(BaseModel):
@@ -780,6 +798,7 @@ def read_qualifications(
     diversion_info: str | None = None,
     library: Literal["primary", "backup"] = "primary",
     signature_series: str | None = None,
+    qualification_level: Literal["P0", "P1", "P2"] | None = None,
     business_type: str | None = None,
     business_attribute: str | None = None,
 ) -> Any:
@@ -796,6 +815,7 @@ def read_qualifications(
         diversion_info=diversion_info,
         library=library,
         signature_series=signature_series,
+        qualification_level=qualification_level,
         business_type=business_type,
         business_attribute=business_attribute,
     )
@@ -807,6 +827,66 @@ def read_qualifications(
 @router.get("/series-rules", dependencies=[read_perm], response_model=list[SignatureSeriesRule])
 def list_series_rules(session: SessionDep) -> Any:
     return session.exec(select(SignatureSeriesRule).order_by(SignatureSeriesRule.pattern)).all()
+
+
+@router.post("/series-rules/classify-signatures", dependencies=[write_perm])
+def classify_imported_signatures(session: SessionDep, body: SignatureBatchClassify) -> Any:
+    signatures = list(dict.fromkeys(value.strip() for value in body.signatures if value.strip()))
+    if not signatures:
+        raise HTTPException(status_code=400, detail="请导入签名")
+    items = session.exec(select(QualificationInfo).where(
+        sql_col(QualificationInfo.sms_signature).in_(signatures),
+        QualificationInfo.library == body.library,
+        QualificationInfo.archived == False,  # noqa: E712
+    )).all()
+    matched = set()
+    series_rules = list(session.exec(select(SignatureSeriesRule)).all())
+    for item in items:
+        names = matching_series_names(session, item.sms_signature, series_rules)
+        item.signature_series_names = names
+        item.signature_series = names[0] if names else None
+        session.add(item)
+        if item.sms_signature:
+            matched.add(item.sms_signature)
+    session.commit()
+    return {"updated_count": len(items), "unmatched_signatures": [value for value in signatures if value not in matched]}
+
+
+@router.post("/series-rules/batch", dependencies=[write_perm], response_model=list[SignatureSeriesRule])
+def create_series_rules_batch(session: SessionDep, body: SignatureSeriesRuleBatch) -> Any:
+    name = body.series_name.strip()
+    patterns = list(dict.fromkeys(value.strip() for value in body.patterns if value.strip()))
+    if not name or len(name) > 100 or not patterns or any(len(value) > 200 for value in patterns):
+        raise HTTPException(status_code=400, detail="系列名称或匹配词无效")
+    existing = session.exec(select(SignatureSeriesRule).where(sql_col(SignatureSeriesRule.pattern).in_(patterns))).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"匹配词已存在：{existing.pattern}")
+    rules = [SignatureSeriesRule(pattern=pattern, series_name=name) for pattern in patterns]
+    session.add_all(rules)
+    try:
+        session.flush()
+        reclassify_qualifications(session)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    return rules
+
+
+@router.patch("/batch-levels", dependencies=[write_perm])
+def batch_set_qualification_levels(session: SessionDep, body: QualificationBatchLevels) -> Any:
+    if not body.ids:
+        raise HTTPException(status_code=400, detail="请选择资质")
+    levels: list[str] = list(dict.fromkeys(body.levels))
+    items = session.exec(select(QualificationInfo).where(
+        sql_col(QualificationInfo.id).in_(body.ids),
+        QualificationInfo.archived == False,  # noqa: E712
+    )).all()
+    for item in items:
+        item.qualification_levels = levels
+        session.add(item)
+    session.commit()
+    return {"updated_count": len(items)}
 
 
 @router.post("/series-rules", dependencies=[write_perm], response_model=SignatureSeriesRule)

@@ -14,26 +14,31 @@ from app.models import (
 )
 
 
-def matching_series(session: Session, signature: str | None) -> str | None:
+def matching_series_names(
+    session: Session, signature: str | None, rules: list[SignatureSeriesRule] | None = None
+) -> list[str]:
     if not signature:
-        return None
-    rules = session.exec(select(SignatureSeriesRule)).all()
+        return []
+    if rules is None:
+        rules = list(session.exec(select(SignatureSeriesRule)).all())
     matches = [rule for rule in rules if rule.pattern in signature]
-    return max(matches, key=lambda rule: (len(rule.pattern), rule.pattern)).series_name if matches else None
+    matches.sort(key=lambda rule: (-len(rule.pattern), rule.pattern))
+    return list(dict.fromkeys(rule.series_name for rule in matches))
 
 
 def reclassify_qualifications(session: Session) -> None:
     rules = list(session.exec(select(SignatureSeriesRule)).all())
     for item in session.exec(select(QualificationInfo)).all():
-        matches = [rule for rule in rules if item.sms_signature and rule.pattern in item.sms_signature]
-        series = max(matches, key=lambda rule: (len(rule.pattern), rule.pattern)).series_name if matches else None
-        if item.signature_series != series:
-            item.signature_series = series
+        names = matching_series_names(session, item.sms_signature, rules)
+        if item.signature_series_names != names:
+            item.signature_series_names = names
+            item.signature_series = names[0] if names else None
             session.add(item)
 
 
 def get_qualification(*, session: Session, id: uuid.UUID) -> QualificationInfo | None:
-    return session.get(QualificationInfo, id)
+    item = session.get(QualificationInfo, id)
+    return item if item and not item.archived else None
 
 
 def list_qualifications(
@@ -49,6 +54,7 @@ def list_qualifications(
     diversion_info: str | None = None,
     library: Literal["primary", "backup"] = "primary",
     signature_series: str | None = None,
+    qualification_level: Literal["P0", "P1", "P2"] | None = None,
     business_type: str | None = None,
     business_attribute: str | None = None,
 ) -> tuple[list[QualificationInfo], int]:
@@ -57,7 +63,9 @@ def list_qualifications(
     if enterprise_name:
         query = query.where(QualificationInfo.enterprise_name.contains(enterprise_name))
     if signature_series:
-        query = query.where(QualificationInfo.signature_series == signature_series)
+        query = query.where(col(QualificationInfo.signature_series_names).contains([signature_series]))
+    if qualification_level:
+        query = query.where(col(QualificationInfo.qualification_levels).contains([qualification_level]))
     if business_type:
         query = query.where(QualificationInfo.business_type == business_type)
     if business_attribute:
@@ -105,7 +113,8 @@ def create_qualification(
     *, session: Session, create: QualificationInfoCreate
 ) -> QualificationInfo:
     db_obj = QualificationInfo.model_validate(create)
-    db_obj.signature_series = matching_series(session, db_obj.sms_signature)
+    db_obj.signature_series_names = matching_series_names(session, db_obj.sms_signature)
+    db_obj.signature_series = db_obj.signature_series_names[0] if db_obj.signature_series_names else None
     session.add(db_obj)
     session.commit()
     session.refresh(db_obj)
@@ -117,7 +126,8 @@ def update_qualification(
 ) -> QualificationInfo:
     data = update.model_dump(exclude_unset=True)
     db_obj.sqlmodel_update(data)
-    db_obj.signature_series = matching_series(session, db_obj.sms_signature)
+    db_obj.signature_series_names = matching_series_names(session, db_obj.sms_signature)
+    db_obj.signature_series = db_obj.signature_series_names[0] if db_obj.signature_series_names else None
     session.add(db_obj)
     session.commit()
     session.refresh(db_obj)
@@ -125,7 +135,9 @@ def update_qualification(
 
 
 def delete_qualification(*, session: Session, db_obj: QualificationInfo) -> None:
-    session.delete(db_obj)
+    # 保留历史报备与子端口占用的外键引用，列表及详情不再展示该资质。
+    db_obj.archived = True
+    session.add(db_obj)
     session.commit()
 
 
