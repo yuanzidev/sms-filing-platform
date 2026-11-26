@@ -12,6 +12,7 @@ from app.models import (
     QualificationInfoUpdate,
     SignatureSeriesRule,
 )
+from app.services.qualification_compliance import auto_compliance_reason
 
 
 def matching_series_names(
@@ -113,6 +114,10 @@ def create_qualification(
     *, session: Session, create: QualificationInfoCreate
 ) -> QualificationInfo:
     db_obj = QualificationInfo.model_validate(create)
+    if db_obj.library == "backup" and auto_compliance_reason(
+        db_obj.sms_signature, db_obj.enterprise_name, db_obj.signature_type
+    ):
+        db_obj.library = "primary"
     db_obj.signature_series_names = matching_series_names(session, db_obj.sms_signature)
     db_obj.signature_series = db_obj.signature_series_names[0] if db_obj.signature_series_names else None
     session.add(db_obj)
@@ -126,6 +131,10 @@ def update_qualification(
 ) -> QualificationInfo:
     data = update.model_dump(exclude_unset=True)
     db_obj.sqlmodel_update(data)
+    if db_obj.library == "backup" and auto_compliance_reason(
+        db_obj.sms_signature, db_obj.enterprise_name, db_obj.signature_type
+    ):
+        db_obj.library = "primary"
     db_obj.signature_series_names = matching_series_names(session, db_obj.sms_signature)
     db_obj.signature_series = db_obj.signature_series_names[0] if db_obj.signature_series_names else None
     session.add(db_obj)

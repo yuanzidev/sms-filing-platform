@@ -194,7 +194,7 @@ export function QualificationDialog({
       return createQualification(apiData)
     },
     onSuccess: async (result) => {
-      toast.success('资质创建成功')
+      toast.success(result.library === 'primary' && library === 'backup' ? '资质创建成功，已自动划入主库' : '资质创建成功')
       // Upload images after record is created
       const id = result.id
       if (Object.keys(imageFiles).length > 0) {
@@ -238,8 +238,8 @@ export function QualificationDialog({
       }
       return updateQualification(id, apiData)
     },
-    onSuccess: async (_, variables) => {
-      toast.success('资质更新成功')
+    onSuccess: async (result, variables) => {
+      toast.success(result.library === 'primary' && library === 'backup' ? '资质更新成功，已自动划入主库' : '资质更新成功')
       if (Object.keys(imageFiles).length > 0) {
         setUploading(true)
         for (const [fieldKey, file] of Object.entries(imageFiles)) {

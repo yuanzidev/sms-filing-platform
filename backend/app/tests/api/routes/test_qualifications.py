@@ -173,6 +173,153 @@ def _unique_marker() -> str:
     return uuid.uuid4().hex[:8]
 
 
+def test_backup_create_auto_promotes_only_clear_company_names(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    for signature, source, expected in (
+        (f"上海富友电子商务{marker}", "企业简称", "primary"),
+        (f"上海富友{marker}", "企业简称", "backup"),
+        (f"上海富友电子商务{marker}", "商标", "backup"),
+    ):
+        response = client.post(
+            f"{settings.API_V1_STR}/qualifications",
+            headers=superuser_token_headers,
+            json={
+                "library": "backup",
+                "enterprise_name": f"上海富友电子商务{marker}有限公司",
+                "sms_signature": signature,
+                "signature_type": source,
+            },
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["library"] == expected
+
+
+def test_backup_promotion_requires_explicit_ids_and_rechecks_eligibility(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    with Session(engine) as session:
+        clear = QualificationInfo(
+            library="backup",
+            enterprise_name=f"上海富友电子商务{marker}有限公司",
+            sms_signature=f"上海富友电子商务{marker}",
+        )
+        unclear = QualificationInfo(
+            library="backup",
+            enterprise_name=f"上海富友电子商务{marker}有限公司",
+            sms_signature=f"上海富友{marker}",
+        )
+        session.add_all([clear, unclear])
+        session.commit()
+        clear_id, unclear_id = str(clear.id), str(unclear.id)
+
+    url = f"{settings.API_V1_STR}/qualifications/backup-promote"
+    preview = client.post(url, headers=superuser_token_headers, json={"dry_run": True})
+    assert preview.status_code == 200, preview.text
+    assert clear_id in preview.json()["ids"]
+    assert unclear_id not in preview.json()["ids"]
+
+    rejected = client.post(url, headers=superuser_token_headers, json={"dry_run": False})
+    assert rejected.status_code == 400
+    executed = client.post(
+        url,
+        headers=superuser_token_headers,
+        json={"dry_run": False, "ids": [clear_id, unclear_id]},
+    )
+    assert executed.status_code == 200, executed.text
+    assert executed.json()["ids"] == [clear_id]
+    with Session(engine) as session:
+        assert session.get(QualificationInfo, uuid.UUID(clear_id)).library == "primary"
+        assert session.get(QualificationInfo, uuid.UUID(unclear_id)).library == "backup"
+
+
+def test_manual_promotion_moves_selected_backup_record(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    response = client.post(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        json={"library": "backup", "enterprise_name": f"上海富友{marker}有限公司", "sms_signature": "富友"},
+    )
+    item_id = response.json()["id"]
+    moved = client.post(
+        f"{settings.API_V1_STR}/qualifications/backup-promote/manual",
+        headers=superuser_token_headers,
+        json={"ids": [item_id]},
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["ids"] == [item_id]
+    assert client.get(f"{settings.API_V1_STR}/qualifications/{item_id}", headers=superuser_token_headers).json()["library"] == "primary"
+
+
+def test_backup_import_promotes_clear_names_and_keeps_ambiguous_names(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    enterprise = f"上海富友电子商务{marker}有限公司"
+    content = _build_xlsx(
+        ["企业名称", "短信签名", "签名类型/来源"],
+        [[enterprise, f"上海富友电子商务{marker}", "企业简称"], [enterprise, f"上海富友{marker}", "企业简称"]],
+    )
+    url = f"{settings.API_V1_STR}/qualifications/import"
+    for expected_count in (2, 0):
+        response = client.post(url, headers=superuser_token_headers, files={"file": ("资质.xlsx", content)}, data={"library": "backup"})
+        assert response.status_code == 200, response.text
+        assert response.json()["success_count"] == expected_count
+        assert response.json()["auto_promoted_count"] == (1 if expected_count else 0)
+    with Session(engine) as session:
+        records = session.exec(select(QualificationInfo).where(QualificationInfo.enterprise_name == enterprise)).all()
+        assert len(records) == 2
+        assert {item.sms_signature: item.library for item in records} == {
+            f"上海富友电子商务{marker}": "primary",
+            f"上海富友{marker}": "backup",
+        }
+
+
+def test_backup_edit_promotes_when_signature_becomes_clear(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    created = client.post(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        json={"library": "backup", "enterprise_name": f"上海富友电子商务{marker}有限公司", "sms_signature": f"上海富友{marker}"},
+    )
+    item_id = created.json()["id"]
+    updated = client.patch(
+        f"{settings.API_V1_STR}/qualifications/{item_id}",
+        headers=superuser_token_headers,
+        json={"sms_signature": f"上海富友电子商务{marker}"},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["library"] == "primary"
+
+
+def test_auto_promotion_does_not_create_duplicate_primary_records(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    with Session(engine) as session:
+        for _ in range(2):
+            session.add(QualificationInfo(
+                library="backup",
+                enterprise_name=f"上海去重科技{marker}有限公司",
+                sms_signature=f"上海去重科技{marker}",
+            ))
+        session.commit()
+    response = client.post(
+        f"{settings.API_V1_STR}/qualifications/backup-promote",
+        headers=superuser_token_headers,
+        json={"dry_run": True},
+    )
+    matching = [item_id for item_id in response.json()["ids"] if
+                client.get(f"{settings.API_V1_STR}/qualifications/{item_id}", headers=superuser_token_headers).json()["enterprise_name"] == f"上海去重科技{marker}有限公司"]
+    assert len(matching) == 1
+
+
 def test_batch_by_signatures_filters_by_import_date(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:

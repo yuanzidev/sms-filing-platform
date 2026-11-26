@@ -27,6 +27,8 @@ import {
   saveSignatureSeriesRulesBatch,
   deleteSignatureSeriesRule,
   cleanupBackupQualifications,
+  promoteEligibleBackupQualifications,
+  promoteBackupQualificationsManually,
 } from '@/lib/api/qualifications'
 import type { QualificationInfo } from '@/lib/api/types'
 import { formatCN } from '@/lib/time'
@@ -81,6 +83,8 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
   const [cleanupReported, setCleanupReported] = useState<'all' | 'yes' | 'no'>('all')
   const [cleanupCount, setCleanupCount] = useState<number | null>(null)
   const [cleanupIds, setCleanupIds] = useState<string[]>([])
+  const [promotionIds, setPromotionIds] = useState<string[]>([])
+  const [manualPromotionOpen, setManualPromotionOpen] = useState(false)
   const [rulePattern, setRulePattern] = useState('')
   const [ruleSeries, setRuleSeries] = useState('')
   const [batchSignatures, setBatchSignatures] = useState('')
@@ -175,6 +179,25 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
       toast.success(`已归档 ${result.count} 条备用资质`)
     },
     onError: () => toast.error('归档失败'),
+  })
+  const autoPromote = useMutation({
+    mutationFn: (ids: string[]) => promoteEligibleBackupQualifications({ dry_run: false, ids }),
+    onSuccess: (result) => {
+      setPromotionIds([])
+      queryClient.invalidateQueries({ queryKey: ['qualifications'] })
+      toast.success(`已自动划入主库 ${result.count} 条资质`)
+    },
+    onError: () => toast.error('自动划入失败'),
+  })
+  const manualPromote = useMutation({
+    mutationFn: (ids: string[]) => promoteBackupQualificationsManually(ids),
+    onSuccess: (result) => {
+      setManualPromotionOpen(false)
+      setRowSelection({})
+      queryClient.invalidateQueries({ queryKey: ['qualifications'] })
+      toast.success(`已人工确认并划入主库 ${result.count} 条资质`)
+    },
+    onError: () => toast.error('划入失败，请检查所选资质是否仍在备用库或已存在于主库'),
   })
   const { has } = usePermissions()
 
@@ -355,10 +378,17 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>{library === 'backup' ? '备用资质库' : '资质管理'}</h2>
             <p className='text-muted-foreground'>
-              管理企业资质信息（企业名称、证件、负责人、经办人等）
+              {library === 'backup' ? '上传待审核资料；全称和明确规范简称自动划入主库，其余可人工确认' : '查看和管理已划入主库的资质'}
             </p>
           </div>
           <div className='flex space-x-2'>
+            {library === 'backup' && has('qualification:write') && <Button variant='outline' onClick={async () => {
+              try {
+                const result = await promoteEligibleBackupQualifications({ dry_run: true })
+                if (!result.count) toast.info('没有可自动划入的资质')
+                else setPromotionIds(result.ids)
+              } catch { toast.error('自动划入预览失败') }
+            }}>自动划入合规资质</Button>}
             {library === 'backup' && has('qualification:write') && <Button variant='outline' disabled={!cleanupBefore && cleanupReported === 'all'} onClick={async () => {
               try {
                 const result = await cleanupBackupQualifications(cleanupFilters)
@@ -367,7 +397,7 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
               } catch { toast.error('清理预览失败') }
             }}>按条件归档</Button>}
             {has('qualification:write') && <Button variant='outline' onClick={() => setRulesOpen(true)}>管理签名系列</Button>}
-            {has('qualification:write') && (
+            {library === 'backup' && has('qualification:write') && (
               <Button
                 onClick={() => {
                   setSelected(undefined)
@@ -378,7 +408,7 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
                 新建资质
               </Button>
             )}
-            {has('qualification:import') && (
+            {library === 'backup' && has('qualification:import') && (
               <>
                 <Button
                   variant='outline'
@@ -400,6 +430,9 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
               <Button variant='outline' onClick={() => { setLevelsToSet([]); setLevelsDialogOpen(true) }}>
                 设置级别 ({selectedCount})
               </Button>
+            )}
+            {library === 'backup' && has('qualification:write') && selectedCount > 0 && (
+              <Button variant='outline' onClick={() => setManualPromotionOpen(true)}>人工确认划入 ({selectedCount})</Button>
             )}
             {has('qualification:write') && selectedCount > 0 && (
               <Button
@@ -653,6 +686,28 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
           </AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction disabled={archiveBackup.isPending} onClick={() => archiveBackup.mutate()}>确认归档</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={promotionIds.length > 0} onOpenChange={(open) => { if (!open) setPromotionIds([]) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>确认自动划入主库</AlertDialogTitle>
+            <AlertDialogDescription>已按企业全称或完整规范简称匹配到 {promotionIds.length} 条备用资质。执行时会重新校验；商标和模糊匹配记录不会自动划入。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction disabled={autoPromote.isPending} onClick={() => autoPromote.mutate(promotionIds)}>确认划入</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={manualPromotionOpen} onOpenChange={setManualPromotionOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>人工确认划入主库</AlertDialogTitle>
+            <AlertDialogDescription>请确认已人工核验所选 {selectedCount} 条资质的签名真实性、特定性和唯一性。划入后可用于主库报备。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction disabled={manualPromote.isPending} onClick={() => manualPromote.mutate(selectedIds)}>确认已核验并划入</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

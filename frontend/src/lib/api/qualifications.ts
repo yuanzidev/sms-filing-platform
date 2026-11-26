@@ -226,3 +226,9 @@ export const classifySignatures = async (
 
 export const cleanupBackupQualifications = async (filters: { before?: string; reported?: boolean; dry_run?: boolean; ids?: string[] }): Promise<{ count: number; ids: string[]; dry_run: boolean }> =>
   (await api.post('/api/v1/qualifications/backup-cleanup', filters)).data
+
+export const promoteEligibleBackupQualifications = async (body: { dry_run: boolean; ids?: string[] }): Promise<{ count: number; ids: string[]; dry_run: boolean }> =>
+  (await api.post('/api/v1/qualifications/backup-promote', body)).data
+
+export const promoteBackupQualificationsManually = async (ids: string[]): Promise<{ count: number; ids: string[] }> =>
+  (await api.post('/api/v1/qualifications/backup-promote/manual', { ids })).data

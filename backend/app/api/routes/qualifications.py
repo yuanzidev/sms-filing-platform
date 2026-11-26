@@ -54,6 +54,7 @@ from app.services.excel_image_extractor import (
     upload_import_images,
 )
 from app.services.operation_log import log_operation
+from app.services.qualification_compliance import auto_compliance_reason
 
 router = APIRouter(prefix="/qualifications", tags=["qualifications"])
 
@@ -522,7 +523,9 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...), 
 
             objects.append(
                 QualificationInfo(
-                    library=library,
+                    library=("primary" if library == "backup" and auto_compliance_reason(
+                        cell("sms_signature"), enterprise_name, cell("signature_type")
+                    ) else library),
                     enterprise_name=enterprise_name,
                     cert_type=cell("cert_type"),
                     cert_number=cell("cert_number"),
@@ -568,8 +571,12 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...), 
     # Phase 2: refresh import time for existing matches; skip repeats within this file.
     skipped_rows: list[int] = []
     updated_rows: list[int] = []
+    auto_promoted_count = 0
     if objects:
-        existing_by_key = _load_existing_qualifications(session, library)
+        existing_by_library = {
+            "primary": _load_existing_qualifications(session, "primary"),
+            "backup": _load_existing_qualifications(session, "backup"),
+        }
         seen_keys: set[tuple[str, ...]] = set()
         deduped_objects: list[QualificationInfo] = []
         deduped_row_indices: list[int] = []
@@ -580,7 +587,12 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...), 
                 skipped_rows.append(row_idx)
                 continue
             seen_keys.add(key)
-            existing = existing_by_key.get(key)
+            existing = existing_by_library[obj.library].get(key)
+            if existing is None and library == "backup" and obj.library == "primary":
+                existing = existing_by_library["backup"].get(key)
+                if existing is not None:
+                    existing.library = "primary"
+                    auto_promoted_count += 1
             if existing is not None:
                 existing.created_at = imported_at
                 existing.updated_at = imported_at
@@ -591,6 +603,8 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...), 
             deduped_row_indices.append(row_idx)
         objects = deduped_objects
         data_row_indices = deduped_row_indices
+        if library == "backup":
+            auto_promoted_count += sum(obj.library == "primary" for obj in objects)
 
     # Phase 3: If no valid rows need writing, return collected errors/skips.
     if not objects and not updated_rows and (errors or skipped_rows):
@@ -598,6 +612,7 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...), 
             "total": len({e["row"] for e in errors}) + len(skipped_rows),
             "success_count": 0,
             "updated_count": 0,
+            "auto_promoted_count": 0,
             "error_count": len(errors),
             "errors": errors,
             "skipped_count": len(skipped_rows),
@@ -655,6 +670,8 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...), 
         "total": len(objects) + len(updated_rows) + len(skipped_rows) + len({e["row"] for e in errors}),
         "success_count": len(objects),
         "updated_count": len(updated_rows),
+        "auto_promoted_count": auto_promoted_count,
+        **({"message": f"导入完成：新增 {len(objects)} 条，更新 {len(updated_rows)} 条；自动划入主库 {auto_promoted_count} 条"} if library == "backup" else {}),
         "error_count": len(errors),
         "errors": errors,
         "skipped_count": len(skipped_rows),
@@ -692,6 +709,15 @@ class BackupCleanupRequest(BaseModel):
     reported: bool | None = None
     dry_run: bool = True
     ids: list[uuid.UUID] | None = None
+
+
+class BackupPromotionRequest(BaseModel):
+    dry_run: bool = True
+    ids: list[uuid.UUID] | None = None
+
+
+class BackupManualPromotionRequest(BaseModel):
+    ids: list[uuid.UUID]
 
 
 @router.post("/import/error-report", dependencies=[import_perm])
@@ -937,6 +963,72 @@ def archive_backup_qualifications(session: SessionDep, body: BackupCleanupReques
             session.add(item)
         session.commit()
     return {"count": len(selected), "ids": [str(item.id) for item in selected], "dry_run": body.dry_run}
+
+
+@router.post("/backup-promote", dependencies=[write_perm])
+def promote_backup_qualifications(
+    session: SessionDep, body: BackupPromotionRequest, current_user: CurrentUser, request: Request
+) -> Any:
+    if not body.dry_run and not body.ids:
+        raise HTTPException(status_code=400, detail="请先预览并确认要划入的记录")
+    query = select(QualificationInfo).where(
+        QualificationInfo.library == "backup",
+        QualificationInfo.archived == False,  # noqa: E712
+    )
+    if not body.dry_run:
+        query = query.where(sql_col(QualificationInfo.id).in_(body.ids))
+    primary_keys = set(_load_existing_qualifications(session, "primary"))
+    selected: list[QualificationInfo] = []
+    for item in session.exec(query.order_by(QualificationInfo.created_at.desc())).all():
+        key = _qualification_dedup_key(item)
+        if auto_compliance_reason(item.sms_signature, item.enterprise_name, item.signature_type) and key not in primary_keys:
+            selected.append(item)
+            primary_keys.add(key)
+    if not body.dry_run:
+        for item in selected:
+            item.library = "primary"
+            item.updated_at = utcnow()
+            session.add(item)
+        if selected:
+            log_operation(
+                session=session, user=current_user,
+                user_ip=request.client.host if request.client else "",
+                module="qualifications", action="auto_promote",
+                target=f"{len(selected)} 条备用资质",
+            )
+        session.commit()
+    return {"count": len(selected), "ids": [str(item.id) for item in selected], "dry_run": body.dry_run}
+
+
+@router.post("/backup-promote/manual", dependencies=[write_perm])
+def manually_promote_backup_qualifications(
+    session: SessionDep, body: BackupManualPromotionRequest, current_user: CurrentUser, request: Request
+) -> Any:
+    if not body.ids:
+        raise HTTPException(status_code=400, detail="请选择备用资质")
+    items = session.exec(select(QualificationInfo).where(
+        sql_col(QualificationInfo.id).in_(body.ids),
+        QualificationInfo.library == "backup",
+        QualificationInfo.archived == False,  # noqa: E712
+    )).all()
+    if len(items) != len(set(body.ids)):
+        raise HTTPException(status_code=400, detail="所选资质包含无效记录")
+    primary_keys = set(_load_existing_qualifications(session, "primary"))
+    item_keys = [_qualification_dedup_key(item) for item in items]
+    if any(key in primary_keys for key in item_keys) or len(item_keys) != len(set(item_keys)):
+        raise HTTPException(status_code=409, detail="主库已有相同资质")
+    for item in items:
+        item.library = "primary"
+        item.updated_at = utcnow()
+        session.add(item)
+    log_operation(
+        session=session, user=current_user,
+        user_ip=request.client.host if request.client else "",
+        module="qualifications", action="manual_promote",
+        target=f"{len(items)} 条备用资质",
+    )
+    session.commit()
+    return {"count": len(items), "ids": [str(item.id) for item in items]}
 
 
 @router.patch("/series-rules/{rule_id}", dependencies=[write_perm], response_model=SignatureSeriesRule)
