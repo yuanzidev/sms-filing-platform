@@ -3,6 +3,7 @@
 import io
 import re
 import uuid
+import zipfile
 from datetime import date, datetime
 from typing import Any
 from urllib.parse import quote
@@ -129,6 +130,7 @@ def generate_excel(
     allocated_sub_ports: dict[tuple[uuid.UUID, str], str] | None = None,
     auto_allocate_sub_ports: bool = False,
     export_overrides: dict[str, dict[str, str]] | None = None,
+    template_fill_empty_only: bool = False,
 ) -> io.BytesIO:
     """Generate Excel bytes from qualification+port Cartesian product.
 
@@ -225,7 +227,9 @@ def generate_excel(
 
         for col_idx, field_name in enumerate(col_names, 1):
             override = export_overrides.get(p.carrier, {}) if p else {}
-            value = override.get(field_name) or get_field_value(q, p, field_name, allocated_sub)
+            original = get_field_value(q, p, field_name, allocated_sub)
+            replacement = override.get(field_name)
+            value = original if field_name == "sms_template_content" and template_fill_empty_only and original.strip() else replacement or original
             if field_name in img_col_map:
                 value = ""
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
@@ -266,6 +270,47 @@ def generate_excel(
     output = io.BytesIO(xlsx_bytes)
     output.seek(0)
     return output
+
+
+def generate_export_file(
+    qualifications: list[QualificationInfo],
+    ports: list[PortInfo],
+    export_group: ExportGroup,
+    group_by_field: str | None = None,
+    qual_images: dict[uuid.UUID, dict[str, bytes]] | None = None,
+    port_images: dict[uuid.UUID, dict[str, bytes]] | None = None,
+    allocated_sub_ports: dict[tuple[uuid.UUID, str], str] | None = None,
+    auto_allocate_sub_ports: bool = False,
+    export_overrides: dict[str, dict[str, str]] | None = None,
+    template_fill_empty_only: bool = False,
+) -> tuple[bytes, str]:
+    export_ports = [port for port in ports if not port.sub_port_number] if auto_allocate_sub_ports else ports
+
+    def workbook(port_subset: list[PortInfo]) -> bytes:
+        return generate_excel(
+            qualifications,
+            port_subset,
+            export_group,
+            group_by_field=group_by_field,
+            qual_images=qual_images,
+            port_images=port_images,
+            allocated_sub_ports=allocated_sub_ports,
+            auto_allocate_sub_ports=auto_allocate_sub_ports,
+            export_overrides=export_overrides,
+            template_fill_empty_only=template_fill_empty_only,
+        ).read()
+
+    if len(export_ports) <= 1:
+        return workbook(export_ports), "xlsx"
+
+    archive_bytes = io.BytesIO()
+    with zipfile.ZipFile(archive_bytes, "w", zipfile.ZIP_DEFLATED) as archive:
+        for index, port in enumerate(export_ports, 1):
+            port_label = re.sub(r'[^\w\u4e00-\u9fff-]', '_', port.main_port_number)
+            filename = f"{index:02d}-{port_label}-{port.id}.xlsx"
+            data = workbook([port])
+            archive.writestr(filename, data)
+    return archive_bytes.getvalue(), "zip"
 
 
 def _embed_cell_images(ws, cell_images: dict[str, bytes]) -> list[io.BytesIO]:
@@ -785,7 +830,7 @@ def create_task(
 
     # 6. Generate Excel
     try:
-        excel_bytes = generate_excel(
+        file_data, extension = generate_export_file(
             qualifications=qualifications,
             ports=selected_ports,
             export_group=export_group,
@@ -795,6 +840,7 @@ def create_task(
             allocated_sub_ports=allocated_sub_ports,
             auto_allocate_sub_ports=auto_allocate,
             export_overrides=create.export_overrides,
+            template_fill_empty_only=create.template_fill_empty_only,
         )
     except Exception as e:
         # 任务失败未产出文件：释放本任务已分配的子端口占用，避免永久烧号
@@ -802,16 +848,14 @@ def create_task(
         delete_filing_task(session=session, db_obj=task)
         raise HTTPException(status_code=500, detail=f"生成Excel失败: {e}")
 
-    file_data = excel_bytes.read()
-
     # 6. Upload to storage
-    file_key = f"filing-exports/{task.id}.xlsx"
+    file_key = f"filing-exports/{task.id}.{extension}"
     try:
         storage = get_storage()
         storage.upload(
             key=file_key,
             data=file_data,
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            content_type="application/zip" if extension == "zip" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
     except Exception as e:
         # 任务失败未产出文件：释放本任务已分配的子端口占用，避免永久烧号
@@ -927,11 +971,12 @@ def download_filing_task(*, session: SessionDep, id: uuid.UUID) -> Any:
         raise HTTPException(
             status_code=503, detail={"reason": f"存储服务异常: {e}", "can_retry": True}
         )
+    extension = "zip" if task.file_path.endswith(".zip") else "xlsx"
     return StreamingResponse(
         io.BytesIO(data),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        media_type="application/zip" if extension == "zip" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(task.task_name or 'export')}.xlsx"
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(task.task_name or 'export')}.{extension}"
         },
     )
 
@@ -977,7 +1022,7 @@ def regenerate_filing_task(
     qual_images = _load_qualification_images(session, qualifications)
     port_images = _load_port_images(session, ports)
 
-    output = generate_excel(
+    file_data, extension = generate_export_file(
         qualifications,
         ports,
         export_group,
@@ -987,15 +1032,22 @@ def regenerate_filing_task(
         allocated_sub_ports=allocated_sub_ports,
         auto_allocate_sub_ports=bool(usages),
         export_overrides=task.export_overrides,
+        template_fill_empty_only=task.template_fill_empty_only,
     )
-    file_data = output.read()
     storage = get_storage()
-    file_path = f"filing-exports/{task.id}.xlsx"
+    old_file_path = task.file_path
+    file_path = f"filing-exports/{task.id}.{extension}"
     storage.upload(
         key=file_path,
         data=file_data,
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        content_type="application/zip" if extension == "zip" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+    if old_file_path and old_file_path != file_path:
+        try:
+            storage.delete(old_file_path)
+        except Exception:
+            pass  # 新文件已保存，旧文件清理失败不影响报备任务
 
     task.file_path = file_path
     task.file_size = len(file_data)

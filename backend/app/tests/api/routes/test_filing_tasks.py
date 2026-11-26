@@ -1,5 +1,6 @@
 """Tests for filing-tasks API: explicit port selection."""
 import uuid
+import zipfile
 from collections.abc import Generator
 from io import BytesIO
 
@@ -11,7 +12,7 @@ from sqlmodel import Session, delete
 from app.core.config import settings
 from app.core.db import engine
 from app.core.storage import get_storage
-from app.models import FilingTask
+from app.models import FilingSubPortUsage, FilingTask
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -136,18 +137,55 @@ def test_create_filing_task_with_explicit_port_ids(
     assert {p["sub_port_number"] for p in body["ports"]} == {None, "0001"}
     assert body["download_url"]
 
-    # 下载并校验 Excel 包含两个端口行（资质×端口=2行 + 表头）
+    # 多选端口下载为 ZIP，每个端口文件只包含本端口的数据。
     r2 = client.get(
         f"{settings.API_V1_STR}/filing-tasks/{body['id']}/download",
         headers=superuser_token_headers,
     )
     assert r2.status_code == 200
-    wb = load_workbook(BytesIO(r2.content))
-    ws = wb.active
-    assert ws.cell(row=1, column=1).value == "主端口号"
-    assert ws.cell(row=1, column=2).value == "子端口号"
-    # 资质(1) × 端口(2) = 2 数据行
-    assert ws.max_row == 3
+    assert r2.headers["content-type"] == "application/zip"
+    with zipfile.ZipFile(BytesIO(r2.content)) as archive:
+        assert len(archive.namelist()) == 2
+        sub_ports = set()
+        for filename in archive.namelist():
+            ws = load_workbook(BytesIO(archive.read(filename))).active
+            assert ws.cell(row=1, column=1).value == "主端口号"
+            assert ws.cell(row=1, column=2).value == "子端口号"
+            assert ws.max_row == 2
+            sub_ports.add(ws.cell(row=2, column=2).value)
+        assert sub_ports == {None, "0001"}
+
+
+def test_auto_allocation_exports_only_main_port_row(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex[:8]
+    qualification_id = _create_qualification(client, superuser_token_headers, f"自动分配-{marker}")
+    main_id = _create_port(client, superuser_token_headers, f"10698{marker}")
+    sub_id = _create_port(client, superuser_token_headers, f"10698{marker}", "0001")
+    group_id = _create_export_group(client, superuser_token_headers, f"自动分配组-{marker}")
+    created = client.post(
+        f"{settings.API_V1_STR}/filing-tasks",
+        headers=superuser_token_headers,
+        json={"qualification_ids": [qualification_id], "port_ids": [main_id, sub_id],
+              "export_group_id": group_id, "auto_allocate_sub_ports": True,
+              "sub_port_range_start": 600001, "sub_port_range_end": 600100},
+    )
+    assert created.status_code == 200, created.text
+    task_id = uuid.UUID(created.json()["id"])
+    try:
+        download = client.get(
+            f"{settings.API_V1_STR}/filing-tasks/{task_id}/download",
+            headers=superuser_token_headers,
+        )
+        assert download.status_code == 200
+        assert download.headers["content-type"].startswith("application/vnd.openxmlformats")
+        sheet = load_workbook(BytesIO(download.content)).active
+        assert sheet.max_row == 2
+    finally:
+        with Session(engine) as session:
+            session.execute(delete(FilingSubPortUsage).where(FilingSubPortUsage.filing_task_id == task_id))
+            session.commit()
 
 
 def test_create_filing_task_rejects_empty_port_ids(

@@ -43,6 +43,7 @@ def create_filing_task(
         export_group_name=export_group_name,
         group_by_field=create.group_by_field,
         export_overrides=create.export_overrides,
+        template_fill_empty_only=create.template_fill_empty_only,
         file_path=None,
         file_size=None,
         qualification_count=len(create.qualification_ids),

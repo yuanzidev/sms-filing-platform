@@ -145,6 +145,7 @@ export function FilingCreatePage() {
   const [groupByField, setGroupByField] = useState<string>('__none__')
   const [taskName, setTaskName] = useState('')
   const [exportOverrides, setExportOverrides] = useState<Record<string, { port_type?: string; usage_category?: string; specific_usage?: string; sms_template_content?: string }>>({})
+  const [templateFillEmptyOnly, setTemplateFillEmptyOnly] = useState(false)
   const [fillOptionsOpen, setFillOptionsOpen] = useState(false)
   const [fillField, setFillField] = useState<FillField>('specific_usage')
   const [fillValue, setFillValue] = useState('')
@@ -489,6 +490,7 @@ export function FilingCreatePage() {
             .filter((carrier) => Object.values(exportOverrides[carrier] ?? {}).some(Boolean))
             .map((carrier) => [carrier, exportOverrides[carrier]])
         ),
+        template_fill_empty_only: templateFillEmptyOnly,
         group_by_field:
           groupByField === '__none__' ? undefined : groupByField || undefined,
         task_name: taskName.trim() || undefined,
@@ -1121,6 +1123,11 @@ export function FilingCreatePage() {
                     </div>
                   )
                 })}
+
+                <label className='flex items-center gap-2 text-sm'>
+                  <Checkbox checked={templateFillEmptyOnly} onCheckedChange={(checked) => setTemplateFillEmptyOnly(checked === true)} />
+                  仅填充资质原值为空处（短信模板内容）
+                </label>
 
                 <div className='space-y-2'>
                   <label className='text-sm font-medium'>

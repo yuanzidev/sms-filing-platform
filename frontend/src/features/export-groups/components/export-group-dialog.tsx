@@ -125,6 +125,15 @@ export function ExportGroupDialog({ open, onOpenChange, group, onSubmit }: Props
     })
   }
 
+  const moveToEdge = (idx: number, edge: 'top' | 'bottom') => {
+    setSelectedFields((prev) => {
+      const next = [...prev]
+      const [field] = next.splice(idx, 1)
+      next.splice(edge === 'top' ? 0 : next.length, 0, field)
+      return next
+    })
+  }
+
   const removeField = (key: string) => {
     setSelectedFields((prev) => prev.filter((k) => k !== key))
   }
@@ -227,6 +236,7 @@ export function ExportGroupDialog({ open, onOpenChange, group, onSubmit }: Props
                         >
                           <span className="text-muted-foreground w-5 text-xs">{idx + 1}.</span>
                           <span className="flex-1 truncate">{registryMap.get(key) || key}</span>
+                          <Button type="button" variant="ghost" size="sm" className="h-6 px-1" disabled={idx === 0} onClick={() => moveToEdge(idx, 'top')} aria-label={`将${registryMap.get(key) || key}置顶`}>置顶</Button>
                           <Button
                             type="button"
                             variant="ghost"
@@ -247,6 +257,7 @@ export function ExportGroupDialog({ open, onOpenChange, group, onSubmit }: Props
                           >
                             <ChevronDown className="h-3.5 w-3.5" />
                           </Button>
+                          <Button type="button" variant="ghost" size="sm" className="h-6 px-1" disabled={idx === selectedFields.length - 1} onClick={() => moveToEdge(idx, 'bottom')} aria-label={`将${registryMap.get(key) || key}置底`}>置底</Button>
                           <Button
                             type="button"
                             variant="ghost"

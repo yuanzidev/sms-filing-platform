@@ -78,9 +78,16 @@ export function SignatureImportDialog({
           setError('请同时选择开始和结束时间')
           return null
         }
+        if (timePrecision === 'second' && importStart && importEnd &&
+          (![importStart, importEnd].every((value) => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)))) {
+          setError('请按 YYYY-MM-DD HH:mm:ss 格式填写开始和结束时间')
+          return null
+        }
         const res = await getQualificationsBySignatures(sigs,
           importStart && importEnd
-            ? { import_start: importStart, import_end: importEnd, import_precision: timePrecision }
+            ? { import_start: timePrecision === 'second' ? importStart.replace(' ', 'T') : importStart,
+                import_end: timePrecision === 'second' ? importEnd.replace(' ', 'T') : importEnd,
+                import_precision: timePrecision }
             : undefined,
           library,
           { business_type: businessType.trim() || undefined, business_attribute: businessAttribute.trim() || undefined }
@@ -211,28 +218,28 @@ export function SignatureImportDialog({
               </select>
               <Input
                 aria-label='开始时间'
-                type={timePrecision === 'month' ? 'month' : timePrecision === 'day' ? 'date' : 'datetime-local'}
-                step={timePrecision === 'second' ? '1' : undefined}
+                type={timePrecision === 'month' ? 'month' : timePrecision === 'day' ? 'date' : 'text'}
+                placeholder={timePrecision === 'second' ? 'YYYY-MM-DD HH:mm:ss' : undefined}
                 value={importStart}
                 onChange={(e) => {
                   setImportStart(e.target.value)
                   setResult(null)
                   setResultKey('')
                 }}
-                className='w-48'
+                className={timePrecision === 'second' ? 'w-56' : 'w-48'}
               />
               <span className='self-center text-sm'>至</span>
               <Input
                 aria-label='结束时间'
-                type={timePrecision === 'month' ? 'month' : timePrecision === 'day' ? 'date' : 'datetime-local'}
-                step={timePrecision === 'second' ? '1' : undefined}
+                type={timePrecision === 'month' ? 'month' : timePrecision === 'day' ? 'date' : 'text'}
+                placeholder={timePrecision === 'second' ? 'YYYY-MM-DD HH:mm:ss' : undefined}
                 value={importEnd}
                 onChange={(e) => {
                   setImportEnd(e.target.value)
                   setResult(null)
                   setResultKey('')
                 }}
-                className='w-48'
+                className={timePrecision === 'second' ? 'w-56' : 'w-48'}
               />
               {(importStart || importEnd) && (
                 <Button

@@ -25,6 +25,7 @@ class FilingTaskBase(SQLModel):
     export_group_name: str | None = Field(default=None, max_length=100)
     group_by_field: str | None = Field(default=None, max_length=64)
     export_overrides: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False, default=dict))
+    template_fill_empty_only: bool = Field(default=False)
     file_path: str | None = Field(default=None, max_length=512)
     file_size: int | None = Field(default=None)
     qualification_count: int
@@ -49,6 +50,7 @@ class FilingTaskCreate(SQLModel):
     export_group_id: uuid.UUID
     group_by_field: str | None = None
     export_overrides: dict[str, dict[str, str]] = Field(default_factory=dict)
+    template_fill_empty_only: bool = False
     # 自动分配子端口号模式
     auto_allocate_sub_ports: bool = False
     sub_port_range_start: int | None = None

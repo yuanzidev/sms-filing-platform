@@ -136,22 +136,69 @@ def test_export_overrides_fill_and_survive_regeneration(
             headers=superuser_token_headers,
         )
         assert download.status_code == 200, download.text
-        ws = load_workbook(BytesIO(download.content)).active
-        headers = [cell.value for cell in ws[1]]
-        assert [ws.cell(row, headers.index("端口类型") + 1).value for row in (2, 3)] == [
-            "营销短信", "5G消息端口",
-        ]
-        assert [ws.cell(row, headers.index("用途类别") + 1).value for row in (2, 3)] == [
-            "业务提醒", "服务通知",
-        ]
-        assert ws.cell(2, headers.index("具体用途") + 1).value == "验证码、通知、订单信息"
-        assert ws.cell(2, headers.index("短信模板内容") + 1).value == "您的订单号***已受理"
+        assert download.headers["content-type"] == "application/zip"
+        with zipfile.ZipFile(BytesIO(download.content)) as archive:
+            assert len(archive.namelist()) == 2
+            sheets = [load_workbook(BytesIO(archive.read(name))).active for name in archive.namelist()]
+            rows = {}
+            for ws in sheets:
+                headers = [cell.value for cell in ws[1]]
+                assert ws.max_row == 2
+                port = ws.cell(2, headers.index("主端口号") + 1).value
+                rows[port] = {header: ws.cell(2, index + 1).value for index, header in enumerate(headers)}
+            assert set(rows) == {"10698分类", "10698电信分类"}
+            assert rows["10698分类"]["端口类型"] == "营销短信"
+            assert rows["10698电信分类"]["端口类型"] == "5G消息端口"
+            assert rows["10698分类"]["用途类别"] == "业务提醒"
+            assert rows["10698电信分类"]["用途类别"] == "服务通知"
+            assert rows["10698分类"]["具体用途"] == "验证码、通知、订单信息"
+            assert rows["10698分类"]["短信模板内容"] == "您的订单号***已受理"
         if _ == 0:
             regenerated = client.post(
                 f"{settings.API_V1_STR}/filing-tasks/{task_id}/regenerate",
                 headers=superuser_token_headers,
             )
             assert regenerated.status_code == 200, regenerated.text
+
+
+def test_template_override_fills_only_empty_original_values(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = uuid.uuid4().hex[:8]
+    ids: list[str] = []
+    for template in ("已审核模板", None, "   "):
+        created = client.post(
+            f"{settings.API_V1_STR}/qualifications",
+            headers=superuser_token_headers,
+            json={"enterprise_name": f"模板企业-{marker}-{len(ids)}", "sms_template_content": template},
+        )
+        assert created.status_code == 200
+        ids.append(created.json()["id"])
+    port_id = _create_port(client, superuser_token_headers, f"1069模板{marker}")
+    group = client.post(
+        f"{settings.API_V1_STR}/export-groups",
+        headers=superuser_token_headers,
+        json={"name": f"模板字段组-{marker}", "fields": [
+            {"field_name": "sms_template_content", "field_label": "短信模板内容", "sort_order": 0},
+        ]},
+    )
+    assert group.status_code == 200
+    task = client.post(
+        f"{settings.API_V1_STR}/filing-tasks",
+        headers=superuser_token_headers,
+        json={"qualification_ids": ids, "port_ids": [port_id],
+              "export_group_id": group.json()["id"],
+              "export_overrides": {"中国移动": {"sms_template_content": "备用模板"}},
+              "template_fill_empty_only": True},
+    )
+    assert task.status_code == 200, task.text
+    download = client.get(
+        f"{settings.API_V1_STR}/filing-tasks/{task.json()['id']}/download",
+        headers=superuser_token_headers,
+    )
+    assert download.status_code == 200
+    ws = load_workbook(BytesIO(download.content)).active
+    assert [ws.cell(row, 1).value for row in (2, 3, 4)] == ["已审核模板", "备用模板", "备用模板"]
 
 
 def test_filing_fill_options_can_be_managed(

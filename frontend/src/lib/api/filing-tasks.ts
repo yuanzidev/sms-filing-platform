@@ -86,7 +86,8 @@ export const downloadFilingTaskFile = async (
     timeout: FILE_DOWNLOAD_TIMEOUT,
   })
   // 从 Content-Disposition 响应头提取 filename
-  let filename = name || 'export.xlsx'
+  const extension = String(response.headers['content-type'] || '').includes('application/zip') ? 'zip' : 'xlsx'
+  let filename = name ? `${name}.${extension}` : `export.${extension}`
   const disposition =
     (response.headers as Record<string, string>)['content-disposition'] || ''
   const match = disposition.match(/filename\*?=(?:UTF-8'')?(.+?)(?:;|$)/i)
