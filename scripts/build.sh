@@ -100,8 +100,13 @@ build_images() {
 # 验证镜像启动（验证完成后自动停止）
 validate_images() {
     print_info "验证镜像启动（验证完成后自动停止）..."
-    print_info "拉取 linux/amd64 基础镜像..."
-    docker pull --platform linux/amd64 postgres:${POSTGRES_TAG:-17}
+    local postgres_image="postgres:${POSTGRES_TAG:-17}"
+    if [ "$(docker image inspect "$postgres_image" --format '{{.Os}}/{{.Architecture}}' 2>/dev/null)" = "linux/amd64" ]; then
+        print_info "复用本地 linux/amd64 基础镜像: $postgres_image"
+    else
+        print_info "拉取 linux/amd64 基础镜像..."
+        docker pull --platform linux/amd64 "$postgres_image"
+    fi
     docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE_LOCAL" down || true
 
     local exit_code=0
