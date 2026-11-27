@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ChevronUp, ChevronDown, X, Search as SearchIcon } from 'lucide-react'
+import { ArrowDownToLine, ArrowUpToLine, ChevronUp, ChevronDown, X, Search as SearchIcon } from 'lucide-react'
 import type { ExportGroup } from '@/lib/api/types'
 import { getExportFieldRegistry, type ExportField } from '@/lib/api/export-fields'
 
@@ -45,6 +45,11 @@ interface Props {
 export function ExportGroupDialog({ open, onOpenChange, group, onSubmit }: Props) {
   const [selectedFields, setSelectedFields] = useState<string[]>([])
   const [fieldSearch, setFieldSearch] = useState('')
+  const stopHoldRef = useRef<() => void>(() => {})
+  const repeatedRef = useRef(false)
+
+  useEffect(() => () => stopHoldRef.current(), [])
+  useEffect(() => { if (!open) stopHoldRef.current() }, [open])
 
   const { data: registry = [], isLoading } = useQuery({
     queryKey: ['export-field-registry'],
@@ -107,22 +112,45 @@ export function ExportGroupDialog({ open, onOpenChange, group, onSubmit }: Props
     })
   }
 
-  const moveUp = (idx: number) => {
-    if (idx <= 0) return
+  const moveField = (key: string, direction: -1 | 1) => {
     setSelectedFields((prev) => {
+      const idx = prev.indexOf(key)
+      const target = idx + direction
+      if (idx < 0 || target < 0 || target >= prev.length) return prev
       const next = [...prev]
-      ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
+      ;[next[idx], next[target]] = [next[target], next[idx]]
       return next
     })
   }
 
-  const moveDown = (idx: number) => {
-    setSelectedFields((prev) => {
-      if (idx >= prev.length - 1) return prev
-      const next = [...prev]
-      ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
-      return next
-    })
+  const startHold = (key: string, direction: -1 | 1) => {
+    stopHoldRef.current()
+    repeatedRef.current = false
+    let interval: number | undefined
+    const timeout = window.setTimeout(() => {
+      repeatedRef.current = true
+      moveField(key, direction)
+      interval = window.setInterval(() => moveField(key, direction), 100)
+    }, 350)
+    const stop = () => {
+      window.clearTimeout(timeout)
+      window.clearInterval(interval)
+      window.removeEventListener('pointerup', stop)
+      window.removeEventListener('pointercancel', stop)
+      window.removeEventListener('blur', stop)
+    }
+    stopHoldRef.current = stop
+    window.addEventListener('pointerup', stop)
+    window.addEventListener('pointercancel', stop)
+    window.addEventListener('blur', stop)
+  }
+
+  const clickMove = (key: string, direction: -1 | 1) => {
+    if (repeatedRef.current) {
+      repeatedRef.current = false
+      return
+    }
+    moveField(key, direction)
   }
 
   const moveToEdge = (idx: number, edge: 'top' | 'bottom') => {
@@ -232,18 +260,22 @@ export function ExportGroupDialog({ open, onOpenChange, group, onSubmit }: Props
                       {selectedFields.map((key, idx) => (
                         <div
                           key={key}
-                          className="flex items-center gap-1 text-sm rounded px-2 py-1.5 hover:bg-muted/50"
+                          className="flex min-w-0 items-center gap-0.5 rounded px-1 py-1.5 text-sm hover:bg-muted/50"
                         >
-                          <span className="text-muted-foreground w-5 text-xs">{idx + 1}.</span>
-                          <span className="flex-1 truncate">{registryMap.get(key) || key}</span>
-                          <Button type="button" variant="ghost" size="sm" className="h-6 px-1" disabled={idx === 0} onClick={() => moveToEdge(idx, 'top')} aria-label={`将${registryMap.get(key) || key}置顶`}>置顶</Button>
+                          <span className="text-muted-foreground w-5 shrink-0 text-xs">{idx + 1}.</span>
+                          <span className="min-w-0 flex-1 truncate" title={registryMap.get(key) || key}>{registryMap.get(key) || key}</span>
+                          <Button type="button" variant="ghost" size="icon" className="h-6 w-6 shrink-0" disabled={idx === 0} onClick={() => moveToEdge(idx, 'top')} aria-label={`将${registryMap.get(key) || key}置顶`} title="置顶"><ArrowUpToLine className="h-3.5 w-3.5" /></Button>
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6"
+                            className="h-6 w-6 shrink-0 touch-none"
                             disabled={idx === 0}
-                            onClick={() => moveUp(idx)}
+                            onPointerDown={(event) => { if (event.button === 0) startHold(key, -1) }}
+                            onKeyDown={() => { repeatedRef.current = false }}
+                            onClick={() => clickMove(key, -1)}
+                            aria-label={`将${registryMap.get(key) || key}上移，长按连续移动`}
+                            title="上移，长按连续移动"
                           >
                             <ChevronUp className="h-3.5 w-3.5" />
                           </Button>
@@ -251,19 +283,24 @@ export function ExportGroupDialog({ open, onOpenChange, group, onSubmit }: Props
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6"
+                            className="h-6 w-6 shrink-0 touch-none"
                             disabled={idx === selectedFields.length - 1}
-                            onClick={() => moveDown(idx)}
+                            onPointerDown={(event) => { if (event.button === 0) startHold(key, 1) }}
+                            onKeyDown={() => { repeatedRef.current = false }}
+                            onClick={() => clickMove(key, 1)}
+                            aria-label={`将${registryMap.get(key) || key}下移，长按连续移动`}
+                            title="下移，长按连续移动"
                           >
                             <ChevronDown className="h-3.5 w-3.5" />
                           </Button>
-                          <Button type="button" variant="ghost" size="sm" className="h-6 px-1" disabled={idx === selectedFields.length - 1} onClick={() => moveToEdge(idx, 'bottom')} aria-label={`将${registryMap.get(key) || key}置底`}>置底</Button>
+                          <Button type="button" variant="ghost" size="icon" className="h-6 w-6 shrink-0" disabled={idx === selectedFields.length - 1} onClick={() => moveToEdge(idx, 'bottom')} aria-label={`将${registryMap.get(key) || key}置底`} title="置底"><ArrowDownToLine className="h-3.5 w-3.5" /></Button>
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
                             onClick={() => removeField(key)}
+                            aria-label={`移除${registryMap.get(key) || key}`}
                           >
                             <X className="h-3.5 w-3.5" />
                           </Button>
