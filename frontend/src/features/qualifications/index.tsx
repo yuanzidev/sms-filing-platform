@@ -88,6 +88,7 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
   const [rulePattern, setRulePattern] = useState('')
   const [ruleSeries, setRuleSeries] = useState('')
   const [batchSignatures, setBatchSignatures] = useState('')
+  const [batchSeries, setBatchSeries] = useState('__rules__')
   const [editingRuleId, setEditingRuleId] = useState<string | undefined>()
   const [detailTarget, setDetailTarget] = useState<
     QualificationInfo | undefined
@@ -147,10 +148,10 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
     onError: () => toast.error('系列规则删除失败'),
   })
   const classifyBatch = useMutation({
-    mutationFn: () => classifySignatures(batchSignatures.split(/\r?\n/).map((value) => value.trim()).filter(Boolean), library),
+    mutationFn: () => classifySignatures(batchSignatures.split(/\r?\n/).map((value) => value.trim()).filter(Boolean), library, batchSeries === '__rules__' ? undefined : batchSeries),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['qualifications'] })
-      toast.success(`已归类 ${result.updated_count} 条资质；未匹配 ${result.unmatched_signatures.length} 个签名`)
+      toast.success(`已归类 ${result.updated_count} 条资质${batchSeries === '__rules__' ? '（按规则）' : `到「${batchSeries}」`}；未找到 ${result.unmatched_signatures.length} 个签名`)
     },
     onError: () => toast.error('批量归类失败'),
   })
@@ -378,7 +379,7 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>{library === 'backup' ? '备用资质库' : '资质管理'}</h2>
             <p className='text-muted-foreground'>
-              {library === 'backup' ? '上传待审核资料；全称和明确规范简称自动划入主库，其余可人工确认' : '查看和管理已划入主库的资质'}
+              {library === 'backup' ? '上传待审核资料；全称和明确规范简称自动划入主库，其余可人工确认' : '查看和管理已划入主库的资质；导入模板末列可填写资质级别'}
             </p>
           </div>
           <div className='flex space-x-2'>
@@ -408,7 +409,7 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
                 新建资质
               </Button>
             )}
-            {library === 'backup' && has('qualification:import') && (
+            {has('qualification:import') && (
               <>
                 <Button
                   variant='outline'
@@ -652,7 +653,14 @@ export function QualificationsPage({ library = 'primary' }: { library?: 'primary
           ))}</div>
           <div className='space-y-2 border-t pt-4'>
             <p className='text-sm font-medium'>批量导入签名并归类</p>
-            <p className='text-muted-foreground text-xs'>匹配当前资质库中已有的签名，按上方关键字规则重新归类。每行一个签名，也可导入 Excel 第一列。</p>
+            <p className='text-muted-foreground text-xs'>匹配当前资质库中已有的签名；指定目标系列会替换原系列，也可按上方匹配词规则归类。每行一个签名，也可导入 Excel 第一列。</p>
+            <Select value={batchSeries} onValueChange={setBatchSeries}>
+              <SelectTrigger aria-label='目标系列'><SelectValue placeholder='选择目标系列' /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value='__rules__'>按匹配词规则自动归类</SelectItem>
+                {[...new Set(seriesRules.map((rule) => rule.series_name))].map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <Textarea rows={4} placeholder='每行一个签名' value={batchSignatures} onChange={(event) => setBatchSignatures(event.target.value)} />
             <Input type='file' accept='.xlsx,.xls' aria-label='导入签名表格' onChange={(event) => readSignatureFile(event.target.files?.[0])} />
             <Button disabled={!batchSignatures.trim() || classifyBatch.isPending} onClick={() => classifyBatch.mutate()}>批量归类</Button>

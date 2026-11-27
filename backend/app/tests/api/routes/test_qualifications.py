@@ -628,6 +628,86 @@ def test_batch_classify_imported_signatures_reports_unmatched(
     assert detail.json()["signature_series_names"] == [f"物流系-{marker}"]
 
 
+def test_batch_classify_uses_selected_series(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    signature = f"指定系列签名{marker}"
+    series_name = f"指定系列{marker}"
+    rule = client.post(
+        f"{settings.API_V1_STR}/qualifications/series-rules",
+        headers=superuser_token_headers,
+        json={"pattern": f"规则{marker}", "series_name": series_name},
+    )
+    assert rule.status_code == 200
+    created = client.post(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        json={"enterprise_name": f"企业{marker}", "sms_signature": signature},
+    )
+    assert created.status_code == 200
+    response = client.post(
+        f"{settings.API_V1_STR}/qualifications/series-rules/classify-signatures",
+        headers=superuser_token_headers,
+        json={"signatures": [signature], "series_name": series_name},
+    )
+    assert response.status_code == 200, response.text
+    detail = client.get(
+        f"{settings.API_V1_STR}/qualifications/{created.json()['id']}",
+        headers=superuser_token_headers,
+    )
+    assert detail.json()["signature_series_names"] == [series_name]
+
+
+def test_import_qualification_levels_and_update_existing(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    marker = _unique_marker()
+    endpoint = f"{settings.API_V1_STR}/qualifications/import"
+    headers = ["企业名称", "短信签名", "资质级别"]
+    name, signature = f"级别企业{marker}", f"级别签名{marker}"
+
+    def upload(level: str) -> dict:
+        response = client.post(
+            endpoint,
+            headers=superuser_token_headers,
+            files={"file": ("levels.xlsx", _build_xlsx(headers, [[name, signature, level]]))},
+        )
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    assert upload("P0、P2")["success_count"] == 1
+    assert upload("P1")["updated_count"] == 1
+    listed = client.get(
+        f"{settings.API_V1_STR}/qualifications",
+        headers=superuser_token_headers,
+        params={"sms_signature": signature, "sms_signature_mode": "exact"},
+    )
+    assert listed.json()["total"] == 1
+    assert listed.json()["data"][0]["qualification_levels"] == ["P1"]
+    assert upload("")["updated_count"] == 1
+    unchanged = client.get(
+        f"{settings.API_V1_STR}/qualifications/{listed.json()['data'][0]['id']}",
+        headers=superuser_token_headers,
+    )
+    assert unchanged.json()["qualification_levels"] == ["P1"]
+
+
+def test_import_rejects_invalid_qualification_level(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    response = client.post(
+        f"{settings.API_V1_STR}/qualifications/import",
+        headers=superuser_token_headers,
+        files={"file": ("levels.xlsx", _build_xlsx(
+            ["企业名称", "资质级别"], [[f"无效级别{_unique_marker()}", "P3"]]
+        ))},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["error_count"] == 1
+    assert response.json()["errors"][0]["field"] == "资质级别"
+
+
 def test_series_accepts_multiple_keywords_in_one_request(
     client: TestClient, superuser_token_headers: dict[str, str]
 ) -> None:
@@ -818,7 +898,9 @@ def test_template_column_order_matches_new_spec(
     assert "经办人身份证反面" not in headers
     assert "引流举证附件" not in headers
     # 总列数
-    assert len([h for h in headers if h]) == 47
+    assert len([h for h in headers if h]) == 48
+    assert headers[-1] == "资质级别"
+    assert ws.cell(row=2, column=48).value == "P0、P2"
 
 
 def test_import_accepts_renamed_link_address_header(

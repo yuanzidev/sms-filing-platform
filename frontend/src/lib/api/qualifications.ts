@@ -220,9 +220,9 @@ export const deleteSignatureSeriesRule = async (id: string): Promise<void> => {
 }
 
 export const classifySignatures = async (
-  signatures: string[], library: 'primary' | 'backup'
+  signatures: string[], library: 'primary' | 'backup', seriesName?: string
 ): Promise<{ updated_count: number; unmatched_signatures: string[] }> =>
-  (await api.post('/api/v1/qualifications/series-rules/classify-signatures', { signatures, library })).data
+  (await api.post('/api/v1/qualifications/series-rules/classify-signatures', { signatures, library, series_name: seriesName })).data
 
 export const cleanupBackupQualifications = async (filters: { before?: string; reported?: boolean; dry_run?: boolean; ids?: string[] }): Promise<{ count: number; ids: string[]; dry_run: boolean }> =>
   (await api.post('/api/v1/qualifications/backup-cleanup', filters)).data

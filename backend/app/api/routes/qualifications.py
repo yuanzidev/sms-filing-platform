@@ -1,6 +1,7 @@
 """Qualification info management routes."""
 
 import io
+import re
 import uuid
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Literal
@@ -101,6 +102,7 @@ _QUALIFICATION_HEADER_TO_FIELD = {
     "引流短链": "diversion_short_link",
     "引流长链": "diversion_long_link",
     "链接类型": "link_type",
+    "资质级别": "qualification_levels",
 }
 
 _QUALIFICATION_HEADERS = [
@@ -151,6 +153,7 @@ _QUALIFICATION_HEADERS = [
     "引流号码举证附件",
     "引流链接举证",
     "APP/平台名称",
+    "资质级别",
 ]
 
 _QUALIFICATION_IMAGE_HEADERS = {
@@ -230,6 +233,7 @@ def download_qualification_template() -> Any:
         "",  # 引流号码举证附件
         "",  # 引流链接举证
         "示例平台",  # APP/平台名称
+        "P0、P2",  # 资质级别
     ]
     for col_idx, val in enumerate(example_data, 1):
         ws.cell(row=2, column=col_idx, value=val)
@@ -247,7 +251,8 @@ def download_qualification_template() -> Any:
         "6. 系统会自动提取每行单元格内嵌的图片，并与对应字段关联",
         "7. 支持的图片格式：PNG、JPEG、GIF、BMP、WEBP，单张不超过 10MB",
         "8. 法人证件类型/号码/地址：选填；运营商报备强依赖时再填",
-        "9. 支持图片的列：单位证件图片、责任人身份证正面/反面、法人身份证正面/反面、签名举证附件、引流号码举证附件、引流链接举证、商标唯一性举证、其他证明图片、经办人现场照片；图片文件建议小于 10MB，支持 PNG、JPEG 格式",
+        "9. 资质级别：选填，可填 P0、P1、P2；多个级别用顿号或逗号分隔。更新已有资质时请保留原行其他字段；填写级别会更新，留空则保留原级别",
+        "10. 支持图片的列：单位证件图片、责任人身份证正面/反面、法人身份证正面/反面、签名举证附件、引流号码举证附件、引流链接举证、商标唯一性举证、其他证明图片、经办人现场照片；图片文件建议小于 10MB，支持 PNG、JPEG 格式",
     ]
     for i, note in enumerate(notes, 2):
         instructions.cell(row=i, column=1, value=note)
@@ -486,6 +491,16 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...), 
             )
 
         # Validate booleans
+        levels_text = cell("qualification_levels")
+        levels = list(dict.fromkeys(re.split(r"[、,，\s]+", levels_text))) if levels_text else []
+        if any(level not in ("P0", "P1", "P2") for level in levels):
+            row_errors.append({
+                "row": row_idx,
+                "field": "资质级别",
+                "value": levels_text,
+                "reason": "资质级别无效",
+                "suggestion": "请填写 P0、P1、P2，多个级别用顿号或逗号分隔",
+            })
         for bool_field, cn_name in [
             ("signature_verified", "是否签名校验"),
             ("is_gateway_signature", "是否网关签名"),
@@ -545,6 +560,7 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...), 
                     handler_address=cell("handler_address"),
                     handler_phone=cell("handler_phone"),
                     sms_signature=cell("sms_signature"),
+                    qualification_levels=levels,
                     signature_type=cell("signature_type"),
                     signature_verified=parse_bool("signature_verified"),
                     is_gateway_signature=parse_bool("is_gateway_signature"),
@@ -594,6 +610,8 @@ def import_qualifications(*, session: SessionDep, file: UploadFile = File(...), 
                     existing.library = "primary"
                     auto_promoted_count += 1
             if existing is not None:
+                if obj.qualification_levels:
+                    existing.qualification_levels = obj.qualification_levels
                 existing.created_at = imported_at
                 existing.updated_at = imported_at
                 session.add(existing)
@@ -697,6 +715,7 @@ class QualificationBatchLevels(BaseModel):
 class SignatureBatchClassify(BaseModel):
     signatures: list[str]
     library: Literal["primary", "backup"] = "primary"
+    series_name: str | None = None
 
 
 class SignatureSeriesRuleBatch(BaseModel):
@@ -860,15 +879,18 @@ def classify_imported_signatures(session: SessionDep, body: SignatureBatchClassi
     signatures = list(dict.fromkeys(value.strip() for value in body.signatures if value.strip()))
     if not signatures:
         raise HTTPException(status_code=400, detail="请导入签名")
+    selected_series = body.series_name.strip() if body.series_name else None
+    series_rules = list(session.exec(select(SignatureSeriesRule)).all())
+    if selected_series and selected_series not in {rule.series_name for rule in series_rules}:
+        raise HTTPException(status_code=400, detail="请选择已有签名系列")
     items = session.exec(select(QualificationInfo).where(
         sql_col(QualificationInfo.sms_signature).in_(signatures),
         QualificationInfo.library == body.library,
         QualificationInfo.archived == False,  # noqa: E712
     )).all()
     matched = set()
-    series_rules = list(session.exec(select(SignatureSeriesRule)).all())
     for item in items:
-        names = matching_series_names(session, item.sms_signature, series_rules)
+        names = [selected_series] if selected_series else matching_series_names(session, item.sms_signature, series_rules)
         item.signature_series_names = names
         item.signature_series = names[0] if names else None
         session.add(item)
